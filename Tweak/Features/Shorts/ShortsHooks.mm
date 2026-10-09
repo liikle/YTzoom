@@ -37,6 +37,8 @@ static void YTKACEShortsControllerLayout(UIViewController *receiver,
                                          SEL selector);
 static void YTKACEPausedLayout(UIView *receiver, SEL selector);
 static void YTKACEInteractiveStickerLayout(UIView *receiver, SEL selector);
+static BOOL YTKACEInteractiveStickerPointInside(
+    UIView *receiver, SEL selector, CGPoint point, UIEvent *event);
 static NSArray<NSArray<NSString *> *> *YTKACEShortsRules(void);
 
 static void YTKACESetShortsHidden(UIView *view, BOOL hidden) {
@@ -399,6 +401,7 @@ static IMP YTKACEShortsOriginal(id receiver, SEL selector,
         if (original != NULL &&
             original != (IMP)YTKACEReelLayout &&
             original != (IMP)YTKACEReelOverlayLayout &&
+            original != (IMP)YTKACEInteractiveStickerPointInside &&
             original != (IMP)YTKACEShortsControllerLayout &&
             original != (IMP)YTKACEPausedLayout &&
             original != (IMP)YTKACEInteractiveStickerLayout) {
@@ -451,7 +454,8 @@ static BOOL YTKACEShortsIsReplacement(IMP implementation) {
         implementation == (IMP)YTKACEReelOverlayLayout ||
         implementation == (IMP)YTKACEShortsControllerLayout ||
         implementation == (IMP)YTKACEPausedLayout ||
-        implementation == (IMP)YTKACEInteractiveStickerLayout;
+implementation == (IMP)YTKACEInteractiveStickerLayout ||
+implementation == (IMP)YTKACEInteractiveStickerPointInside;
 }
 
 static id YTKACEShortsObject(id receiver, NSString *name) {
@@ -902,6 +906,26 @@ static void YTKACEInteractiveStickerLayout(UIView *receiver, SEL selector) {
     }
 }
 
+static BOOL YTKACEInteractiveStickerPointInside(
+    UIView *receiver,
+    SEL selector,
+    CGPoint point,
+    UIEvent *event
+) {
+    if (YTKACEFeatureEnabled(
+        @"YTKACE.Preference.Shorts.StickerAdsHidden")) {
+        return YES;
+    }
+
+    IMP original = YTKACEShortsOriginal(receiver, selector, 0);
+
+    if (original != NULL) {
+        return ((BOOL (*)(id, SEL, CGPoint, UIEvent *))original)(
+            receiver, selector, point, event);
+    }
+
+    return NO;
+}
 
 static void YTKACEInstallShortsLayout(NSString *className, IMP replacement) {
     Class cls = NSClassFromString(className);
@@ -917,6 +941,38 @@ static void YTKACEInstallShortsLayout(NSString *className, IMP replacement) {
         original != NULL && !YTKACEShortsIsReplacement(original)) {
         YTKACEShortsOriginals[key] =
             [NSValue valueWithPointer:(const void *)original];
+        [YTKACEShortsInstalledHooks addObject:key];
+    }
+}
+
+static void YTKACEInstallShortsPointInside(NSString *className) {
+    Class cls = NSClassFromString(className);
+    if (cls == Nil) return;
+
+    SEL selector = @selector(pointInside:withEvent:);
+    NSString *key = YTKACEShortsHookKey(cls, selector);
+
+    if ([YTKACEShortsInstalledHooks containsObject:key]) return;
+
+    Method method = class_getInstanceMethod(cls, selector);
+    if (method == NULL) return;
+
+    IMP current = method_getImplementation(method);
+    if (YTKACEShortsIsReplacement(current)) return;
+
+    IMP original = NULL;
+
+    if (YTKACEInstallInstanceHook(
+            className,
+            NSStringFromSelector(selector),
+            (IMP)YTKACEInteractiveStickerPointInside,
+            &original) &&
+        original != NULL &&
+        !YTKACEShortsIsReplacement(original)) {
+
+        YTKACEShortsOriginals[key] =
+            [NSValue valueWithPointer:(const void *)original];
+
         [YTKACEShortsInstalledHooks addObject:key];
     }
 }
@@ -1044,11 +1100,13 @@ void YTKACEInstallShortsHooks(void) {
         YTKACEInstallShortsLayout(className, (IMP)YTKACEPausedLayout);
     }
     for (NSString *className in @[
-        @"YTReelInteractiveStickerView",
-        @"YTShortsStickersView",
-        @"YTShortsStickersViewSwift"
-    ]) {
-        YTKACEInstallShortsLayout(className,
-                                  (IMP)YTKACEInteractiveStickerLayout);
+    @"YTReelInteractiveStickerView",
+    @"YTShortsStickersView",
+    @"YTShortsStickersViewSwift"
+]) {
+    YTKACEInstallShortsLayout(className,
+        (IMP)YTKACEInteractiveStickerLayout);
+
+    YTKACEInstallShortsPointInside(className);
     }
 }

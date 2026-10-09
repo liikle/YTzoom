@@ -906,25 +906,37 @@ static void YTKACEInteractiveStickerLayout(UIView *receiver, SEL selector) {
     }
 }
 
+
 static BOOL YTKACEInteractiveStickerPointInside(
     UIView *receiver,
     SEL selector,
     CGPoint point,
     UIEvent *event
 ) {
-    if (YTKACEFeatureEnabled(
+    if (!YTKACEFeatureEnabled(
         @"YTKACE.Preference.Shorts.StickerAdsHidden")) {
+        IMP original = YTKACEShortsOriginal(receiver, selector, 0);
+
+        if (original != NULL) {
+            return ((BOOL (*)(id, SEL, CGPoint, UIEvent *))original)(
+                receiver, selector, point, event);
+        }
+
+        return NO;
+    }
+
+    // Expand the hit area by 40 points in each direction.
+    CGRect expandedBounds = CGRectInset(receiver.bounds, -40.0, -40.0);
+
+    if (CGRectContainsPoint(expandedBounds, point)) {
         return YES;
     }
 
     IMP original = YTKACEShortsOriginal(receiver, selector, 0);
 
-    if (original != NULL) {
-        return ((BOOL (*)(id, SEL, CGPoint, UIEvent *))original)(
+    return original != NULL &&
+        ((BOOL (*)(id, SEL, CGPoint, UIEvent *))original)(
             receiver, selector, point, event);
-    }
-
-    return NO;
 }
 
 static void YTKACEInstallShortsLayout(NSString *className, IMP replacement) {

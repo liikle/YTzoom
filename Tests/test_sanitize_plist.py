@@ -55,6 +55,18 @@ class SanitizePlistTests(unittest.TestCase):
                 result = plistlib.load(handle)
         self.assertEqual(result["UIBackgroundModes"], ["fetch", "audio"])
 
+    def test_sets_display_name(self):
+        value = {"CFBundleDisplayName": "YouTube", "CFBundleName": "YouTube"}
+        with tempfile.TemporaryDirectory() as directory:
+            path = pathlib.Path(directory) / "Info.plist"
+            with path.open("wb") as handle:
+                plistlib.dump(value, handle)
+            subprocess.run([sys.executable, str(SCRIPT), str(path)], check=True)
+            with path.open("rb") as handle:
+                result = plistlib.load(handle)
+        self.assertEqual(result["CFBundleDisplayName"], "YTzoom")
+        self.assertEqual(result["CFBundleName"], "YouTube")
+
 
 if __name__ == "__main__":
     unittest.main()

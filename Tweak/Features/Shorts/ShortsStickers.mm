@@ -1,7 +1,9 @@
 #import "../../YTKACE.h"
 #import "../../Runtime/Hooking.h"
+#import "../../Runtime/Localization.h"
 #import "../../Runtime/Preferences.h"
 #import "../Downloads/DownloadLog.h"
+#import "../../UI/Notice.h"
 
 #import <QuartzCore/QuartzCore.h>
 #import <UIKit/UIKit.h>
@@ -31,6 +33,8 @@ static NSString *const YTKACEStickerMaxScaleKey =
 
 static const void *YTKACEStickerAlphaAssociation = &YTKACEStickerAlphaAssociation;
 static NSHashTable<UIView *> *YTKACEStickerViews;
+static NSHashTable<UIView *> *YTKACEStickerToolbelts;
+static const void *YTKACEStickerToggleAssociation = &YTKACEStickerToggleAssociation;
 
 @protocol YTKACEStickerScaleLimit <NSObject>
 - (instancetype)initWithMinScale:(double)minScale maxScale:(double)maxScale;
@@ -60,11 +64,12 @@ static BOOL YTKACEIsInteractiveSticker(UIView *view) {
         ((BOOL (*)(id, SEL))objc_msgSend)(view, selector);
 }
 
-static id YTKACEStickerIvar(UIView *sticker, const char *name) {
-    Ivar ivar = class_getInstanceVariable(object_getClass(sticker), name);
+static id YTKACEStickerIvar(id object, const char *name) {
+    if (object == nil) return nil;
+    Ivar ivar = class_getInstanceVariable(object_getClass(object), name);
     const char *type = ivar != NULL ? ivar_getTypeEncoding(ivar) : NULL;
     if (type == NULL || type[0] != '@') return nil;
-    return object_getIvar(sticker, ivar);
+    return object_getIvar(object, ivar);
 }
 
 // The view YouTube snapshots for the sticker's appearance.
@@ -247,11 +252,136 @@ static void YTKACETextToImageRender(UIView *self, SEL _cmd, void (^completion)(U
     ((void (*)(id, SEL, id))YTKACEOrigTextToImageRender)(self, _cmd, handler);
 }
 
+// Toggle under the Shorts editor's tool rail (YTCreationToolbeltView with the
+// "YTCreationToolbelt.editor" identifier). The rail clips to its bounds, so
+// the button lives in the rail's superview and follows its frame and alpha.
+@interface YTKACEStickerToggleTarget : NSObject
++ (instancetype)sharedTarget;
+- (void)toggleTapped:(UIButton *)sender;
+@end
+
+@implementation YTKACEStickerToggleTarget
++ (instancetype)sharedTarget {
+    static YTKACEStickerToggleTarget *target;
+    static dispatch_once_t onceToken;
+    dispatch_once(&onceToken, ^{ target = [YTKACEStickerToggleTarget new]; });
+    return target;
+}
+- (void)toggleTapped:(__unused UIButton *)sender {
+    BOOL invisible = !YTKACEStickersInvisible();
+    YTKACESetPreference(YTKACEInvisibleStickersKey, invisible);
+    YTKACEShowNotice(YTKACELocalized(invisible ? @"Stickers are invisible" : @"Stickers are visible"));
+}
+@end
+
+static BOOL YTKACEIsShortsEditorToolbelt(UIView *toolbelt) {
+    UIResponder *controller = toolbelt.nextResponder;
+    if (![controller isKindOfClass:UIViewController.class]) return NO;
+    NSString *identifier = YTKACEStickerIvar(controller, "_toolbeltIdentifier");
+    if (![identifier isKindOfClass:NSString.class] ||
+        ![identifier isEqualToString:@"YTCreationToolbelt.editor"]) {
+        return NO;
+    }
+    Class editor = NSClassFromString(@"YTShortsEditorViewController");
+    UIViewController *parent = ((UIViewController *)controller).parentViewController;
+    for (NSInteger depth = 0; parent != nil && depth < 4; depth++) {
+        if (editor != Nil && [parent isKindOfClass:editor]) return YES;
+        parent = parent.parentViewController;
+    }
+    return NO;
+}
+
+static void YTKACEStyleStickerToggle(UIButton *button) {
+    BOOL invisible = YTKACEStickersInvisible();
+    UIImageSymbolConfiguration *configuration =
+        [UIImageSymbolConfiguration configurationWithPointSize:19.0
+                                                        weight:UIImageSymbolWeightSemibold];
+    [button setImage:[UIImage systemImageNamed:invisible ? @"eye.slash" : @"eye"
+                             withConfiguration:configuration]
+            forState:UIControlStateNormal];
+    button.accessibilityLabel = YTKACELocalized(@"Invisible Interactive Stickers");
+    button.accessibilityValue = YTKACELocalized(invisible ? @"On" : @"Off");
+}
+
+static void YTKACESyncStickerToggle(UIView *toolbelt) {
+    UIButton *button = objc_getAssociatedObject(toolbelt, YTKACEStickerToggleAssociation);
+    UIView *host = toolbelt.superview;
+    if (!YTKACEMasterEnabled() || host == nil || !YTKACEIsShortsEditorToolbelt(toolbelt)) {
+        [button removeFromSuperview];
+        return;
+    }
+    if (button == nil) {
+        button = [UIButton buttonWithType:UIButtonTypeSystem];
+        button.tintColor = UIColor.whiteColor;
+        button.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.4];
+        button.clipsToBounds = YES;
+        [button addTarget:[YTKACEStickerToggleTarget sharedTarget]
+                   action:@selector(toggleTapped:)
+         forControlEvents:UIControlEventTouchUpInside];
+        objc_setAssociatedObject(toolbelt, YTKACEStickerToggleAssociation, button,
+                                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        [YTKACEStickerToolbelts addObject:toolbelt];
+    }
+    if (button.superview != host) {
+        [host insertSubview:button aboveSubview:toolbelt];
+    }
+    UIView *pill = YTKACEStickerIvar(toolbelt, "_toolbeltBackgroundView");
+    CGRect anchor = [pill isKindOfClass:UIView.class] && !CGRectIsEmpty(pill.bounds)
+        ? [pill convertRect:pill.bounds toView:host]
+        : [toolbelt convertRect:toolbelt.bounds toView:host];
+    CGFloat side = MIN(48.0, MAX(36.0, CGRectGetWidth(anchor)));
+    button.frame = CGRectMake(round(CGRectGetMidX(anchor) - side / 2.0),
+                              round(CGRectGetMaxY(anchor) + 10.0), side, side);
+    button.layer.cornerRadius = side / 2.0;
+    button.hidden = toolbelt.hidden;
+    button.alpha = toolbelt.alpha;
+    YTKACEStyleStickerToggle(button);
+}
+
+static IMP YTKACEOrigToolbeltLayout;
+static void YTKACEToolbeltLayout(UIView *self, SEL _cmd) {
+    ((void (*)(id, SEL))YTKACEOrigToolbeltLayout)(self, _cmd);
+    YTKACESyncStickerToggle(self);
+}
+
+static IMP YTKACEOrigToolbeltMove;
+static void YTKACEToolbeltMove(UIView *self, SEL _cmd) {
+    ((void (*)(id, SEL))YTKACEOrigToolbeltMove)(self, _cmd);
+    YTKACESyncStickerToggle(self);
+}
+
+static IMP YTKACEOrigToolbeltFrame;
+static void YTKACEToolbeltFrame(UIView *self, SEL _cmd, CGRect frame) {
+    ((void (*)(id, SEL, CGRect))YTKACEOrigToolbeltFrame)(self, _cmd, frame);
+    YTKACESyncStickerToggle(self);
+}
+
+static IMP YTKACEOrigToolbeltCenter;
+static void YTKACEToolbeltCenter(UIView *self, SEL _cmd, CGPoint center) {
+    ((void (*)(id, SEL, CGPoint))YTKACEOrigToolbeltCenter)(self, _cmd, center);
+    YTKACESyncStickerToggle(self);
+}
+
+static IMP YTKACEOrigToolbeltAlpha;
+static void YTKACEToolbeltAlpha(UIView *self, SEL _cmd, CGFloat alpha) {
+    ((void (*)(id, SEL, CGFloat))YTKACEOrigToolbeltAlpha)(self, _cmd, alpha);
+    YTKACESyncStickerToggle(self);
+}
+
+static IMP YTKACEOrigToolbeltHidden;
+static void YTKACEToolbeltHidden(UIView *self, SEL _cmd, BOOL hidden) {
+    ((void (*)(id, SEL, BOOL))YTKACEOrigToolbeltHidden)(self, _cmd, hidden);
+    YTKACESyncStickerToggle(self);
+}
+
 static void YTKACEStickerPreferencesChanged(NSNotification *notification) {
     NSString *key = notification.userInfo[@"key"];
     if (![key isEqualToString:YTKACEInvisibleStickersKey] &&
         ![key isEqualToString:YTKACEMasterEnabledKey]) {
         return;
+    }
+    for (UIView *toolbelt in YTKACEStickerToolbelts.allObjects) {
+        YTKACESyncStickerToggle(toolbelt);
     }
     SEL regenerate = NSSelectorFromString(@"forceSnapshotRegeneration");
     for (UIView *sticker in YTKACEStickerViews.allObjects) {
@@ -277,6 +407,7 @@ static void YTKACEInstallStickerViewHooks(NSString *className,
 void YTKACEInstallShortsStickerHooks(void) {
     if (YTKACEStickerViews != nil) return;
     YTKACEStickerViews = [NSHashTable weakObjectsHashTable];
+    YTKACEStickerToolbelts = [NSHashTable weakObjectsHashTable];
 
     YTKACEInstallStickerViewHooks(@"YTCreationBaseInteractiveStickerView",
         (IMP)YTKACESkipBurnInBase, &YTKACEOrigSkipBurnInBase,
@@ -295,6 +426,20 @@ void YTKACEInstallShortsStickerHooks(void) {
                               (IMP)YTKACERenderImage, &YTKACEOrigRenderImage);
     YTKACEInstallInstanceHook(@"YTCreationTextToImageStickerView", @"renderStickerImage:",
                               (IMP)YTKACETextToImageRender, &YTKACEOrigTextToImageRender);
+
+    NSString *toolbelt = @"YTCreationToolbeltView";
+    YTKACEInstallInstanceHook(toolbelt, @"layoutSubviews",
+                              (IMP)YTKACEToolbeltLayout, &YTKACEOrigToolbeltLayout);
+    YTKACEInstallInstanceHook(toolbelt, @"didMoveToSuperview",
+                              (IMP)YTKACEToolbeltMove, &YTKACEOrigToolbeltMove);
+    YTKACEInstallInstanceHook(toolbelt, @"setFrame:",
+                              (IMP)YTKACEToolbeltFrame, &YTKACEOrigToolbeltFrame);
+    YTKACEInstallInstanceHook(toolbelt, @"setCenter:",
+                              (IMP)YTKACEToolbeltCenter, &YTKACEOrigToolbeltCenter);
+    YTKACEInstallInstanceHook(toolbelt, @"setAlpha:",
+                              (IMP)YTKACEToolbeltAlpha, &YTKACEOrigToolbeltAlpha);
+    YTKACEInstallInstanceHook(toolbelt, @"setHidden:",
+                              (IMP)YTKACEToolbeltHidden, &YTKACEOrigToolbeltHidden);
 
     [NSNotificationCenter.defaultCenter
         addObserverForName:YTKACEPreferencesDidChangeNotification

@@ -1676,7 +1676,7 @@ static NSDictionary *YTKACEShortsOptionsDefinition(void) {
         @[
             YTKACEToggleDetail(@"Remove Pause Suggestions", @"Hide the videos shown when you pause a Short.",
                                @"YTKACE.Preference.Shorts.PauseCardHidden"),
-            YTKACEToggle(@"Remove Sticker Ads", @"YTKACE.Preference.Shorts.StickerAdsHidden", @"", @""),
+            YTKACEToggle(@"Invisible Stickers", @"YTKACE.Preference.Shorts.StickerAdsHidden", @"", @""),
             YTKACEToggleDetail(@"Remove Suggestion Pill",
                                @"Hide the suggestion pill above a Short's title.",
                                @"YTKACE.Preference.Shorts.SuggestionPillHidden"),

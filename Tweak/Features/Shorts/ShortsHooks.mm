@@ -1111,12 +1111,15 @@ void YTKACEInstallShortsHooks(void) {
     ]) {
         YTKACEInstallShortsLayout(className, (IMP)YTKACEPausedLayout);
     }
-    for (NSString *className in @[
+    
+for (NSString *className in @[
     @"YTReelInteractiveStickerView",
     @"YTShortsStickersView",
     @"YTShortsStickersViewSwift"
 ]) {
     YTKACEInstallShortsLayout(className,
         (IMP)YTKACEInteractiveStickerLayout);
+
+    YTKACEInstallShortsPointInside(className);
     }
 }

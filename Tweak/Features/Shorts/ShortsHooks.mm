@@ -966,6 +966,9 @@ static void YTKACEInstallShortsPointInside(NSString *className) {
 
     if ([YTKACEShortsInstalledHooks containsObject:key]) return;
 
+    // Only hook classes that implement this method directly.
+    if (YTKACEShortsDirectMethod(cls, selector) == NULL) return;
+
     Method method = class_getInstanceMethod(cls, selector);
     if (method == NULL) return;
 

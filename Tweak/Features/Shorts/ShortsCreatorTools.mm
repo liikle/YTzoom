@@ -13,9 +13,11 @@
 // Shorts editor creator tools (verified against YouTube 21.33.6 and 21.40.5):
 // - Text and image sticker caps live in -[YTCreationStickerOverlayViewController
 //   canAddMoreTextStickers] / canAddMoreImageStickers.
-// - Text sticker fonts come from +[TOKStyle fontNameForTextStyle:]. Text
-//   stickers are rendered by UIKit into the images that get burned into the
-//   export, so a font registered with the process ends up in the video.
+// - Text sticker fonts come from +[TOKStyle attributesForTextStyle:...], which
+//   asks +[UIFont fontForTextStyle:ofSize:] (YouTube's bundled fonts) first and
+//   only falls back to +[TOKStyle fontNameForTextStyle:] when that returns nil.
+//   Text stickers are rendered by UIKit into the images that get burned into
+//   the export, so a font registered with the process ends up in the video.
 // - A poll sticker builds one option row per entry in its server config
 //   (stickerDisplayData.optionsArray) and takes its text limits from the same
 //   config. +[YTEditPollStickerViewModel defaultViewModelWithInteractiveStickerRenderer:]
@@ -149,6 +151,15 @@ static IMP YTKACEOrigFontName;
 static id YTKACEFontName(id self, SEL _cmd, long long style) {
     if (YTKACEMasterEnabled() && YTKACEActiveStickerFont != nil) return YTKACEActiveStickerFont;
     return ((id (*)(id, SEL, long long))YTKACEOrigFontName)(self, _cmd, style);
+}
+
+static IMP YTKACEOrigStyleFont;
+static UIFont *YTKACEStyleFont(id self, SEL _cmd, long long style, double size) {
+    if (YTKACEMasterEnabled() && YTKACEActiveStickerFont != nil) {
+        UIFont *font = [UIFont fontWithName:YTKACEActiveStickerFont size:size];
+        if (font != nil) return font;
+    }
+    return ((UIFont *(*)(id, SEL, long long, double))YTKACEOrigStyleFont)(self, _cmd, style, size);
 }
 
 @interface YTKACEStickerFontPicker : NSObject <UIDocumentPickerDelegate>
@@ -299,6 +310,8 @@ void YTKACEInstallShortsCreatorHooks(void) {
                                   @"canAddMoreImageStickers",
                                   (IMP)YTKACECanAddImage, &YTKACEOrigCanAddImage);
         YTKACELoadStoredStickerFont();
+        YTKACEInstallClassHook(@"UIFont", @"fontForTextStyle:ofSize:",
+                               (IMP)YTKACEStyleFont, &YTKACEOrigStyleFont);
         YTKACEInstallClassHook(@"TOKStyle", @"fontNameForTextStyle:",
                                (IMP)YTKACEFontName, &YTKACEOrigFontName);
         YTKACEInstallClassHook(@"YTEditPollStickerViewModel",

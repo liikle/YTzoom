@@ -857,6 +857,7 @@ static void YTKACEPausedLayout(UIView *receiver, SEL selector) {
     YTKACESetShortsHidden(receiver, hidden);
 }
 
+
 static void YTKACEInteractiveStickerLayout(UIView *receiver, SEL selector) {
     YTKACEInvokeShortsOriginal(receiver, selector);
 
@@ -870,10 +871,10 @@ static void YTKACEInteractiveStickerLayout(UIView *receiver, SEL selector) {
         ([token containsString:@"product"] ||
          [token containsString:@"shopping"]);
 
-    // Keep the existing product-hiding behavior.
+    // Preserve the existing product-hiding behavior.
     YTKACESetShortsHidden(receiver, product);
 
-    // Reuse the existing setting for invisible stickers.
+    // Make stickers invisible without disabling their interaction.
     static const void *opacityKey = &opacityKey;
     BOOL invisible = YTKACEFeatureEnabled(
         @"YTKACE.Preference.Shorts.StickerAdsHidden");
@@ -883,17 +884,24 @@ static void YTKACEInteractiveStickerLayout(UIView *receiver, SEL selector) {
 
     if (invisible) {
         if (savedOpacity == nil) {
-            objc_setAssociatedObject(receiver, opacityKey,
+            objc_setAssociatedObject(
+                receiver,
+                opacityKey,
                 @(receiver.layer.opacity),
                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
+
         receiver.layer.opacity = 0.0f;
     } else if (savedOpacity != nil) {
         receiver.layer.opacity = savedOpacity.floatValue;
-        objc_setAssociatedObject(receiver, opacityKey, nil,
+        objc_setAssociatedObject(
+            receiver,
+            opacityKey,
+            nil,
             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
+
 
 static void YTKACEInstallShortsLayout(NSString *className, IMP replacement) {
     Class cls = NSClassFromString(className);

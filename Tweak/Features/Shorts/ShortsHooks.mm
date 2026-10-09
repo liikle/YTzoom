@@ -1106,7 +1106,5 @@ void YTKACEInstallShortsHooks(void) {
 ]) {
     YTKACEInstallShortsLayout(className,
         (IMP)YTKACEInteractiveStickerLayout);
-
-    YTKACEInstallShortsPointInside(className);
     }
 }

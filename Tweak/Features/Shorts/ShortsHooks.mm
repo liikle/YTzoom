@@ -37,8 +37,6 @@ static void YTKACEShortsControllerLayout(UIViewController *receiver,
                                          SEL selector);
 static void YTKACEPausedLayout(UIView *receiver, SEL selector);
 static void YTKACEInteractiveStickerLayout(UIView *receiver, SEL selector);
-static BOOL YTKACEInteractiveStickerPointInside(
-    UIView *receiver, SEL selector, CGPoint point, UIEvent *event);
 static NSArray<NSArray<NSString *> *> *YTKACEShortsRules(void);
 
 static void YTKACESetShortsHidden(UIView *view, BOOL hidden) {
@@ -401,7 +399,6 @@ static IMP YTKACEShortsOriginal(id receiver, SEL selector,
         if (original != NULL &&
             original != (IMP)YTKACEReelLayout &&
             original != (IMP)YTKACEReelOverlayLayout &&
-            original != (IMP)YTKACEInteractiveStickerPointInside &&
             original != (IMP)YTKACEShortsControllerLayout &&
             original != (IMP)YTKACEPausedLayout &&
             original != (IMP)YTKACEInteractiveStickerLayout) {
@@ -454,8 +451,7 @@ static BOOL YTKACEShortsIsReplacement(IMP implementation) {
         implementation == (IMP)YTKACEReelOverlayLayout ||
         implementation == (IMP)YTKACEShortsControllerLayout ||
         implementation == (IMP)YTKACEPausedLayout ||
-implementation == (IMP)YTKACEInteractiveStickerLayout ||
-implementation == (IMP)YTKACEInteractiveStickerPointInside;
+        implementation == (IMP)YTKACEInteractiveStickerLayout;
 }
 
 static id YTKACEShortsObject(id receiver, NSString *name) {
@@ -861,82 +857,23 @@ static void YTKACEPausedLayout(UIView *receiver, SEL selector) {
     YTKACESetShortsHidden(receiver, hidden);
 }
 
-
 static void YTKACEInteractiveStickerLayout(UIView *receiver, SEL selector) {
     YTKACEInvokeShortsOriginal(receiver, selector);
-
     NSString *token = [NSString stringWithFormat:@"%@ %@ %@",
         NSStringFromClass(receiver.class).lowercaseString,
         receiver.accessibilityIdentifier.lowercaseString ?: @"",
         receiver.description.lowercaseString ?: @""];
-
-    BOOL product = YTKACEFeatureEnabled(
-        @"YTKACE.Preference.Overlay.ProductsHidden") &&
+    BOOL product = YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ProductsHidden") &&
         ([token containsString:@"product"] ||
          [token containsString:@"shopping"]);
-
-    // Preserve the existing product-hiding behavior.
-    YTKACESetShortsHidden(receiver, product);
-
-    // Make stickers invisible without disabling their interaction.
-    static const void *opacityKey = &opacityKey;
-    BOOL invisible = YTKACEFeatureEnabled(
-        @"YTKACE.Preference.Shorts.StickerAdsHidden");
-
-    NSNumber *savedOpacity =
-        objc_getAssociatedObject(receiver, opacityKey);
-
-    if (invisible) {
-        if (savedOpacity == nil) {
-            objc_setAssociatedObject(
-                receiver,
-                opacityKey,
-                @(receiver.layer.opacity),
-                OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        }
-
-        receiver.layer.opacity = 0.0f;
-    } else if (savedOpacity != nil) {
-        receiver.layer.opacity = savedOpacity.floatValue;
-        objc_setAssociatedObject(
-            receiver,
-            opacityKey,
-            nil,
-            OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    }
-}
-
-
-static BOOL YTKACEInteractiveStickerPointInside(
-    UIView *receiver,
-    SEL selector,
-    CGPoint point,
-    UIEvent *event
-) {
-    if (!YTKACEFeatureEnabled(
-        @"YTKACE.Preference.Shorts.StickerAdsHidden")) {
-        IMP original = YTKACEShortsOriginal(receiver, selector, 0);
-
-        if (original != NULL) {
-            return ((BOOL (*)(id, SEL, CGPoint, UIEvent *))original)(
-                receiver, selector, point, event);
-        }
-
-        return NO;
-    }
-
-    // Expand the hit area by 40 points in each direction.
-    CGRect expandedBounds = CGRectInset(receiver.bounds, -40.0, -40.0);
-
-    if (CGRectContainsPoint(expandedBounds, point)) {
-        return YES;
-    }
-
-    IMP original = YTKACEShortsOriginal(receiver, selector, 0);
-
-    return original != NULL &&
-        ((BOOL (*)(id, SEL, CGPoint, UIEvent *))original)(
-            receiver, selector, point, event);
+    BOOL stickerAd = YTKACEFeatureEnabled(@"YTKACE.Preference.Shorts.StickerAdsHidden") &&
+        (([token containsString:@"sticker"] &&
+          ([token containsString:@"sponsor"] ||
+           [token containsString:@"promot"] ||
+           [token containsString:@"brand"] ||
+           [token containsString:@"product"])) ||
+         [token containsString:@"shorts_ads_shopping"]);
+    YTKACESetShortsHidden(receiver, product || stickerAd);
 }
 
 static void YTKACEInstallShortsLayout(NSString *className, IMP replacement) {
@@ -953,41 +890,6 @@ static void YTKACEInstallShortsLayout(NSString *className, IMP replacement) {
         original != NULL && !YTKACEShortsIsReplacement(original)) {
         YTKACEShortsOriginals[key] =
             [NSValue valueWithPointer:(const void *)original];
-        [YTKACEShortsInstalledHooks addObject:key];
-    }
-}
-
-static void YTKACEInstallShortsPointInside(NSString *className) {
-    Class cls = NSClassFromString(className);
-    if (cls == Nil) return;
-
-    SEL selector = @selector(pointInside:withEvent:);
-    NSString *key = YTKACEShortsHookKey(cls, selector);
-
-    if ([YTKACEShortsInstalledHooks containsObject:key]) return;
-
-    // Only hook classes that implement this method directly.
-    if (YTKACEShortsDirectMethod(cls, selector) == NULL) return;
-
-    Method method = class_getInstanceMethod(cls, selector);
-    if (method == NULL) return;
-
-    IMP current = method_getImplementation(method);
-    if (YTKACEShortsIsReplacement(current)) return;
-
-    IMP original = NULL;
-
-    if (YTKACEInstallInstanceHook(
-            className,
-            NSStringFromSelector(selector),
-            (IMP)YTKACEInteractiveStickerPointInside,
-            &original) &&
-        original != NULL &&
-        !YTKACEShortsIsReplacement(original)) {
-
-        YTKACEShortsOriginals[key] =
-            [NSValue valueWithPointer:(const void *)original];
-
         [YTKACEShortsInstalledHooks addObject:key];
     }
 }
@@ -1114,15 +1016,12 @@ void YTKACEInstallShortsHooks(void) {
     ]) {
         YTKACEInstallShortsLayout(className, (IMP)YTKACEPausedLayout);
     }
-    
-for (NSString *className in @[
-    @"YTReelInteractiveStickerView",
-    @"YTShortsStickersView",
-    @"YTShortsStickersViewSwift"
-]) {
-    YTKACEInstallShortsLayout(className,
-        (IMP)YTKACEInteractiveStickerLayout);
-
-    YTKACEInstallShortsPointInside(className);
+    for (NSString *className in @[
+        @"YTReelInteractiveStickerView",
+        @"YTShortsStickersView",
+        @"YTShortsStickersViewSwift"
+    ]) {
+        YTKACEInstallShortsLayout(className,
+                                  (IMP)YTKACEInteractiveStickerLayout);
     }
 }

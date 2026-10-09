@@ -61,6 +61,7 @@ void YTKACEInstallShortsLimitHooks(void);
 void YTKACEInstallShortsStartupHooks(void);
 void YTKACEInstallShortsPinchHooks(void);
 void YTKACEInstallShortsPiPHooks(void);
+void YTKACEInstallShortsStickerHooks(void);
 void YTKACESetShortsOverlayFullscreen(UIView *overlay, BOOL fullscreen);
 void YTKACESetShortsElementsFullscreen(UIView *container, BOOL fullscreen);
 UIView *YTKACEShortsContainerForView(UIView *view, UIView *fallbackRoot);

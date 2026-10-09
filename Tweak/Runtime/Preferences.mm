@@ -69,6 +69,8 @@ void YTKACERegisterDefaults(void) {
         @"YTKACE.Preference.Downloads.Subtitles": @NO,
         @"YTKACE.Preference.Playback.CaptionLanguage": @"",
         @"YTKACE.Preference.Shorts.PinchFullscreen": @NO,
+        @"YTKACE.Preference.Shorts.InvisibleStickers": @NO,
+        @"YTKACE.Preference.Shorts.StickerMaxScale": @0,
         @"YTKACE.Preference.Shorts.RemixHidden": @NO,
         @"YTKACE.Preference.Shorts.ShareHidden": @NO,
         @"YTKACE.Preference.Shorts.SaveHidden": @NO,

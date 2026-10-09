@@ -1676,7 +1676,7 @@ static NSDictionary *YTKACEShortsOptionsDefinition(void) {
         @[
             YTKACEToggleDetail(@"Remove Pause Suggestions", @"Hide the videos shown when you pause a Short.",
                                @"YTKACE.Preference.Shorts.PauseCardHidden"),
-            YTKACEToggle(@"Invisible Stickers", @"YTKACE.Preference.Shorts.StickerAdsHidden", @"", @""),
+            YTKACEToggle(@"Remove Sticker Ads", @"YTKACE.Preference.Shorts.StickerAdsHidden", @"", @""),
             YTKACEToggleDetail(@"Remove Suggestion Pill",
                                @"Hide the suggestion pill above a Short's title.",
                                @"YTKACE.Preference.Shorts.SuggestionPillHidden"),
@@ -1686,8 +1686,19 @@ static NSDictionary *YTKACEShortsOptionsDefinition(void) {
             YTKACEToggle(@"Remove Save", @"YTKACE.Preference.Shorts.SaveHidden", @"", @""),
             YTKACEToggle(@"Remove Remix", @"YTKACE.Preference.Shorts.RemixHidden", @"", @""),
             YTKACEToggle(@"Remove Sound Button", @"YTKACE.Preference.Shorts.SoundHidden", @"", @"")
+        ],
+        @[
+            YTKACEToggleDetail(@"Invisible Interactive Stickers",
+                @"Polls, questions and other interactive stickers you add stay tappable but aren't drawn in the editor or the uploaded Short.",
+                @"YTKACE.Preference.Shorts.InvisibleStickers"),
+            YTKACEPickerDetail(@"Sticker Max Size",
+                @"Pinch interactive stickers past YouTube's 1.5x limit in the Shorts editor.",
+                @"YTKACE.Preference.Shorts.StickerMaxScale",
+                @[@"Original", @"3x", @"5x", @"10x", @"Unlimited"],
+                @[@0, @3, @5, @10, @-1], 0)
         ]
-    ], @[YTKACELocalized(@"PLAYBACK"), YTKACELocalized(@"SCREEN TIME"), YTKACELocalized(@"HIDE FROM SHORTS")]);
+    ], @[YTKACELocalized(@"PLAYBACK"), YTKACELocalized(@"SCREEN TIME"), YTKACELocalized(@"HIDE FROM SHORTS"),
+         YTKACELocalized(@"CREATE")]);
 }
 
 static NSDictionary *YTKACETopBarDefinition(void) {

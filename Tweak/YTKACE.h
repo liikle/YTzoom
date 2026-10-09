@@ -4,6 +4,7 @@
 @class CALayer;
 @class UIImage;
 @class UIColor;
+@class UIViewController;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -62,6 +63,8 @@ void YTKACEInstallShortsStartupHooks(void);
 void YTKACEInstallShortsPinchHooks(void);
 void YTKACEInstallShortsPiPHooks(void);
 void YTKACEInstallShortsStickerHooks(void);
+void YTKACEInstallShortsCreatorHooks(void);
+void YTKACEPresentStickerFontMenu(UIViewController *controller);
 void YTKACESetShortsOverlayFullscreen(UIView *overlay, BOOL fullscreen);
 void YTKACESetShortsElementsFullscreen(UIView *container, BOOL fullscreen);
 UIView *YTKACEShortsContainerForView(UIView *view, UIView *fallbackRoot);

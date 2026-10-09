@@ -1695,7 +1695,23 @@ static NSDictionary *YTKACEShortsOptionsDefinition(void) {
                 @"Pinch interactive stickers past YouTube's 1.5x limit in the Shorts editor.",
                 @"YTKACE.Preference.Shorts.StickerMaxScale",
                 @[@"Original", @"3x", @"5x", @"10x", @"Unlimited"],
-                @[@0, @3, @5, @10, @-1], 0)
+                @[@0, @3, @5, @10, @-1], 0),
+            YTKACEToggleDetail(@"Unlimited Text & Image Stickers",
+                @"Remove YouTube's cap on how many text and image stickers a Short can have.",
+                @"YTKACE.Preference.Shorts.UnlimitedStickers"),
+            YTKACEActionDetail(@"Text Sticker Font",
+                @"Use a .ttf or .otf font from Files for every text sticker style.",
+                ^(UIViewController *controller) {
+                    YTKACEPresentStickerFontMenu(controller);
+                }),
+            YTKACEToggleDetail(@"Longer Polls",
+                @"Allow up to 500 characters in poll questions and 200 in answers.",
+                @"YTKACE.Preference.Shorts.LongerPolls"),
+            YTKACEPickerDetail(@"Poll Answer Options",
+                @"How many answers a new poll sticker can have.",
+                @"YTKACE.Preference.Shorts.PollOptions",
+                @[@"Original", @"6", @"10", @"20"],
+                @[@0, @6, @10, @20], 0)
         ]
     ], @[YTKACELocalized(@"PLAYBACK"), YTKACELocalized(@"SCREEN TIME"), YTKACELocalized(@"HIDE FROM SHORTS"),
          YTKACELocalized(@"CREATE")]);

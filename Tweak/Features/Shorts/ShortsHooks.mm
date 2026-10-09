@@ -859,21 +859,40 @@ static void YTKACEPausedLayout(UIView *receiver, SEL selector) {
 
 static void YTKACEInteractiveStickerLayout(UIView *receiver, SEL selector) {
     YTKACEInvokeShortsOriginal(receiver, selector);
+
     NSString *token = [NSString stringWithFormat:@"%@ %@ %@",
         NSStringFromClass(receiver.class).lowercaseString,
         receiver.accessibilityIdentifier.lowercaseString ?: @"",
         receiver.description.lowercaseString ?: @""];
-    BOOL product = YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ProductsHidden") &&
+
+    BOOL product = YTKACEFeatureEnabled(
+        @"YTKACE.Preference.Overlay.ProductsHidden") &&
         ([token containsString:@"product"] ||
          [token containsString:@"shopping"]);
-    BOOL stickerAd = YTKACEFeatureEnabled(@"YTKACE.Preference.Shorts.StickerAdsHidden") &&
-        (([token containsString:@"sticker"] &&
-          ([token containsString:@"sponsor"] ||
-           [token containsString:@"promot"] ||
-           [token containsString:@"brand"] ||
-           [token containsString:@"product"])) ||
-         [token containsString:@"shorts_ads_shopping"]);
-    YTKACESetShortsHidden(receiver, product || stickerAd);
+
+    // Keep the existing product-hiding behavior.
+    YTKACESetShortsHidden(receiver, product);
+
+    // Reuse the existing setting for invisible stickers.
+    static const void *opacityKey = &opacityKey;
+    BOOL invisible = YTKACEFeatureEnabled(
+        @"YTKACE.Preference.Shorts.StickerAdsHidden");
+
+    NSNumber *savedOpacity =
+        objc_getAssociatedObject(receiver, opacityKey);
+
+    if (invisible) {
+        if (savedOpacity == nil) {
+            objc_setAssociatedObject(receiver, opacityKey,
+                @(receiver.layer.opacity),
+                OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        }
+        receiver.layer.opacity = 0.0f;
+    } else if (savedOpacity != nil) {
+        receiver.layer.opacity = savedOpacity.floatValue;
+        objc_setAssociatedObject(receiver, opacityKey, nil,
+            OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    }
 }
 
 static void YTKACEInstallShortsLayout(NSString *className, IMP replacement) {

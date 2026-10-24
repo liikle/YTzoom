@@ -1,4 +1,4 @@
 #import <UIKit/UIKit.h>
 
-void YTKACEInstallGlobalDownloadMiniPlayer(void);
-CGRect YTKACEMiniPlayerTargetFrame(void);
+void YTzoomInstallGlobalDownloadMiniPlayer(void);
+CGRect YTzoomMiniPlayerTargetFrame(void);

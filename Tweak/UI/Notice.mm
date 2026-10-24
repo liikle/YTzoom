@@ -1,17 +1,17 @@
 #import "Notice.h"
-#import "../YTKACE.h"
+#import "../YTzoom.h"
 #import "../Runtime/Preferences.h"
 
 #import <UIKit/UIKit.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static const void *YTKACENoticeGlassAssociation = &YTKACENoticeGlassAssociation;
+static const void *YTzoomNoticeGlassAssociation = &YTzoomNoticeGlassAssociation;
 
-BOOL YTKACEApplyGlassBackground(UIView *view, BOOL dark) {
-    UIVisualEffectView *glass = objc_getAssociatedObject(view, YTKACENoticeGlassAssociation);
-    BOOL wanted = view != nil && YTKACELiquidGlassAvailable() &&
-        YTKACEFeatureEnabled(@"YTKACE.Preference.Glass.Notices");
+BOOL YTzoomApplyGlassBackground(UIView *view, BOOL dark) {
+    UIVisualEffectView *glass = objc_getAssociatedObject(view, YTzoomNoticeGlassAssociation);
+    BOOL wanted = view != nil && YTzoomLiquidGlassAvailable() &&
+        YTzoomFeatureEnabled(@"YTzoom.Preference.Glass.Notices");
     if (!wanted) {
         [glass removeFromSuperview];
         return NO;
@@ -27,7 +27,7 @@ BOOL YTKACEApplyGlassBackground(UIView *view, BOOL dark) {
         glass.userInteractionEnabled = NO;
         glass.translatesAutoresizingMaskIntoConstraints = NO;
         glass.layer.cornerCurve = kCACornerCurveContinuous;
-        objc_setAssociatedObject(view, YTKACENoticeGlassAssociation, glass, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(view, YTzoomNoticeGlassAssociation, glass, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     if (glass.superview != view) {
         [view insertSubview:glass atIndex:0];
@@ -47,7 +47,7 @@ BOOL YTKACEApplyGlassBackground(UIView *view, BOOL dark) {
     return YES;
 }
 
-BOOL YTKACEShowYouTubeDialog(NSString *title, NSString *message) {
+BOOL YTzoomShowYouTubeDialog(NSString *title, NSString *message) {
     Class alertClass = NSClassFromString(@"YTAlertView");
     SEL infoSelector = NSSelectorFromString(@"infoDialog");
     if (alertClass == Nil || ![alertClass respondsToSelector:infoSelector]) {
@@ -72,7 +72,7 @@ BOOL YTKACEShowYouTubeDialog(NSString *title, NSString *message) {
     }
 }
 
-BOOL YTKACEShowYouTubeConfirmation(NSString *title,
+BOOL YTzoomShowYouTubeConfirmation(NSString *title,
                                     NSString *message,
                                     NSString *actionTitle,
                                     dispatch_block_t action) {
@@ -106,7 +106,7 @@ BOOL YTKACEShowYouTubeConfirmation(NSString *title,
     }
 }
 
-static UIViewController *YTKACENoticeController(void) {
+static UIViewController *YTzoomNoticeController(void) {
     UIWindow *window = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (scene.activationState != UISceneActivationStateForegroundActive ||
@@ -133,12 +133,12 @@ static UIViewController *YTKACENoticeController(void) {
     return controller;
 }
 
-void YTKACEShowNotice(NSString *message) {
+void YTzoomShowNotice(NSString *message) {
     if (message.length == 0) {
         return;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIView *host = YTKACENoticeController().view;
+        UIView *host = YTzoomNoticeController().view;
         if (host.window == nil) return;
         UIView *old = [host viewWithTag:0x594B4E54];
         [old removeFromSuperview];
@@ -156,7 +156,7 @@ void YTKACEShowNotice(NSString *message) {
         label.numberOfLines = 0;
         label.translatesAutoresizingMaskIntoConstraints = NO;
         [banner addSubview:label];
-        YTKACEApplyGlassBackground(banner, YES);
+        YTzoomApplyGlassBackground(banner, YES);
         [host addSubview:banner];
         UILayoutGuide *safe = host.safeAreaLayoutGuide;
         [NSLayoutConstraint activateConstraints:@[

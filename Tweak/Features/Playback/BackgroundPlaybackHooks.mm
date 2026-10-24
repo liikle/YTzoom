@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 
@@ -7,8 +7,8 @@ static IMP OriginalMLPlayableInBackground;
 static IMP OriginalBackgroundEnabled;
 static IMP OriginalPlayableInPiP;
 
-static BOOL YTKACEBackgroundBoolean(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(YTKACEBackgroundPlaybackKey)) {
+static BOOL YTzoomBackgroundBoolean(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(YTzoomBackgroundPlaybackKey)) {
         return YES;
     }
 
@@ -25,34 +25,34 @@ static BOOL YTKACEBackgroundBoolean(id receiver, SEL selector) {
         : ((BOOL (*)(id, SEL))original)(receiver, selector);
 }
 
-static BOOL YTKACEPlayableInPiP(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(YTKACEBackgroundPlaybackKey)) return YES;
+static BOOL YTzoomPlayableInPiP(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(YTzoomBackgroundPlaybackKey)) return YES;
     return OriginalPlayableInPiP != NULL &&
         ((BOOL (*)(id, SEL))OriginalPlayableInPiP)(receiver, selector);
 }
 
-void YTKACEInstallBackgroundPlaybackHooks(void) {
-    YTKACEInstallInstanceHook(@"YTIPlayabilityStatus",
+void YTzoomInstallBackgroundPlaybackHooks(void) {
+    YTzoomInstallInstanceHook(@"YTIPlayabilityStatus",
                               @"isPlayableInPictureInPicture",
-                              (IMP)YTKACEPlayableInPiP,
+                              (IMP)YTzoomPlayableInPiP,
                               &OriginalPlayableInPiP);
-    YTKACEInstallInstanceHook(@"YTIPlayabilityStatus",
+    YTzoomInstallInstanceHook(@"YTIPlayabilityStatus",
                               @"isPlayableInBackground",
-                              (IMP)YTKACEBackgroundBoolean,
+                              (IMP)YTzoomBackgroundBoolean,
                               &OriginalPlayableInBackground);
-    YTKACEInstallInstanceHook(@"MLVideo",
+    YTzoomInstallInstanceHook(@"MLVideo",
                               @"playableInBackground",
-                              (IMP)YTKACEBackgroundBoolean,
+                              (IMP)YTzoomBackgroundBoolean,
                               &OriginalMLPlayableInBackground);
-    if (!YTKACEInstallInstanceHook(
+    if (!YTzoomInstallInstanceHook(
             @"YTIBackgroundOfflineSettingCategoryEntryRenderer",
             @"isBackgroundEnabled",
-            (IMP)YTKACEBackgroundBoolean,
+            (IMP)YTzoomBackgroundBoolean,
             &OriginalBackgroundEnabled)) {
-        YTKACEAddInstanceMethod(
+        YTzoomAddInstanceMethod(
             @"YTIBackgroundOfflineSettingCategoryEntryRenderer",
             @"isBackgroundEnabled",
-            (IMP)YTKACEBackgroundBoolean,
+            (IMP)YTzoomBackgroundBoolean,
             "B@:"
         );
     }

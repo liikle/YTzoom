@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Localization.h"
 #import "../../Runtime/Preferences.h"
@@ -11,112 +11,112 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static NSString *const YTKACEPlaylistDownloadKey =
-    @"YTKACE.Preference.Downloads.PlaylistEnabled";
-static NSInteger const YTKACEPlaylistButtonTag = 0x59544B50;
+static NSString *const YTzoomPlaylistDownloadKey =
+    @"YTzoom.Preference.Downloads.PlaylistEnabled";
+static NSInteger const YTzoomPlaylistButtonTag = 0x59544B50;
 
 static IMP OriginalPlaylistContents;
 static IMP OriginalPlaylistHeaderModel;
 
-static NSMutableDictionary<NSString *, NSMutableArray<NSDictionary *> *> *YTKACEPlaylistItems;
-static NSMutableDictionary<NSString *, NSMutableSet<NSString *> *> *YTKACEPlaylistSeen;
-static NSString *YTKACECurrentPlaylistID;
-static __weak UIViewController *YTKACEPlaylistBrowseController;
-static NSString *YTKACECurrentPlaylistTitle;
+static NSMutableDictionary<NSString *, NSMutableArray<NSDictionary *> *> *YTzoomPlaylistItems;
+static NSMutableDictionary<NSString *, NSMutableSet<NSString *> *> *YTzoomPlaylistSeen;
+static NSString *YTzoomCurrentPlaylistID;
+static __weak UIViewController *YTzoomPlaylistBrowseController;
+static NSString *YTzoomCurrentPlaylistTitle;
 
-static NSArray<NSDictionary *> *YTKACECurrentPlaylistItems(void);
+static NSArray<NSDictionary *> *YTzoomCurrentPlaylistItems(void);
 
-static BOOL YTKACEPlaylistDownloadEnabled(void) {
-    return YTKACEDownloadsEnabled() &&
-        YTKACEFeatureEnabled(YTKACEPlaylistDownloadKey);
+static BOOL YTzoomPlaylistDownloadEnabled(void) {
+    return YTzoomDownloadsEnabled() &&
+        YTzoomFeatureEnabled(YTzoomPlaylistDownloadKey);
 }
 
-static id YTKACEPlaylistValue(id object, NSString *name) {
+static id YTzoomPlaylistValue(id object, NSString *name) {
     if (object == nil) return nil;
     SEL selector = NSSelectorFromString(name);
     if (![object respondsToSelector:selector]) return nil;
     return ((id (*)(id, SEL))objc_msgSend)(object, selector);
 }
 
-static NSString *YTKACEPlaylistText(id value) {
+static NSString *YTzoomPlaylistText(id value) {
     if ([value isKindOfClass:NSString.class]) return value;
     for (NSString *name in @[@"text", @"simpleText", @"string"]) {
-        id nested = YTKACEPlaylistValue(value, name);
+        id nested = YTzoomPlaylistValue(value, name);
         if ([nested isKindOfClass:NSString.class]) return nested;
     }
     return nil;
 }
 
-static id YTKACEPlaylistVideoRenderer(id entry) {
-    id direct = YTKACEPlaylistValue(entry, @"playlistVideoRenderer");
+static id YTzoomPlaylistVideoRenderer(id entry) {
+    id direct = YTzoomPlaylistValue(entry, @"playlistVideoRenderer");
     if (direct != nil) return direct;
-    if (YTKACEPlaylistValue(entry, @"videoId") != nil) return entry;
+    if (YTzoomPlaylistValue(entry, @"videoId") != nil) return entry;
     for (NSString *name in @[@"playlistPanelVideoRenderer", @"videoRenderer",
                              @"compactVideoRenderer", @"gridVideoRenderer"]) {
-        id nested = YTKACEPlaylistValue(entry, name);
+        id nested = YTzoomPlaylistValue(entry, name);
         if (nested != nil) return nested;
     }
     return nil;
 }
 
-static void YTKACERecordPlaylistItem(NSString *playlistID, id renderer) {
-    NSString *videoID = YTKACEPlaylistText(YTKACEPlaylistValue(renderer, @"videoId"));
+static void YTzoomRecordPlaylistItem(NSString *playlistID, id renderer) {
+    NSString *videoID = YTzoomPlaylistText(YTzoomPlaylistValue(renderer, @"videoId"));
     if (videoID.length == 0) return;
-    NSMutableSet<NSString *> *seen = YTKACEPlaylistSeen[playlistID];
+    NSMutableSet<NSString *> *seen = YTzoomPlaylistSeen[playlistID];
     if (seen == nil) {
         seen = [NSMutableSet set];
-        YTKACEPlaylistSeen[playlistID] = seen;
-        YTKACEPlaylistItems[playlistID] = [NSMutableArray array];
+        YTzoomPlaylistSeen[playlistID] = seen;
+        YTzoomPlaylistItems[playlistID] = [NSMutableArray array];
     }
     if ([seen containsObject:videoID]) return;
     [seen addObject:videoID];
-    NSString *title = YTKACEPlaylistText(YTKACEPlaylistValue(renderer, @"title"));
-    NSString *author = YTKACEPlaylistText(
-        YTKACEPlaylistValue(renderer, @"shortBylineText")) ?:
-        YTKACEPlaylistText(YTKACEPlaylistValue(renderer, @"longBylineText"));
-    [YTKACEPlaylistItems[playlistID] addObject:@{
+    NSString *title = YTzoomPlaylistText(YTzoomPlaylistValue(renderer, @"title"));
+    NSString *author = YTzoomPlaylistText(
+        YTzoomPlaylistValue(renderer, @"shortBylineText")) ?:
+        YTzoomPlaylistText(YTzoomPlaylistValue(renderer, @"longBylineText"));
+    [YTzoomPlaylistItems[playlistID] addObject:@{
         @"videoId": videoID,
         @"title": title ?: videoID,
         @"author": author ?: @""
     }];
 }
 
-static NSArray *YTKACEPlaylistContents(id receiver, SEL selector) {
+static NSArray *YTzoomPlaylistContents(id receiver, SEL selector) {
     NSArray *items = OriginalPlaylistContents == NULL ? nil :
         ((id (*)(id, SEL))OriginalPlaylistContents)(receiver, selector);
     if (![items isKindOfClass:NSArray.class] || items.count == 0) return items;
-    NSString *playlistID = YTKACEPlaylistText(
-        YTKACEPlaylistValue(receiver, @"playlistId"));
-    if (playlistID.length == 0) playlistID = YTKACECurrentPlaylistID;
+    NSString *playlistID = YTzoomPlaylistText(
+        YTzoomPlaylistValue(receiver, @"playlistId"));
+    if (playlistID.length == 0) playlistID = YTzoomCurrentPlaylistID;
     if (playlistID.length == 0) return items;
-    NSUInteger before = YTKACEPlaylistItems[playlistID].count;
+    NSUInteger before = YTzoomPlaylistItems[playlistID].count;
     for (id entry in items) {
-        id renderer = YTKACEPlaylistVideoRenderer(entry);
-        if (renderer != nil) YTKACERecordPlaylistItem(playlistID, renderer);
+        id renderer = YTzoomPlaylistVideoRenderer(entry);
+        if (renderer != nil) YTzoomRecordPlaylistItem(playlistID, renderer);
     }
-    NSUInteger after = YTKACEPlaylistItems[playlistID].count;
+    NSUInteger after = YTzoomPlaylistItems[playlistID].count;
     if (after != before) {
-        YTKACECurrentPlaylistID = playlistID;
+        YTzoomCurrentPlaylistID = playlistID;
     }
     return items;
 }
 
-static void YTKACEPlaylistHeaderModel(id receiver, SEL selector, id model) {
+static void YTzoomPlaylistHeaderModel(id receiver, SEL selector, id model) {
     if (OriginalPlaylistHeaderModel != NULL) {
         ((void (*)(id, SEL, id))OriginalPlaylistHeaderModel)(receiver, selector, model);
     }
-    id renderer = YTKACEPlaylistValue(model, @"playlistHeaderRenderer") ?: model;
-    NSString *playlistID = YTKACEPlaylistText(
-        YTKACEPlaylistValue(renderer, @"playlistId"));
+    id renderer = YTzoomPlaylistValue(model, @"playlistHeaderRenderer") ?: model;
+    NSString *playlistID = YTzoomPlaylistText(
+        YTzoomPlaylistValue(renderer, @"playlistId"));
     if (playlistID.length == 0) return;
-    YTKACECurrentPlaylistID = playlistID;
-    YTKACECurrentPlaylistTitle =
-        YTKACEPlaylistText(YTKACEPlaylistValue(renderer, @"title")) ?: @"";
+    YTzoomCurrentPlaylistID = playlistID;
+    YTzoomCurrentPlaylistTitle =
+        YTzoomPlaylistText(YTzoomPlaylistValue(renderer, @"title")) ?: @"";
 }
 
-static NSMutableDictionary<NSString *, UIImage *> *YTKACEPlaylistThumbnails;
+static NSMutableDictionary<NSString *, UIImage *> *YTzoomPlaylistThumbnails;
 
-static UIImage *YTKACEPlaylistPlaceholderImage(void) {
+static UIImage *YTzoomPlaylistPlaceholderImage(void) {
     static UIImage *placeholder;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -130,25 +130,25 @@ static UIImage *YTKACEPlaylistPlaceholderImage(void) {
     return placeholder;
 }
 
-@interface YTKACEPlaylistPickerController : UITableViewController
+@interface YTzoomPlaylistPickerController : UITableViewController
 @property(nonatomic, copy) NSArray<NSDictionary *> *items;
 @property(nonatomic, strong) NSMutableSet<NSString *> *selection;
 @property(nonatomic, copy) void (^onDone)(NSSet<NSString *> *selection);
 @end
 
-@implementation YTKACEPlaylistPickerController
+@implementation YTzoomPlaylistPickerController
 
 - (void)viewDidLoad {
     [super viewDidLoad];
-    self.title = YTKACELocalized(@"Select videos");
+    self.title = YTzoomLocalized(@"Select videos");
     self.tableView.allowsMultipleSelection = YES;
     self.navigationItem.rightBarButtonItem = [[UIBarButtonItem alloc]
-        initWithTitle:YTKACELocalized(@"Done")
+        initWithTitle:YTzoomLocalized(@"Done")
                 style:UIBarButtonItemStyleDone
                target:self
                action:@selector(finish)];
     self.navigationItem.leftBarButtonItem = [[UIBarButtonItem alloc]
-        initWithTitle:YTKACELocalized(@"Select all")
+        initWithTitle:YTzoomLocalized(@"Select all")
                 style:UIBarButtonItemStylePlain
                target:self
                action:@selector(toggleAll)];
@@ -182,10 +182,10 @@ heightForRowAtIndexPath:(NSIndexPath *)indexPath {
 
 - (UITableViewCell *)tableView:(UITableView *)tableView
          cellForRowAtIndexPath:(NSIndexPath *)indexPath {
-    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ytkace"];
+    UITableViewCell *cell = [tableView dequeueReusableCellWithIdentifier:@"ytzoom"];
     if (cell == nil) {
         cell = [[UITableViewCell alloc] initWithStyle:UITableViewCellStyleSubtitle
-                                      reuseIdentifier:@"ytkace"];
+                                      reuseIdentifier:@"ytzoom"];
     }
     NSDictionary *item = self.items[(NSUInteger)indexPath.row];
     cell.textLabel.text = item[@"title"];
@@ -193,11 +193,11 @@ heightForRowAtIndexPath:(NSIndexPath *)indexPath {
     cell.detailTextLabel.text = item[@"author"];
     cell.accessoryType = [self.selection containsObject:item[@"videoId"]]
         ? UITableViewCellAccessoryCheckmark : UITableViewCellAccessoryNone;
-    cell.imageView.image = YTKACEPlaylistPlaceholderImage();
+    cell.imageView.image = YTzoomPlaylistPlaceholderImage();
     NSString *thumbnail = item[@"thumbnail"];
     NSString *videoID = item[@"videoId"];
     if (thumbnail.length != 0) {
-        UIImage *cached = YTKACEPlaylistThumbnails[videoID];
+        UIImage *cached = YTzoomPlaylistThumbnails[videoID];
         if (cached != nil) {
             cell.imageView.image = cached;
         } else {
@@ -209,7 +209,7 @@ heightForRowAtIndexPath:(NSIndexPath *)indexPath {
                 UIImage *image = data != nil ? [UIImage imageWithData:data] : nil;
                 if (image == nil) return;
                 dispatch_async(dispatch_get_main_queue(), ^{
-                    YTKACEPlaylistThumbnails[videoID] = image;
+                    YTzoomPlaylistThumbnails[videoID] = image;
                     [weakTable reloadRowsAtIndexPaths:@[indexPath]
                                      withRowAnimation:UITableViewRowAnimationNone];
                 });
@@ -235,7 +235,7 @@ didSelectRowAtIndexPath:(NSIndexPath *)indexPath {
 
 @end
 
-static UIViewController *YTKACEPlaylistTopController(void) {
+static UIViewController *YTzoomPlaylistTopController(void) {
     UIWindow *window = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class]) continue;
@@ -250,7 +250,7 @@ static UIViewController *YTKACEPlaylistTopController(void) {
     return controller;
 }
 
-static UIViewController *YTKACEOwningController(UIView *view) {
+static UIViewController *YTzoomOwningController(UIView *view) {
     UIResponder *responder = view;
     for (NSUInteger depth = 0; responder != nil && depth < 24; depth++) {
         if ([responder isKindOfClass:UIViewController.class]) {
@@ -261,13 +261,13 @@ static UIViewController *YTKACEOwningController(UIView *view) {
     return nil;
 }
 
-static UIView *YTKACESheetAnchorForView(UIView *source) {
+static UIView *YTzoomSheetAnchorForView(UIView *source) {
     if (source == nil || source.window == nil) return source;
-    UIViewController *owner = YTKACEOwningController(source);
-    UIViewController *browse = YTKACEPlaylistBrowseController;
+    UIViewController *owner = YTzoomOwningController(source);
+    UIViewController *browse = YTzoomPlaylistBrowseController;
     UIView *host = browse.viewIfLoaded ?: owner.viewIfLoaded;
     if (host == nil || host.window == nil) {
-        host = YTKACEPlaylistTopController().viewIfLoaded;
+        host = YTzoomPlaylistTopController().viewIfLoaded;
     }
     if (host == nil) return source;
     if ([source isDescendantOfView:host]) return source;
@@ -276,7 +276,7 @@ static UIView *YTKACESheetAnchorForView(UIView *source) {
         anchor = [[UIView alloc] initWithFrame:CGRectZero];
         anchor.userInteractionEnabled = NO;
         anchor.backgroundColor = UIColor.clearColor;
-        anchor.accessibilityIdentifier = @"YTKACE Sheet Anchor";
+        anchor.accessibilityIdentifier = @"YTzoom Sheet Anchor";
     }
     if (anchor.superview != host) {
         [anchor removeFromSuperview];
@@ -287,12 +287,12 @@ static UIView *YTKACESheetAnchorForView(UIView *source) {
     return anchor;
 }
 
-static void YTKACEWaitForIdleDownloads(NSUInteger attempt,
+static void YTzoomWaitForIdleDownloads(NSUInteger attempt,
                                        dispatch_block_t next) {
-    NSUInteger active = [YTKACEDownloadCoordinator.sharedCoordinator activeJobCount];
+    NSUInteger active = [YTzoomDownloadCoordinator.sharedCoordinator activeJobCount];
     if (active == 0 || attempt > 1200) {
         if (attempt > 1200) {
-            YTKACEDownloadLog(@"playlist", @"idle wait timed out active=%lu",
+            YTzoomDownloadLog(@"playlist", @"idle wait timed out active=%lu",
                 (unsigned long)active);
         }
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
@@ -301,11 +301,11 @@ static void YTKACEWaitForIdleDownloads(NSUInteger attempt,
     }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
         (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-            YTKACEWaitForIdleDownloads(attempt + 1, next);
+            YTzoomWaitForIdleDownloads(attempt + 1, next);
         });
 }
 
-static void YTKACERunPlaylistQueue(NSArray<NSDictionary *> *queue,
+static void YTzoomRunPlaylistQueue(NSArray<NSDictionary *> *queue,
                                    NSUInteger index,
                                    NSInteger quality,
                                    BOOL audioOnly,
@@ -314,50 +314,50 @@ static void YTKACERunPlaylistQueue(NSArray<NSDictionary *> *queue,
                                    NSUInteger started,
                                    NSUInteger failed) {
     if (index >= queue.count) {
-        YTKACEDownloadLog(@"playlist", @"queue finished started=%lu failed=%lu",
+        YTzoomDownloadLog(@"playlist", @"queue finished started=%lu failed=%lu",
             (unsigned long)started, (unsigned long)failed);
         NSString *message = failed == 0
             ? [NSString stringWithFormat:
-                YTKACELocalized(@"Downloaded %lu videos"), (unsigned long)started]
+                YTzoomLocalized(@"Downloaded %lu videos"), (unsigned long)started]
             : [NSString stringWithFormat:
-                YTKACELocalized(@"Downloaded %lu videos, %lu unavailable"),
+                YTzoomLocalized(@"Downloaded %lu videos, %lu unavailable"),
                 (unsigned long)started, (unsigned long)failed];
         if (started == 0 && failed != 0) {
-            YTKACEDiscardRestoredRequest();
-            message = YTKACELocalized(
+            YTzoomDiscardRestoredRequest();
+            message = YTzoomLocalized(
                 @"Play any video once to refresh downloads, then try again.");
         }
         dispatch_async(dispatch_get_main_queue(), ^{
-            YTKACEShowNotice(message);
-            [YTKACEDownloadCoordinator.sharedCoordinator
+            YTzoomShowNotice(message);
+            [YTzoomDownloadCoordinator.sharedCoordinator
                 flushBatchSharingFromView:nil];
         });
         return;
     }
     NSDictionary *item = queue[index];
     NSString *videoID = item[@"videoId"];
-    YTKACEResolvePlayerResponse(videoID, ^(id playerResponse, NSError *error) {
+    YTzoomResolvePlayerResponse(videoID, ^(id playerResponse, NSError *error) {
         BOOL queued = NO;
         if (playerResponse != nil) {
-            queued = [YTKACEDownloadCoordinator.sharedCoordinator
+            queued = [YTzoomDownloadCoordinator.sharedCoordinator
                 enqueueDownloadForResponse:playerResponse
                                    quality:quality
                                  audioOnly:audioOnly
                              savesToPhotos:savesToPhotos
                                 sharesFile:sharesFile];
         }
-        YTKACEDownloadLog(@"playlist", @"item %lu/%lu video=%@ queued=%d error=%@",
+        YTzoomDownloadLog(@"playlist", @"item %lu/%lu video=%@ queued=%d error=%@",
             (unsigned long)(index + 1), (unsigned long)queue.count, videoID,
             queued, error.localizedDescription ?: @"none");
-        YTKACEWaitForIdleDownloads(0, ^{
-            YTKACERunPlaylistQueue(queue, index + 1, quality, audioOnly,
+        YTzoomWaitForIdleDownloads(0, ^{
+            YTzoomRunPlaylistQueue(queue, index + 1, quality, audioOnly,
                 savesToPhotos, sharesFile, started + (queued ? 1 : 0),
                 failed + (queued ? 0 : 1));
         });
     });
 }
 
-static void YTKACEStartPlaylistDownload(NSArray<NSDictionary *> *items,
+static void YTzoomStartPlaylistDownload(NSArray<NSDictionary *> *items,
                                         NSSet<NSString *> *selection,
                                         NSInteger quality,
                                         BOOL audioOnly,
@@ -369,87 +369,87 @@ static void YTKACEStartPlaylistDownload(NSArray<NSDictionary *> *items,
         }
     }
     if (queue.count == 0) {
-        YTKACEShowNotice(YTKACELocalized(@"No videos selected"));
+        YTzoomShowNotice(YTzoomLocalized(@"No videos selected"));
         return;
     }
-    if (!YTKACEPlaybackTemplateReady()) {
-        YTKACEShowNotice(YTKACELocalized(
-            @"Play any video once so YTKACE can prepare downloads, then try again."));
+    if (!YTzoomPlaybackTemplateReady()) {
+        YTzoomShowNotice(YTzoomLocalized(
+            @"Play any video once so YTzoom can prepare downloads, then try again."));
         return;
     }
-    YTKACEDownloadLog(@"playlist", @"start count=%lu quality=%ld audioOnly=%d",
+    YTzoomDownloadLog(@"playlist", @"start count=%lu quality=%ld audioOnly=%d",
         (unsigned long)queue.count, (long)quality, audioOnly);
-    [YTKACEDownloadCoordinator.sharedCoordinator
+    [YTzoomDownloadCoordinator.sharedCoordinator
         resolvePlaylistDestinationFromView:source
                                  audioOnly:audioOnly
                                       then:^(BOOL savesToPhotos,
                                              BOOL sharesFile) {
-            YTKACEShowNotice([NSString stringWithFormat:
-                YTKACELocalized(@"Preparing %lu videos"),
+            YTzoomShowNotice([NSString stringWithFormat:
+                YTzoomLocalized(@"Preparing %lu videos"),
                 (unsigned long)queue.count]);
             if (sharesFile) {
-                [YTKACEDownloadCoordinator.sharedCoordinator beginBatchSharing];
+                [YTzoomDownloadCoordinator.sharedCoordinator beginBatchSharing];
             }
-            YTKACEWaitForIdleDownloads(0, ^{
-                YTKACERunPlaylistQueue(queue, 0, quality, audioOnly,
+            YTzoomWaitForIdleDownloads(0, ^{
+                YTzoomRunPlaylistQueue(queue, 0, quality, audioOnly,
                                        savesToPhotos, sharesFile, 0, 0);
             });
         }];
 }
 
-static void YTKACEPresentCustomQualityMenu(UIView *source,
+static void YTzoomPresentCustomQualityMenu(UIView *source,
                                            NSArray<NSDictionary *> *items,
                                            NSSet<NSString *> *selection) {
-    YTKACEDownloadCoordinator *coordinator =
-        YTKACEDownloadCoordinator.sharedCoordinator;
+    YTzoomDownloadCoordinator *coordinator =
+        YTzoomDownloadCoordinator.sharedCoordinator;
     NSArray<NSArray *> *heights = @[
-        @[YTKACELocalized(@"Up to 1080p"), @1080],
-        @[YTKACELocalized(@"Up to 720p"), @720],
-        @[YTKACELocalized(@"Up to 480p"), @480],
-        @[YTKACELocalized(@"Up to 360p"), @360]
+        @[YTzoomLocalized(@"Up to 1080p"), @1080],
+        @[YTzoomLocalized(@"Up to 720p"), @720],
+        @[YTzoomLocalized(@"Up to 480p"), @480],
+        @[YTzoomLocalized(@"Up to 360p"), @360]
     ];
     NSMutableArray *actions = [NSMutableArray array];
     for (NSArray *choice in heights) {
         NSInteger cap = [choice[1] integerValue];
         [actions addObject:[coordinator nativeSheetAction:choice[0]
             icon:@"play" handler:^{
-                YTKACEStartPlaylistDownload(items, selection, cap, NO, source);
+                YTzoomStartPlaylistDownload(items, selection, cap, NO, source);
             }]];
     }
-    [coordinator presentPlaylistSheetWithTitle:YTKACELocalized(@"Maximum quality")
+    [coordinator presentPlaylistSheetWithTitle:YTzoomLocalized(@"Maximum quality")
                                       subtitle:nil
-                                    sourceView:YTKACESheetAnchorForView(source)
+                                    sourceView:YTzoomSheetAnchorForView(source)
                                        actions:actions];
 }
 
-static void YTKACEPresentQualityMenu(UIView *source,
+static void YTzoomPresentQualityMenu(UIView *source,
                                      NSArray<NSDictionary *> *items,
                                      NSSet<NSString *> *selection) {
-    YTKACEDownloadCoordinator *coordinator =
-        YTKACEDownloadCoordinator.sharedCoordinator;
+    YTzoomDownloadCoordinator *coordinator =
+        YTzoomDownloadCoordinator.sharedCoordinator;
     NSMutableArray *actions = [NSMutableArray array];
     [actions addObject:[coordinator nativeSheetAction:
-        YTKACELocalized(@"Best available") icon:@"play" handler:^{
-            YTKACEStartPlaylistDownload(items, selection, 0, NO, source);
+        YTzoomLocalized(@"Best available") icon:@"play" handler:^{
+            YTzoomStartPlaylistDownload(items, selection, 0, NO, source);
         }]];
     [actions addObject:[coordinator nativeSheetAction:
-        YTKACELocalized(@"Custom quality") icon:@"chevron.right" handler:^{
+        YTzoomLocalized(@"Custom quality") icon:@"chevron.right" handler:^{
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                 (int64_t)(0.12 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                    YTKACEPresentCustomQualityMenu(source, items, selection);
+                    YTzoomPresentCustomQualityMenu(source, items, selection);
                 });
         }]];
     [actions addObject:[coordinator nativeSheetAction:
-        YTKACELocalized(@"Audio only") icon:@"music.note" handler:^{
-            YTKACEStartPlaylistDownload(items, selection, 0, YES, source);
+        YTzoomLocalized(@"Audio only") icon:@"music.note" handler:^{
+            YTzoomStartPlaylistDownload(items, selection, 0, YES, source);
         }]];
-    [coordinator presentPlaylistSheetWithTitle:YTKACELocalized(@"Download quality")
+    [coordinator presentPlaylistSheetWithTitle:YTzoomLocalized(@"Download quality")
                                       subtitle:nil
-                                    sourceView:YTKACESheetAnchorForView(source)
+                                    sourceView:YTzoomSheetAnchorForView(source)
                                        actions:actions];
 }
 
-static NSString *YTKACEPlaylistRunsText(NSDictionary *text) {
+static NSString *YTzoomPlaylistRunsText(NSDictionary *text) {
     if (![text isKindOfClass:NSDictionary.class]) return nil;
     if ([text[@"simpleText"] isKindOfClass:NSString.class]) return text[@"simpleText"];
     NSMutableString *out = [NSMutableString string];
@@ -459,11 +459,11 @@ static NSString *YTKACEPlaylistRunsText(NSDictionary *text) {
     return out.length != 0 ? out : nil;
 }
 
-static void YTKACECollectPlaylistJSON(id node, NSMutableArray<NSDictionary *> *items, NSMutableSet<NSString *> *seen,
+static void YTzoomCollectPlaylistJSON(id node, NSMutableArray<NSDictionary *> *items, NSMutableSet<NSString *> *seen,
                                       NSString **continuation, NSUInteger depth) {
     if (depth > 40) return;
     if ([node isKindOfClass:NSArray.class]) {
-        for (id child in node) YTKACECollectPlaylistJSON(child, items, seen, continuation, depth + 1);
+        for (id child in node) YTzoomCollectPlaylistJSON(child, items, seen, continuation, depth + 1);
         return;
     }
     if (![node isKindOfClass:NSDictionary.class]) return;
@@ -542,8 +542,8 @@ static void YTKACECollectPlaylistJSON(id node, NSMutableArray<NSDictionary *> *i
             [seen addObject:videoID];
             [items addObject:@{
                 @"videoId": videoID,
-                @"title": YTKACEPlaylistRunsText(video[@"title"]) ?: videoID,
-                @"author": YTKACEPlaylistRunsText(video[@"shortBylineText"]) ?: @"",
+                @"title": YTzoomPlaylistRunsText(video[@"title"]) ?: videoID,
+                @"author": YTzoomPlaylistRunsText(video[@"shortBylineText"]) ?: @"",
                 @"thumbnail": [NSString stringWithFormat:@"https://i.ytimg.com/vi/%@/hqdefault.jpg", videoID]
             }];
         }
@@ -555,32 +555,32 @@ static void YTKACECollectPlaylistJSON(id node, NSMutableArray<NSDictionary *> *i
         if ([token isKindOfClass:NSString.class]) *continuation = token;
         return;
     }
-    for (id child in [(NSDictionary *)node allValues]) YTKACECollectPlaylistJSON(child, items, seen, continuation, depth + 1);
+    for (id child in [(NSDictionary *)node allValues]) YTzoomCollectPlaylistJSON(child, items, seen, continuation, depth + 1);
 }
 
-extern id YTKACELatestPlayerAuthorization;
-static id YTKACERequestAuthorization;
+extern id YTzoomLatestPlayerAuthorization;
+static id YTzoomRequestAuthorization;
 static IMP OriginalAuthorizeCompletion;
 static IMP OriginalAuthorizeCallback;
 
-static void YTKACENoteAuthorization(id receiver, id request) {
+static void YTzoomNoteAuthorization(id receiver, id request) {
     if (![request isKindOfClass:NSURLRequest.class]) return;
     NSString *host = ((NSURLRequest *)request).URL.host;
-    if ([host containsString:@"youtube"]) YTKACERequestAuthorization = receiver;
+    if ([host containsString:@"youtube"]) YTzoomRequestAuthorization = receiver;
 }
 
-static void YTKACEAuthorizeCompletion(id receiver, SEL selector, id request, id handler) {
-    YTKACENoteAuthorization(receiver, request);
+static void YTzoomAuthorizeCompletion(id receiver, SEL selector, id request, id handler) {
+    YTzoomNoteAuthorization(receiver, request);
     ((void (*)(id, SEL, id, id))OriginalAuthorizeCompletion)(receiver, selector, request, handler);
 }
 
-static void YTKACEAuthorizeCallback(id receiver, SEL selector, id request, id callback) {
-    YTKACENoteAuthorization(receiver, request);
+static void YTzoomAuthorizeCallback(id receiver, SEL selector, id request, id callback) {
+    YTzoomNoteAuthorization(receiver, request);
     ((void (*)(id, SEL, id, id))OriginalAuthorizeCallback)(receiver, selector, request, callback);
 }
 
-static NSString *YTKACEPlaylistAuthHeader(void) {
-    id auth = YTKACELatestPlayerAuthorization ?: YTKACERequestAuthorization;
+static NSString *YTzoomPlaylistAuthHeader(void) {
+    id auth = YTzoomLatestPlayerAuthorization ?: YTzoomRequestAuthorization;
     if (auth == nil) return nil;
     for (NSString *selectorName in @[@"accessToken", @"token", @"authToken", @"oauthToken"]) {
         SEL selector = NSSelectorFromString(selectorName);
@@ -603,7 +603,7 @@ static NSString *YTKACEPlaylistAuthHeader(void) {
     return nil;
 }
 
-static NSArray<NSDictionary *> *YTKACEFetchPlaylistPages(NSString *playlistID, NSString *authHeader, NSUInteger *pagesOut) {
+static NSArray<NSDictionary *> *YTzoomFetchPlaylistPages(NSString *playlistID, NSString *authHeader, NSUInteger *pagesOut) {
     NSMutableArray<NSDictionary *> *items = [NSMutableArray array];
     NSMutableSet<NSString *> *seen = [NSMutableSet set];
     NSString *continuation = nil;
@@ -646,7 +646,7 @@ static NSArray<NSDictionary *> *YTKACEFetchPlaylistPages(NSString *playlistID, N
         dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW, (int64_t)(25 * NSEC_PER_SEC)));
         id json = data != nil ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
         if (![json isKindOfClass:NSDictionary.class] || status >= 400) {
-            YTKACEDownloadLog(@"playlist", @"page %lu failed status=%ld bytes=%lu auth=%d", (unsigned long)page,
+            YTzoomDownloadLog(@"playlist", @"page %lu failed status=%ld bytes=%lu auth=%d", (unsigned long)page,
                               (long)status, (unsigned long)data.length, authHeader.length != 0);
             break;
         }
@@ -654,9 +654,9 @@ static NSArray<NSDictionary *> *YTKACEFetchPlaylistPages(NSString *playlistID, N
         if ([newVisitor isKindOfClass:NSString.class] && [newVisitor length] != 0) visitor = newVisitor;
         continuation = nil;
         NSUInteger before = items.count;
-        YTKACECollectPlaylistJSON(json, items, seen, &continuation, 0);
+        YTzoomCollectPlaylistJSON(json, items, seen, &continuation, 0);
         if (continuation.length == 0 || items.count == before) {
-            YTKACEDownloadLog(@"playlist", @"page %lu end items=%lu token=%d", (unsigned long)page,
+            YTzoomDownloadLog(@"playlist", @"page %lu end items=%lu token=%d", (unsigned long)page,
                               (unsigned long)items.count, continuation.length != 0);
             page++;
             break;
@@ -667,7 +667,7 @@ static NSArray<NSDictionary *> *YTKACEFetchPlaylistPages(NSString *playlistID, N
     return items;
 }
 
-static void YTKACEFetchFullPlaylist(NSString *playlistID, void (^completion)(NSArray<NSDictionary *> *items)) {
+static void YTzoomFetchFullPlaylist(NSString *playlistID, void (^completion)(NSArray<NSDictionary *> *items)) {
     if (playlistID.length == 0) {
         completion(nil);
         return;
@@ -675,54 +675,54 @@ static void YTKACEFetchFullPlaylist(NSString *playlistID, void (^completion)(NSA
     BOOL personal = [playlistID isEqualToString:@"WL"] || [playlistID isEqualToString:@"LL"];
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSUInteger pages = 0;
-        NSArray<NSDictionary *> *items = personal ? @[] : YTKACEFetchPlaylistPages(playlistID, nil, &pages);
+        NSArray<NSDictionary *> *items = personal ? @[] : YTzoomFetchPlaylistPages(playlistID, nil, &pages);
         if (items.count == 0) {
-            NSString *header = YTKACEPlaylistAuthHeader();
-            if (header.length != 0) items = YTKACEFetchPlaylistPages(playlistID, header, &pages);
-            else YTKACEDownloadLog(@"playlist", @"no auth header player=%d request=%d",
-                                   YTKACELatestPlayerAuthorization != nil, YTKACERequestAuthorization != nil);
+            NSString *header = YTzoomPlaylistAuthHeader();
+            if (header.length != 0) items = YTzoomFetchPlaylistPages(playlistID, header, &pages);
+            else YTzoomDownloadLog(@"playlist", @"no auth header player=%d request=%d",
+                                   YTzoomLatestPlayerAuthorization != nil, YTzoomRequestAuthorization != nil);
         }
-        YTKACEDownloadLog(@"playlist", @"fetched %lu items in %lu pages for %@", (unsigned long)items.count,
+        YTzoomDownloadLog(@"playlist", @"fetched %lu items in %lu pages for %@", (unsigned long)items.count,
                           (unsigned long)pages, playlistID);
         dispatch_async(dispatch_get_main_queue(), ^{ completion(items.count != 0 ? items : nil); });
     });
 }
 
-static void YTKACEShowPlaylistMenu(UIView *source, NSArray<NSDictionary *> *items);
+static void YTzoomShowPlaylistMenu(UIView *source, NSArray<NSDictionary *> *items);
 
-static void YTKACEPresentPlaylistMenu(UIView *source) {
-    NSArray<NSDictionary *> *loaded = YTKACECurrentPlaylistItems();
-    YTKACEShowNotice(YTKACELocalized(@"Loading playlist…"));
+static void YTzoomPresentPlaylistMenu(UIView *source) {
+    NSArray<NSDictionary *> *loaded = YTzoomCurrentPlaylistItems();
+    YTzoomShowNotice(YTzoomLocalized(@"Loading playlist…"));
     __weak UIView *weakSource = source;
-    YTKACEFetchFullPlaylist(YTKACECurrentPlaylistID, ^(NSArray<NSDictionary *> *full) {
-        YTKACEShowPlaylistMenu(weakSource, full.count >= loaded.count ? full : loaded);
+    YTzoomFetchFullPlaylist(YTzoomCurrentPlaylistID, ^(NSArray<NSDictionary *> *full) {
+        YTzoomShowPlaylistMenu(weakSource, full.count >= loaded.count ? full : loaded);
     });
 }
 
-static void YTKACEShowPlaylistMenu(UIView *source, NSArray<NSDictionary *> *items) {
-    YTKACEDownloadCoordinator *coordinator =
-        YTKACEDownloadCoordinator.sharedCoordinator;
+static void YTzoomShowPlaylistMenu(UIView *source, NSArray<NSDictionary *> *items) {
+    YTzoomDownloadCoordinator *coordinator =
+        YTzoomDownloadCoordinator.sharedCoordinator;
     if (items.count == 0) {
-        YTKACEShowNotice(YTKACELocalized(
-            @"Scroll the playlist once so YTKACE can read it, then try again."));
+        YTzoomShowNotice(YTzoomLocalized(
+            @"Scroll the playlist once so YTzoom can read it, then try again."));
         return;
     }
     NSMutableArray *actions = [NSMutableArray array];
-    NSString *name = YTKACECurrentPlaylistTitle.length != 0
-        ? YTKACECurrentPlaylistTitle : YTKACELocalized(@"playlist");
+    NSString *name = YTzoomCurrentPlaylistTitle.length != 0
+        ? YTzoomCurrentPlaylistTitle : YTzoomLocalized(@"playlist");
     [actions addObject:[coordinator nativeSheetAction:
-        [NSString stringWithFormat:YTKACELocalized(@"Download all of %@ (%lu)"),
+        [NSString stringWithFormat:YTzoomLocalized(@"Download all of %@ (%lu)"),
             name, (unsigned long)items.count]
         icon:@"play" handler:^{
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                 (int64_t)(0.12 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                    YTKACEPresentQualityMenu(source, items, nil);
+                    YTzoomPresentQualityMenu(source, items, nil);
                 });
         }]];
     [actions addObject:[coordinator nativeSheetAction:
-        YTKACELocalized(@"Select videos") icon:@"doc.on.doc" handler:^{
-            YTKACEPlaylistPickerController *picker =
-                [[YTKACEPlaylistPickerController alloc]
+        YTzoomLocalized(@"Select videos") icon:@"doc.on.doc" handler:^{
+            YTzoomPlaylistPickerController *picker =
+                [[YTzoomPlaylistPickerController alloc]
                     initWithStyle:UITableViewStylePlain];
             picker.items = items;
             picker.selection = [NSMutableSet set];
@@ -731,50 +731,50 @@ static void YTKACEShowPlaylistMenu(UIView *source, NSArray<NSDictionary *> *item
             }
             picker.onDone = ^(NSSet<NSString *> *selection) {
                 if (selection.count == 0) {
-                    YTKACEShowNotice(YTKACELocalized(@"No videos selected"));
+                    YTzoomShowNotice(YTzoomLocalized(@"No videos selected"));
                     return;
                 }
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                     (int64_t)(0.35 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                        YTKACEPresentQualityMenu(source, items, selection);
+                        YTzoomPresentQualityMenu(source, items, selection);
                     });
             };
             UINavigationController *navigation = [[UINavigationController alloc]
                 initWithRootViewController:picker];
-            [YTKACEPlaylistTopController() presentViewController:navigation
+            [YTzoomPlaylistTopController() presentViewController:navigation
                                                         animated:YES
                                                       completion:nil];
         }]];
     [coordinator presentPlaylistSheetWithTitle:
-        YTKACECurrentPlaylistTitle.length != 0 ? YTKACECurrentPlaylistTitle
-                                               : YTKACELocalized(@"Playlist")
-        subtitle:[NSString stringWithFormat:YTKACELocalized(@"%lu videos"),
+        YTzoomCurrentPlaylistTitle.length != 0 ? YTzoomCurrentPlaylistTitle
+                                               : YTzoomLocalized(@"Playlist")
+        subtitle:[NSString stringWithFormat:YTzoomLocalized(@"%lu videos"),
             (unsigned long)items.count]
-        sourceView:YTKACESheetAnchorForView(source)
+        sourceView:YTzoomSheetAnchorForView(source)
         actions:actions];
 }
 
-@interface YTKACEPlaylistButtonTarget : NSObject
+@interface YTzoomPlaylistButtonTarget : NSObject
 + (instancetype)shared;
 - (void)tapped:(UIButton *)sender;
 @end
 
-@implementation YTKACEPlaylistButtonTarget
+@implementation YTzoomPlaylistButtonTarget
 
 + (instancetype)shared {
-    static YTKACEPlaylistButtonTarget *shared;
+    static YTzoomPlaylistButtonTarget *shared;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{ shared = [self new]; });
     return shared;
 }
 
 - (void)tapped:(UIButton *)sender {
-    YTKACEPresentPlaylistMenu(sender);
+    YTzoomPresentPlaylistMenu(sender);
 }
 
 @end
 
-static NSData *YTKACEDecodeBlob(NSString *line) {
+static NSData *YTzoomDecodeBlob(NSString *line) {
     NSRange marker = [line rangeOfString:@": \""];
     NSString *escaped = marker.location != NSNotFound
         ? [line substringFromIndex:NSMaxRange(marker)] : line;
@@ -818,7 +818,7 @@ static NSData *YTKACEDecodeBlob(NSString *line) {
     return bytes;
 }
 
-static BOOL YTKACELooksLikeJunk(NSString *run) {
+static BOOL YTzoomLooksLikeJunk(NSString *run) {
     static NSArray<NSString *> *phrases;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -833,7 +833,7 @@ static BOOL YTKACELooksLikeJunk(NSString *run) {
     return NO;
 }
 
-static NSString *YTKACETitleFromBlob(NSData *blob) {
+static NSString *YTzoomTitleFromBlob(NSData *blob) {
     const unsigned char *bytes = (const unsigned char *)blob.bytes;
     NSUInteger length = blob.length;
     NSMutableDictionary<NSString *, NSNumber *> *counts =
@@ -857,7 +857,7 @@ static NSString *YTKACETitleFromBlob(NSData *blob) {
         for (NSUInteger i = 0; i < run.length; i++) {
             if ([run characterAtIndex:i] < 32) { control = YES; break; }
         }
-        if (control || YTKACELooksLikeJunk(run)) continue;
+        if (control || YTzoomLooksLikeJunk(run)) continue;
         counts[run] = @(counts[run].integerValue + 1);
     }
     NSString *best = nil;
@@ -868,7 +868,7 @@ static NSString *YTKACETitleFromBlob(NSData *blob) {
     return best;
 }
 
-static NSArray<NSDictionary *> *YTKACEExtractPlaylistItems(id model) {
+static NSArray<NSDictionary *> *YTzoomExtractPlaylistItems(id model) {
     if (model == nil) return @[];
     NSString *dump = nil;
     @try {
@@ -903,7 +903,7 @@ static NSArray<NSDictionary *> *YTKACEExtractPlaylistItems(id model) {
         }
         if (videoID == nil || [seen containsObject:videoID]) continue;
         [seen addObject:videoID];
-        NSString *title = YTKACETitleFromBlob(YTKACEDecodeBlob(line));
+        NSString *title = YTzoomTitleFromBlob(YTzoomDecodeBlob(line));
         [items addObject:@{
             @"videoId": videoID,
             @"title": title.length != 0 ? title : videoID,
@@ -922,29 +922,29 @@ static NSArray<NSDictionary *> *YTKACEExtractPlaylistItems(id model) {
     NSTextCheckingResult *titleMatch = [titleExpression
         firstMatchInString:dump options:0 range:NSMakeRange(0, dump.length)];
     if (titleMatch != nil) {
-        YTKACECurrentPlaylistTitle =
+        YTzoomCurrentPlaylistTitle =
             [dump substringWithRange:[titleMatch rangeAtIndex:1]];
     }
     return items;
 }
 
-static NSArray<NSDictionary *> *YTKACECurrentPlaylistItems(void) {
-    NSString *playlistID = YTKACECurrentPlaylistID;
-    UIViewController *browse = YTKACEPlaylistBrowseController;
+static NSArray<NSDictionary *> *YTzoomCurrentPlaylistItems(void) {
+    NSString *playlistID = YTzoomCurrentPlaylistID;
+    UIViewController *browse = YTzoomPlaylistBrowseController;
     NSArray<NSDictionary *> *found = nil;
     for (NSString *name in @[@"response", @"model", @"browseResponse"]) {
-        id model = YTKACEPlaylistValue(browse, name);
-        NSArray<NSDictionary *> *items = YTKACEExtractPlaylistItems(model);
+        id model = YTzoomPlaylistValue(browse, name);
+        NSArray<NSDictionary *> *items = YTzoomExtractPlaylistItems(model);
         if (items.count != 0) { found = items; break; }
     }
     if (playlistID.length == 0) return found ?: @[];
-    NSMutableArray<NSDictionary *> *cached = YTKACEPlaylistItems[playlistID];
+    NSMutableArray<NSDictionary *> *cached = YTzoomPlaylistItems[playlistID];
     if (cached == nil) {
         cached = [NSMutableArray array];
-        YTKACEPlaylistItems[playlistID] = cached;
-        YTKACEPlaylistSeen[playlistID] = [NSMutableSet set];
+        YTzoomPlaylistItems[playlistID] = cached;
+        YTzoomPlaylistSeen[playlistID] = [NSMutableSet set];
     }
-    NSMutableSet<NSString *> *seen = YTKACEPlaylistSeen[playlistID];
+    NSMutableSet<NSString *> *seen = YTzoomPlaylistSeen[playlistID];
     for (NSDictionary *item in found) {
         NSString *videoID = item[@"videoId"];
         if ([seen containsObject:videoID]) continue;
@@ -956,58 +956,58 @@ static NSArray<NSDictionary *> *YTKACECurrentPlaylistItems(void) {
 
 static IMP OriginalBrowseAppear;
 
-static void YTKACERefreshHeaderBars(UIView *root);
+static void YTzoomRefreshHeaderBars(UIView *root);
 
 static IMP OriginalBrowseDisappear;
 
-static void YTKACEBrowseDisappear(UIViewController *receiver, SEL selector,
+static void YTzoomBrowseDisappear(UIViewController *receiver, SEL selector,
                                   BOOL animated) {
     if (OriginalBrowseDisappear != NULL) {
         ((void (*)(id, SEL, BOOL))OriginalBrowseDisappear)(receiver, selector,
                                                             animated);
     }
-    if (YTKACEPlaylistBrowseController != nil &&
-        YTKACEPlaylistBrowseController != receiver) {
+    if (YTzoomPlaylistBrowseController != nil &&
+        YTzoomPlaylistBrowseController != receiver) {
         return;
     }
-    YTKACECurrentPlaylistID = nil;
-    YTKACEPlaylistBrowseController = nil;
-    YTKACERefreshHeaderBars(receiver.view.window ?: receiver.view);
+    YTzoomCurrentPlaylistID = nil;
+    YTzoomPlaylistBrowseController = nil;
+    YTzoomRefreshHeaderBars(receiver.view.window ?: receiver.view);
 }
 
-static void YTKACEBrowseAppear(UIViewController *receiver, SEL selector,
+static void YTzoomBrowseAppear(UIViewController *receiver, SEL selector,
                                BOOL animated) {
     if (OriginalBrowseAppear != NULL) {
         ((void (*)(id, SEL, BOOL))OriginalBrowseAppear)(receiver, selector,
                                                         animated);
     }
-    id value = YTKACEPlaylistValue(receiver, @"browseIdentifier");
+    id value = YTzoomPlaylistValue(receiver, @"browseIdentifier");
     NSString *browseID = [value isKindOfClass:NSString.class] ? value : nil;
     if (browseID.length == 0) return;
     if ([browseID hasPrefix:@"VL"]) {
-        YTKACECurrentPlaylistID = [browseID substringFromIndex:2];
-        YTKACEPlaylistBrowseController = receiver;
+        YTzoomCurrentPlaylistID = [browseID substringFromIndex:2];
+        YTzoomPlaylistBrowseController = receiver;
     } else {
-        YTKACECurrentPlaylistID = nil;
-        YTKACEPlaylistBrowseController = nil;
+        YTzoomCurrentPlaylistID = nil;
+        YTzoomPlaylistBrowseController = nil;
     }
-    YTKACERefreshHeaderBars(receiver.view.window ?: receiver.view);
+    YTzoomRefreshHeaderBars(receiver.view.window ?: receiver.view);
 }
 
 static IMP OriginalSetRightBarButtonItems;
 
-static UIBarButtonItem *YTKACEPlaylistBarItem(void) {
+static UIBarButtonItem *YTzoomPlaylistBarItem(void) {
     static UIBarButtonItem *item;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
-        button.tag = YTKACEPlaylistButtonTag;
-        button.accessibilityIdentifier = @"YTKACE Playlist Download";
-        button.accessibilityLabel = YTKACELocalized(@"Download playlist");
+        button.tag = YTzoomPlaylistButtonTag;
+        button.accessibilityIdentifier = @"YTzoom Playlist Download";
+        button.accessibilityLabel = YTzoomLocalized(@"Download playlist");
         button.tintColor = UIColor.whiteColor;
         button.frame = CGRectMake(0.0, 0.0, 32.0, 32.0);
-        [button setImage:YTKACEDownloadGlyphImage() forState:UIControlStateNormal];
-        [button addTarget:YTKACEPlaylistButtonTarget.shared
+        [button setImage:YTzoomDownloadGlyphImage() forState:UIControlStateNormal];
+        [button addTarget:YTzoomPlaylistButtonTarget.shared
                    action:@selector(tapped:)
          forControlEvents:UIControlEventTouchUpInside];
         item = [[UIBarButtonItem alloc] initWithCustomView:button];
@@ -1015,11 +1015,11 @@ static UIBarButtonItem *YTKACEPlaylistBarItem(void) {
     return item;
 }
 
-static void YTKACESetRightBarButtonItems(UIView *receiver, SEL selector,
+static void YTzoomSetRightBarButtonItems(UIView *receiver, SEL selector,
                                          NSArray *items) {
     NSArray *result = items;
-    if (YTKACEPlaylistDownloadEnabled() && YTKACECurrentPlaylistID.length != 0) {
-        UIBarButtonItem *ours = YTKACEPlaylistBarItem();
+    if (YTzoomPlaylistDownloadEnabled() && YTzoomCurrentPlaylistID.length != 0) {
+        UIBarButtonItem *ours = YTzoomPlaylistBarItem();
         if (![items containsObject:ours]) {
             NSMutableArray *merged = items != nil
                 ? [items mutableCopy] : [NSMutableArray array];
@@ -1033,7 +1033,7 @@ static void YTKACESetRightBarButtonItems(UIView *receiver, SEL selector,
     }
 }
 
-static void YTKACERefreshHeaderBars(UIView *root) {
+static void YTzoomRefreshHeaderBars(UIView *root) {
     if (root == nil) return;
     if ([NSStringFromClass(root.class) isEqualToString:@"YTHeaderView"]) {
         SEL getter = NSSelectorFromString(@"rightBarButtonItems");
@@ -1046,37 +1046,37 @@ static void YTKACERefreshHeaderBars(UIView *root) {
         return;
     }
     for (UIView *child in root.subviews) {
-        YTKACERefreshHeaderBars(child);
+        YTzoomRefreshHeaderBars(child);
     }
 }
 
-void YTKACEInstallPlaylistDownloaderHooks(void) {
-    if (YTKACEPlaylistItems == nil) {
-        YTKACEPlaylistItems = [NSMutableDictionary dictionary];
-        YTKACEPlaylistSeen = [NSMutableDictionary dictionary];
-        YTKACEPlaylistThumbnails = [NSMutableDictionary dictionary];
+void YTzoomInstallPlaylistDownloaderHooks(void) {
+    if (YTzoomPlaylistItems == nil) {
+        YTzoomPlaylistItems = [NSMutableDictionary dictionary];
+        YTzoomPlaylistSeen = [NSMutableDictionary dictionary];
+        YTzoomPlaylistThumbnails = [NSMutableDictionary dictionary];
     }
-    BOOL contents = YTKACEInstallInstanceHook(@"YTIPlaylistVideoListRenderer",
+    BOOL contents = YTzoomInstallInstanceHook(@"YTIPlaylistVideoListRenderer",
                                               @"contentsArray",
-                                              (IMP)YTKACEPlaylistContents,
+                                              (IMP)YTzoomPlaylistContents,
                                               &OriginalPlaylistContents);
-    BOOL header = YTKACEInstallInstanceHook(@"YTPageHeaderViewController",
+    BOOL header = YTzoomInstallInstanceHook(@"YTPageHeaderViewController",
                                             @"loadWithModel:",
-                                            (IMP)YTKACEPlaylistHeaderModel,
+                                            (IMP)YTzoomPlaylistHeaderModel,
                                             &OriginalPlaylistHeaderModel);
-    BOOL layout = YTKACEInstallInstanceHook(@"YTHeaderView",
+    BOOL layout = YTzoomInstallInstanceHook(@"YTHeaderView",
                                             @"setRightBarButtonItems:",
-                                            (IMP)YTKACESetRightBarButtonItems,
+                                            (IMP)YTzoomSetRightBarButtonItems,
                                             &OriginalSetRightBarButtonItems);
-    YTKACEDownloadLog(@"playlist",
+    YTzoomDownloadLog(@"playlist",
         @"hooks contents=%d header=%d layout=%d", contents, header, layout);
-    YTKACEInstallInstanceHook(@"SSOAuthorizationImpl", @"authorizeRequest:completionHandler:",
-                              (IMP)YTKACEAuthorizeCompletion, &OriginalAuthorizeCompletion);
-    YTKACEInstallInstanceHook(@"SSOAuthorizationImpl", @"authorizeRequest:callback:",
-                              (IMP)YTKACEAuthorizeCallback, &OriginalAuthorizeCallback);
-    YTKACEInstallInstanceHook(@"YTBrowseViewController", @"viewDidAppear:",
-                              (IMP)YTKACEBrowseAppear, &OriginalBrowseAppear);
-    YTKACEInstallInstanceHook(@"YTBrowseViewController", @"viewWillDisappear:",
-                              (IMP)YTKACEBrowseDisappear,
+    YTzoomInstallInstanceHook(@"SSOAuthorizationImpl", @"authorizeRequest:completionHandler:",
+                              (IMP)YTzoomAuthorizeCompletion, &OriginalAuthorizeCompletion);
+    YTzoomInstallInstanceHook(@"SSOAuthorizationImpl", @"authorizeRequest:callback:",
+                              (IMP)YTzoomAuthorizeCallback, &OriginalAuthorizeCallback);
+    YTzoomInstallInstanceHook(@"YTBrowseViewController", @"viewDidAppear:",
+                              (IMP)YTzoomBrowseAppear, &OriginalBrowseAppear);
+    YTzoomInstallInstanceHook(@"YTBrowseViewController", @"viewWillDisappear:",
+                              (IMP)YTzoomBrowseDisappear,
                               &OriginalBrowseDisappear);
 }

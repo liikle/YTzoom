@@ -1,105 +1,105 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../Downloads/DownloadLog.h"
 
 #import <UIKit/UIKit.h>
 #import <objc/message.h>
 
-static BOOL YTKACECastYes(id receiver, SEL selector) {
+static BOOL YTzoomCastYes(id receiver, SEL selector) {
     (void)receiver;
     (void)selector;
     return YES;
 }
 
-static BOOL YTKACECastNo(id receiver, SEL selector) {
+static BOOL YTzoomCastNo(id receiver, SEL selector) {
     (void)receiver;
     (void)selector;
     return NO;
 }
 
-static NSInteger YTKACECastAllowedStatus(id receiver, SEL selector) {
+static NSInteger YTzoomCastAllowedStatus(id receiver, SEL selector) {
     (void)receiver;
     (void)selector;
     return 1;
 }
 
-static void YTKACESkipLocalNetworkPage(id receiver,
+static void YTzoomSkipLocalNetworkPage(id receiver,
                                        SEL selector,
                                        id completion) {
     (void)receiver;
     (void)selector;
-    YTKACEDownloadLog(@"cast", @"permission page bypassed");
-    YTKACEStartCastDiscovery();
+    YTzoomDownloadLog(@"cast", @"permission page bypassed");
+    YTzoomStartCastDiscovery();
     if (completion == nil) return;
     dispatch_async(dispatch_get_main_queue(), ^{
         @try {
             ((void (^)(BOOL))completion)(YES);
         } @catch (__unused NSException *exception) {
-            YTKACEDownloadLog(@"cast", @"permission completion failed");
+            YTzoomDownloadLog(@"cast", @"permission completion failed");
         }
     });
 }
 
-static void YTKACERefreshCastHooks(void) {
-    YTKACEInstallInstanceHook(@"MDXRoutePresentationController",
+static void YTzoomRefreshCastHooks(void) {
+    YTzoomInstallInstanceHook(@"MDXRoutePresentationController",
                               @"hasSufficientLocalNetworkPermissions",
-                              (IMP)YTKACECastYes,
+                              (IMP)YTzoomCastYes,
                               NULL);
-    YTKACEInstallInstanceHook(@"MDXLocalNetworkPermissions",
+    YTzoomInstallInstanceHook(@"MDXLocalNetworkPermissions",
                               @"lastKnownPermissionsStatus",
-                              (IMP)YTKACECastAllowedStatus,
+                              (IMP)YTzoomCastAllowedStatus,
                               NULL);
-    YTKACEInstallInstanceHook(@"MDXLocalNetworkPermissions",
+    YTzoomInstallInstanceHook(@"MDXLocalNetworkPermissions",
                               @"isAuthorized",
-                              (IMP)YTKACECastYes,
+                              (IMP)YTzoomCastYes,
                               NULL);
-    YTKACEInstallInstanceHook(@"MDXLocalStorage",
+    YTzoomInstallInstanceHook(@"MDXLocalStorage",
                               @"localNetworkPermissionsStatus",
-                              (IMP)YTKACECastAllowedStatus,
+                              (IMP)YTzoomCastAllowedStatus,
                               NULL);
-    YTKACEInstallInstanceHook(
+    YTzoomInstallInstanceHook(
         @"MDXPermissionsController",
         @"showLocalNetworkPermissionsRequiredPageWithCompletion:",
-        (IMP)YTKACESkipLocalNetworkPage,
+        (IMP)YTzoomSkipLocalNetworkPage,
         NULL
     );
-    YTKACEInstallInstanceHook(@"CADPLocalNetworkPermissionInfo",
+    YTzoomInstallInstanceHook(@"CADPLocalNetworkPermissionInfo",
                               @"isLocalNetworkPermissionAllowed",
-                              (IMP)YTKACECastYes,
+                              (IMP)YTzoomCastYes,
                               NULL);
-    YTKACEInstallInstanceHook(@"CADPLocalNetworkPermissionInfo",
+    YTzoomInstallInstanceHook(@"CADPLocalNetworkPermissionInfo",
                               @"wasLocalNetworkPermissionAllowed",
-                              (IMP)YTKACECastYes,
+                              (IMP)YTzoomCastYes,
                               NULL);
-    YTKACEInstallInstanceHook(
+    YTzoomInstallInstanceHook(
         @"CADPLocalNetworkPermissionInfo",
         @"shouldPresentLocalNetworkAccessPermissionDialog",
-        (IMP)YTKACECastNo,
+        (IMP)YTzoomCastNo,
         NULL
     );
-    YTKACEInstallInstanceHook(
+    YTzoomInstallInstanceHook(
         @"YTBAMediaHubUiDeviceItemsResult",
         @"shouldShowLocalNetworkPermissionPrompt",
-        (IMP)YTKACECastNo,
+        (IMP)YTzoomCastNo,
         NULL
     );
 }
 
-void YTKACEStartCastDiscovery(void) {
+void YTzoomStartCastDiscovery(void) {
     dispatch_async(dispatch_get_main_queue(), ^{
         @try {
             Class contextClass = NSClassFromString(@"GCKCastContext");
             SEL sharedSelector = NSSelectorFromString(@"sharedInstance");
             if (contextClass == Nil ||
                 ![contextClass respondsToSelector:sharedSelector]) {
-                YTKACEDownloadLog(@"cast", @"context unavailable");
+                YTzoomDownloadLog(@"cast", @"context unavailable");
                 return;
             }
             id context = ((id (*)(id, SEL))objc_msgSend)(contextClass,
                                                          sharedSelector);
             SEL managerSelector = NSSelectorFromString(@"discoveryManager");
             if (context == nil || ![context respondsToSelector:managerSelector]) {
-                YTKACEDownloadLog(@"cast", @"manager unavailable");
+                YTzoomDownloadLog(@"cast", @"manager unavailable");
                 return;
             }
             id manager = ((id (*)(id, SEL))objc_msgSend)(context,
@@ -107,7 +107,7 @@ void YTKACEStartCastDiscovery(void) {
             SEL startSelector = NSSelectorFromString(@"startDiscovery");
             if (manager != nil && [manager respondsToSelector:startSelector]) {
                 ((void (*)(id, SEL))objc_msgSend)(manager, startSelector);
-                YTKACEDownloadLog(@"cast", @"discovery started");
+                YTzoomDownloadLog(@"cast", @"discovery started");
                 dispatch_after(
                     dispatch_time(DISPATCH_TIME_NOW, 2 * NSEC_PER_SEC),
                     dispatch_get_main_queue(), ^{
@@ -117,30 +117,30 @@ void YTKACEStartCastDiscovery(void) {
                                 manager,
                                 countSelector
                             );
-                            YTKACEDownloadLog(@"cast", @"devices=%lu",
+                            YTzoomDownloadLog(@"cast", @"devices=%lu",
                                              (unsigned long)count);
                         }
                     }
                 );
             }
         } @catch (__unused NSException *exception) {
-            YTKACEDownloadLog(@"cast", @"discovery exception");
+            YTzoomDownloadLog(@"cast", @"discovery exception");
         }
     });
 }
 
-void YTKACEInstallCastCompatibilityHooks(void) {
+void YTzoomInstallCastCompatibilityHooks(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        YTKACERefreshCastHooks();
+        YTzoomRefreshCastHooks();
 
         [NSNotificationCenter.defaultCenter
             addObserverForName:UIApplicationDidBecomeActiveNotification
                     object:nil
                          queue:NSOperationQueue.mainQueue
                     usingBlock:^(__unused NSNotification *notification) {
-                        YTKACERefreshCastHooks();
-                        YTKACEDownloadLog(@"cast", @"app active");
+                        YTzoomRefreshCastHooks();
+                        YTzoomDownloadLog(@"cast", @"app active");
                     }];
     });
 }

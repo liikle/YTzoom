@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../Downloads/DownloadLog.h"
@@ -15,19 +15,19 @@ static IMP OriginalLegacyQuality;
 static IMP OriginalSetUserSelectableFormats;
 static IMP OriginalDidLoadContentPlaybackData;
 static IMP OriginalQualityHandleTap;
-static NSMutableDictionary<NSString *, NSValue *> *YTKACEStreamingOriginals;
-static const void *YTKACERedesignedQualityControllerKey =
-    &YTKACERedesignedQualityControllerKey;
+static NSMutableDictionary<NSString *, NSValue *> *YTzoomStreamingOriginals;
+static const void *YTzoomRedesignedQualityControllerKey =
+    &YTzoomRedesignedQualityControllerKey;
 
-static NSString *YTKACEStreamingKey(Class cls, SEL selector) {
+static NSString *YTzoomStreamingKey(Class cls, SEL selector) {
     return [NSString stringWithFormat:@"%@|%@", NSStringFromClass(cls),
                                       NSStringFromSelector(selector)];
 }
 
-static IMP YTKACEStreamingOriginal(id receiver, SEL selector) {
+static IMP YTzoomStreamingOriginal(id receiver, SEL selector) {
     for (Class cls = object_getClass(receiver); cls != Nil; cls = class_getSuperclass(cls)) {
-        IMP value = (IMP)[YTKACEStreamingOriginals[
-            YTKACEStreamingKey(cls, selector)] pointerValue];
+        IMP value = (IMP)[YTzoomStreamingOriginals[
+            YTzoomStreamingKey(cls, selector)] pointerValue];
         if (value != NULL) {
             return value;
         }
@@ -35,8 +35,8 @@ static IMP YTKACEStreamingOriginal(id receiver, SEL selector) {
     return NULL;
 }
 
-static BOOL YTKACELegacyQuality(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.LegacyQualityMenu")) {
+static BOOL YTzoomLegacyQuality(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.LegacyQualityMenu")) {
         return NO;
     }
     return OriginalLegacyQuality != NULL
@@ -44,7 +44,7 @@ static BOOL YTKACELegacyQuality(id receiver, SEL selector) {
         : NO;
 }
 
-static id YTKACEValue(id object, NSString *key) {
+static id YTzoomValue(id object, NSString *key) {
     if (object == nil || key.length == 0) {
         return nil;
     }
@@ -55,13 +55,13 @@ static id YTKACEValue(id object, NSString *key) {
     }
 }
 
-static NSArray<NSString *> *YTKACEQualityLabels(void) {
+static NSArray<NSString *> *YTzoomQualityLabels(void) {
     return @[@"", @"2160p60", @"2160p", @"1440p60", @"1440p",
              @"1080p60", @"1080p", @"720p60", @"720p", @"480p",
              @"360p", @"240p", @"144p"];
 }
 
-static NSInteger YTKACEQualityIndex(void) {
+static NSInteger YTzoomQualityIndex(void) {
     SCNetworkReachabilityRef reachability =
         SCNetworkReachabilityCreateWithName(NULL, "youtube.com");
     SCNetworkReachabilityFlags flags = 0;
@@ -73,25 +73,25 @@ static NSInteger YTKACEQualityIndex(void) {
     BOOL onCellular = hasFlags &&
         (flags & kSCNetworkReachabilityFlagsIsWWAN) != 0;
     BOOL onWiFi = !onCellular;
-    NSString *key = onWiFi ? @"YTKACE.Preference.Playback.WiFiQuality" : @"YTKACE.Preference.Playback.CellularQuality";
-    id value = YTKACEPreferenceObject(key);
+    NSString *key = onWiFi ? @"YTzoom.Preference.Playback.WiFiQuality" : @"YTzoom.Preference.Playback.CellularQuality";
+    id value = YTzoomPreferenceObject(key);
     NSInteger index = [value respondsToSelector:@selector(integerValue)]
         ? [value integerValue] : 0;
-    return index >= 0 && index < (NSInteger)YTKACEQualityLabels().count ? index : 0;
+    return index >= 0 && index < (NSInteger)YTzoomQualityLabels().count ? index : 0;
 }
 
-static NSInteger YTKACEResolution(NSString *label) {
+static NSInteger YTzoomResolution(NSString *label) {
     NSScanner *scanner = [NSScanner scannerWithString:label ?: @""];
     NSInteger value = 0;
     return [scanner scanInteger:&value] ? value : 0;
 }
 
-static NSString *YTKACETargetQualityLabel(NSArray *formats, NSString *target) {
+static NSString *YTzoomTargetQualityLabel(NSArray *formats, NSString *target) {
     NSString *nearest = nil;
     NSInteger nearestDistance = NSIntegerMax;
-    NSInteger targetResolution = YTKACEResolution(target);
+    NSInteger targetResolution = YTzoomResolution(target);
     for (id format in formats) {
-        id value = YTKACEValue(format, @"qualityLabel");
+        id value = YTzoomValue(format, @"qualityLabel");
         if (![value isKindOfClass:NSString.class]) {
             continue;
         }
@@ -103,7 +103,7 @@ static NSString *YTKACETargetQualityLabel(NSArray *formats, NSString *target) {
                          options:NSCaseInsensitiveSearch].location != NSNotFound) {
             continue;
         }
-        NSInteger resolution = YTKACEResolution(label);
+        NSInteger resolution = YTzoomResolution(label);
         NSInteger distance = labs(resolution - targetResolution);
         if (resolution > 0 && distance < nearestDistance) {
             nearest = label;
@@ -113,17 +113,17 @@ static NSString *YTKACETargetQualityLabel(NSArray *formats, NSString *target) {
     return nearest;
 }
 
-static void YTKACEApplyPreferredQuality(id controller) {
-    NSInteger index = YTKACEQualityIndex();
+static void YTzoomApplyPreferredQuality(id controller) {
+    NSInteger index = YTzoomQualityIndex();
     if (index == 0) {
         return;
     }
-    id activeVideo = YTKACEValue(controller, @"activeVideo");
-    id formats = YTKACEValue(activeVideo, @"selectableVideoFormats");
+    id activeVideo = YTzoomValue(controller, @"activeVideo");
+    id formats = YTzoomValue(activeVideo, @"selectableVideoFormats");
     if (![formats isKindOfClass:NSArray.class] || [formats count] == 0) {
         return;
     }
-    NSString *label = YTKACETargetQualityLabel(formats, YTKACEQualityLabels()[index]);
+    NSString *label = YTzoomTargetQualityLabel(formats, YTzoomQualityLabels()[index]);
     Class constraintClass = NSClassFromString(
         @"MLQuickMenuVideoQualitySettingFormatConstraint");
     SEL initializer = NSSelectorFromString(
@@ -144,7 +144,7 @@ static void YTKACEApplyPreferredQuality(id controller) {
     }
 }
 
-BOOL YTKACEPlayerIsShorts(id player) {
+BOOL YTzoomPlayerIsShorts(id player) {
     SEL parentSelector = NSSelectorFromString(@"parentViewController");
     id current = player;
     for (NSUInteger depth = 0; current != nil && depth < 6; depth++) {
@@ -158,7 +158,7 @@ BOOL YTKACEPlayerIsShorts(id player) {
     return NO;
 }
 
-static void YTKACEDidLoadContentPlaybackData(id receiver,
+static void YTzoomDidLoadContentPlaybackData(id receiver,
                                               SEL selector,
                                               id playbackController,
                                               id playbackData) {
@@ -167,16 +167,16 @@ static void YTKACEDidLoadContentPlaybackData(id receiver,
             receiver, selector, playbackController, playbackData);
     }
     if (playbackController == nil || playbackData == nil ||
-        YTKACEQualityIndex() == 0) {
+        YTzoomQualityIndex() == 0) {
         return;
     }
-    if (YTKACEPlayerIsShorts(receiver)) {
+    if (YTzoomPlayerIsShorts(receiver)) {
         return;
     }
     __weak id weakReceiver = receiver;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)NSEC_PER_SEC),
                    dispatch_get_main_queue(), ^{
-        YTKACEApplyPreferredQuality(weakReceiver);
+        YTzoomApplyPreferredQuality(weakReceiver);
     });
 }
 
@@ -186,7 +186,7 @@ static void YTKACEDidLoadContentPlaybackData(id receiver,
 static IMP OriginalAVEligibleForHDR;
 static IMP OriginalAVAvailableHDRModes;
 
-static BOOL YTKACECallerIsYouTube(const void *address) {
+static BOOL YTzoomCallerIsYouTube(const void *address) {
     static const void *mainBase;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -203,32 +203,32 @@ static BOOL YTKACECallerIsYouTube(const void *address) {
         dladdr(address, &info) != 0 && info.dli_fbase == mainBase;
 }
 
-static BOOL YTKACEHDRSuppressed(const void *caller) {
-    return YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.HDRDisabled") &&
-        YTKACECallerIsYouTube(caller);
+static BOOL YTzoomHDRSuppressed(const void *caller) {
+    return YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.HDRDisabled") &&
+        YTzoomCallerIsYouTube(caller);
 }
 
-static BOOL YTKACEAVEligibleForHDR(id receiver, SEL selector) {
-    if (YTKACEHDRSuppressed(__builtin_return_address(0))) return NO;
+static BOOL YTzoomAVEligibleForHDR(id receiver, SEL selector) {
+    if (YTzoomHDRSuppressed(__builtin_return_address(0))) return NO;
     return OriginalAVEligibleForHDR != NULL
         ? ((BOOL (*)(id, SEL))OriginalAVEligibleForHDR)(receiver, selector) : NO;
 }
 
-static NSInteger YTKACEAVAvailableHDRModes(id receiver, SEL selector) {
-    if (YTKACEHDRSuppressed(__builtin_return_address(0))) return 0;
+static NSInteger YTzoomAVAvailableHDRModes(id receiver, SEL selector) {
+    if (YTzoomHDRSuppressed(__builtin_return_address(0))) return 0;
     return OriginalAVAvailableHDRModes != NULL
         ? ((NSInteger (*)(id, SEL))OriginalAVAvailableHDRModes)(receiver, selector) : 0;
 }
 
 
-static NSArray *YTKACEFormatsWithoutPremium(NSArray *formats) {
-    if (!YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.PremiumQualityHidden") ||
+static NSArray *YTzoomFormatsWithoutPremium(NSArray *formats) {
+    if (!YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.PremiumQualityHidden") ||
         ![formats isKindOfClass:NSArray.class]) {
         return formats;
     }
     NSMutableArray *kept = [NSMutableArray array];
     for (id format in formats) {
-        id label = YTKACEValue(format, @"qualityLabel");
+        id label = YTzoomValue(format, @"qualityLabel");
         if ([label isKindOfClass:NSString.class] &&
             [label rangeOfString:@"Premium"
                          options:NSCaseInsensitiveSearch].location != NSNotFound) {
@@ -241,21 +241,21 @@ static NSArray *YTKACEFormatsWithoutPremium(NSArray *formats) {
 
 static IMP OriginalRedesignedSetFormats;
 
-static void YTKACERedesignedSetFormats(id receiver, SEL selector, NSArray *formats) {
-    NSArray *selected = YTKACEFormatsWithoutPremium(formats);
+static void YTzoomRedesignedSetFormats(id receiver, SEL selector, NSArray *formats) {
+    NSArray *selected = YTzoomFormatsWithoutPremium(formats);
     if (OriginalRedesignedSetFormats != NULL) {
         ((void (*)(id, SEL, id))OriginalRedesignedSetFormats)(receiver, selector,
                                                               selected);
     }
 }
 
-static void YTKACESetUserSelectableFormats(id receiver,
+static void YTzoomSetUserSelectableFormats(id receiver,
                                             SEL selector,
                                             NSArray *formats) {
     NSArray *selectedFormats = formats;
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.LegacyQualityMenu")) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.LegacyQualityMenu")) {
         id redesigned = objc_getAssociatedObject(
-            receiver, YTKACERedesignedQualityControllerKey);
+            receiver, YTzoomRedesignedQualityControllerKey);
         if (redesigned == nil) {
             Class controllerClass = NSClassFromString(
                 @"YTVideoQualitySwitchRedesignedController");
@@ -266,12 +266,12 @@ static void YTKACESetUserSelectableFormats(id receiver,
                 redesigned = ((id (*)(id, SEL, id, id))objc_msgSend)(
                     allocated, initializer, nil, nil);
                 objc_setAssociatedObject(receiver,
-                    YTKACERedesignedQualityControllerKey,
+                    YTzoomRedesignedQualityControllerKey,
                     redesigned,
                     OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
         }
-        id video = YTKACEValue(receiver, @"_video");
+        id video = YTzoomValue(receiver, @"_video");
         if (redesigned != nil && video != nil) {
             @try {
                 [redesigned setValue:video forKey:@"_video"];
@@ -287,17 +287,17 @@ static void YTKACESetUserSelectableFormats(id receiver,
             }
         }
     }
-    selectedFormats = YTKACEFormatsWithoutPremium(selectedFormats);
+    selectedFormats = YTzoomFormatsWithoutPremium(selectedFormats);
     if (OriginalSetUserSelectableFormats != NULL) {
         ((void (*)(id, SEL, id))OriginalSetUserSelectableFormats)(
             receiver, selector, selectedFormats);
     }
 }
 
-static void YTKACEQualityHandleTap(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.LegacyQualityMenu")) {
-        id controller = YTKACEValue(receiver, @"_controller");
-        id node = YTKACEValue(controller, @"node");
+static void YTzoomQualityHandleTap(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.LegacyQualityMenu")) {
+        id controller = YTzoomValue(receiver, @"_controller");
+        id node = YTzoomValue(controller, @"node");
         SEL identifierSelector = NSSelectorFromString(@"accessibilityIdentifier");
         SEL labelSelector = NSSelectorFromString(@"accessibilityLabel");
         NSString *identifier = [node respondsToSelector:identifierSelector]
@@ -321,8 +321,8 @@ static void YTKACEQualityHandleTap(id receiver, SEL selector) {
             ? ((id (*)(id, SEL))objc_msgSend)(sheet, parentSelector) : nil;
         if (sheetClass != Nil && bottomSheetClass != Nil &&
             [sheet isKindOfClass:sheetClass] && [parent isKindOfClass:bottomSheetClass]) {
-            id delegate = YTKACEValue(sheet, @"delegate");
-            id overlay = YTKACEValue(delegate, @"parentResponder");
+            id delegate = YTzoomValue(sheet, @"delegate");
+            id overlay = YTzoomValue(delegate, @"parentResponder");
             Class overlayClass = NSClassFromString(
                 @"YTMainAppVideoPlayerOverlayViewController");
             SEL qualitySelector = NSSelectorFromString(@"didPressVideoQuality:");
@@ -349,23 +349,23 @@ static void YTKACEQualityHandleTap(id receiver, SEL selector) {
     }
 }
 
-static BOOL YTKACEAutoplayIsQueueConfig(id receiver) {
+static BOOL YTzoomAutoplayIsQueueConfig(id receiver) {
     NSString *name = NSStringFromClass(object_getClass(receiver));
     return [name containsString:@"QueueConfig"] ||
         [name containsString:@"GaplessPlaybackCoordinator"];
 }
 
-static BOOL YTKACEAutoplayValue(id receiver, SEL selector) {
+static BOOL YTzoomAutoplayValue(id receiver, SEL selector) {
     const BOOL disabled =
-        YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.AutoplayDisabled");
+        YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.AutoplayDisabled");
     BOOL result;
     if (disabled) {
         result = NO;
-    } else if (YTKACEQueueHasItems() && YTKACEQueueOwnsCurrentVideo() &&
-               !YTKACEAutoplayIsQueueConfig(receiver)) {
+    } else if (YTzoomQueueHasItems() && YTzoomQueueOwnsCurrentVideo() &&
+               !YTzoomAutoplayIsQueueConfig(receiver)) {
         result = NO;
     } else {
-        IMP original = YTKACEStreamingOriginal(receiver, selector);
+        IMP original = YTzoomStreamingOriginal(receiver, selector);
         result = original != NULL
             ? ((BOOL (*)(id, SEL))original)(receiver, selector) : NO;
     }
@@ -373,19 +373,19 @@ static BOOL YTKACEAutoplayValue(id receiver, SEL selector) {
     return result;
 }
 
-static void YTKACEAutoplaySetter(id receiver, SEL selector, BOOL enabled) {
-    IMP original = YTKACEStreamingOriginal(receiver, selector);
+static void YTzoomAutoplaySetter(id receiver, SEL selector, BOOL enabled) {
+    IMP original = YTzoomStreamingOriginal(receiver, selector);
     if (original != NULL) {
         ((void (*)(id, SEL, BOOL))original)(
             receiver,
             selector,
-            YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.AutoplayDisabled") ? NO : enabled
+            YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.AutoplayDisabled") ? NO : enabled
         );
     }
 }
 
-static BOOL YTKACECellularQualityValue(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.HDOnCellular")) {
+static BOOL YTzoomCellularQualityValue(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.HDOnCellular")) {
         NSString *name = NSStringFromSelector(selector).lowercaseString;
         BOOL limiter = [name containsString:@"limit"] ||
             [name containsString:@"restrict"] ||
@@ -393,11 +393,11 @@ static BOOL YTKACECellularQualityValue(id receiver, SEL selector) {
             [name containsString:@"data_saver"];
         return !limiter;
     }
-    IMP original = YTKACEStreamingOriginal(receiver, selector);
+    IMP original = YTzoomStreamingOriginal(receiver, selector);
     return original != NULL ? ((BOOL (*)(id, SEL))original)(receiver, selector) : NO;
 }
 
-static void YTKACEStoreStreamingOriginal(NSString *className,
+static void YTzoomStoreStreamingOriginal(NSString *className,
                                          NSString *selectorName,
                                          IMP original) {
     if (original == NULL) {
@@ -405,13 +405,13 @@ static void YTKACEStoreStreamingOriginal(NSString *className,
     }
     Class cls = NSClassFromString(className);
     if (cls != Nil) {
-        YTKACEStreamingOriginals[YTKACEStreamingKey(cls,
+        YTzoomStreamingOriginals[YTzoomStreamingKey(cls,
             NSSelectorFromString(selectorName))] =
             [NSValue valueWithPointer:(const void *)original];
     }
 }
 
-static BOOL YTKACEInstallBoolGetter(NSString *className,
+static BOOL YTzoomInstallBoolGetter(NSString *className,
                                     NSString *selectorName,
                                     IMP replacement) {
     Class cls = NSClassFromString(className);
@@ -428,14 +428,14 @@ static BOOL YTKACEInstallBoolGetter(NSString *className,
         return NO;
     }
     IMP original = NULL;
-    if (!YTKACEInstallInstanceHook(className, selectorName, replacement, &original)) {
+    if (!YTzoomInstallInstanceHook(className, selectorName, replacement, &original)) {
         return NO;
     }
-    YTKACEStoreStreamingOriginal(className, selectorName, original);
+    YTzoomStoreStreamingOriginal(className, selectorName, original);
     return YES;
 }
 
-static BOOL YTKACEInstallBoolSetter(NSString *className,
+static BOOL YTzoomInstallBoolSetter(NSString *className,
                                     NSString *selectorName,
                                     IMP replacement) {
     Class cls = NSClassFromString(className);
@@ -447,24 +447,24 @@ static BOOL YTKACEInstallBoolSetter(NSString *className,
         return NO;
     }
     IMP original = NULL;
-    if (!YTKACEInstallInstanceHook(className, selectorName, replacement, &original)) {
+    if (!YTzoomInstallInstanceHook(className, selectorName, replacement, &original)) {
         return NO;
     }
-    YTKACEStoreStreamingOriginal(className, selectorName, original);
+    YTzoomStoreStreamingOriginal(className, selectorName, original);
     return YES;
 }
 
-void YTKACEInstallStreamingHooks(void) {
-    if (YTKACEStreamingOriginals == nil) {
-        YTKACEStreamingOriginals = [NSMutableDictionary dictionary];
+void YTzoomInstallStreamingHooks(void) {
+    if (YTzoomStreamingOriginals == nil) {
+        YTzoomStreamingOriginals = [NSMutableDictionary dictionary];
     }
-    YTKACEInstallClassHook(@"AVPlayer", @"eligibleForHDRPlayback",
-                           (IMP)YTKACEAVEligibleForHDR, &OriginalAVEligibleForHDR);
-    YTKACEInstallClassHook(@"AVPlayer", @"availableHDRModes",
-                           (IMP)YTKACEAVAvailableHDRModes, &OriginalAVAvailableHDRModes);
-    YTKACEInstallInstanceHook(
+    YTzoomInstallClassHook(@"AVPlayer", @"eligibleForHDRPlayback",
+                           (IMP)YTzoomAVEligibleForHDR, &OriginalAVEligibleForHDR);
+    YTzoomInstallClassHook(@"AVPlayer", @"availableHDRModes",
+                           (IMP)YTzoomAVAvailableHDRModes, &OriginalAVAvailableHDRModes);
+    YTzoomInstallInstanceHook(
         @"YTVideoQualitySwitchRedesignedController", @"setUserSelectableFormats:",
-        (IMP)YTKACERedesignedSetFormats, &OriginalRedesignedSetFormats);
+        (IMP)YTzoomRedesignedSetFormats, &OriginalRedesignedSetFormats);
 
     Class qualityClass = NSClassFromString(@"YTIMediaQualitySettingsHotConfig");
     Method qualityMethod = qualityClass == Nil ? NULL : class_getInstanceMethod(
@@ -472,28 +472,28 @@ void YTKACEInstallStreamingHooks(void) {
         NSSelectorFromString(@"enableQuickMenuVideoQualitySettings")
     );
     if (qualityMethod != NULL) {
-        YTKACEInstallInstanceHook(@"YTIMediaQualitySettingsHotConfig",
+        YTzoomInstallInstanceHook(@"YTIMediaQualitySettingsHotConfig",
                                   @"enableQuickMenuVideoQualitySettings",
-                                  (IMP)YTKACELegacyQuality,
+                                  (IMP)YTzoomLegacyQuality,
                                   &OriginalLegacyQuality);
     } else {
-        YTKACEAddInstanceMethod(@"YTIMediaQualitySettingsHotConfig",
+        YTzoomAddInstanceMethod(@"YTIMediaQualitySettingsHotConfig",
                                 @"enableQuickMenuVideoQualitySettings",
-                                (IMP)YTKACELegacyQuality,
+                                (IMP)YTzoomLegacyQuality,
                                 "B@:");
     }
 
-    YTKACEInstallInstanceHook(@"YTVideoQualitySwitchOriginalController",
+    YTzoomInstallInstanceHook(@"YTVideoQualitySwitchOriginalController",
                               @"setUserSelectableFormats:",
-                              (IMP)YTKACESetUserSelectableFormats,
+                              (IMP)YTzoomSetUserSelectableFormats,
                               &OriginalSetUserSelectableFormats);
-    YTKACEInstallInstanceHook(@"YTPlayerViewController",
+    YTzoomInstallInstanceHook(@"YTPlayerViewController",
                               @"playbackController:didLoadContentPlaybackData:",
-                              (IMP)YTKACEDidLoadContentPlaybackData,
+                              (IMP)YTzoomDidLoadContentPlaybackData,
                               &OriginalDidLoadContentPlaybackData);
-    YTKACEInstallInstanceHook(@"ELMTouchCommandPropertiesHandler",
+    YTzoomInstallInstanceHook(@"ELMTouchCommandPropertiesHandler",
                               @"handleTap",
-                              (IMP)YTKACEQualityHandleTap,
+                              (IMP)YTzoomQualityHandleTap,
                               &OriginalQualityHandleTap);
 
     NSArray<NSString *> *autoplayClasses = @[
@@ -533,19 +533,19 @@ void YTKACEInstallStreamingHooks(void) {
     for (NSString *className in autoplayClasses) {
         if (NSClassFromString(className) == Nil) continue;
         for (NSString *selectorName in autoplayGetters) {
-            if (YTKACEInstallBoolGetter(className, selectorName,
-                                        (IMP)YTKACEAutoplayValue)) {
+            if (YTzoomInstallBoolGetter(className, selectorName,
+                                        (IMP)YTzoomAutoplayValue)) {
                 autoplayBound++;
             }
         }
         for (NSString *selectorName in autoplaySetters) {
-            if (YTKACEInstallBoolSetter(className, selectorName,
-                                        (IMP)YTKACEAutoplaySetter)) {
+            if (YTzoomInstallBoolSetter(className, selectorName,
+                                        (IMP)YTzoomAutoplaySetter)) {
                 autoplayBound++;
             }
         }
     }
-    YTKACEDownloadLog(@"autoplay", @"bound %lu hooks",
+    YTzoomDownloadLog(@"autoplay", @"bound %lu hooks",
                       (unsigned long)autoplayBound);
 
     NSArray<NSString *> *qualityClasses = @[
@@ -564,9 +564,9 @@ void YTKACEInstallStreamingHooks(void) {
     ];
     for (NSString *className in qualityClasses) {
         for (NSString *selectorName in qualitySelectors) {
-            YTKACEInstallBoolGetter(className,
+            YTzoomInstallBoolGetter(className,
                                     selectorName,
-                                    (IMP)YTKACECellularQualityValue);
+                                    (IMP)YTzoomCellularQualityValue);
         }
     }
 }

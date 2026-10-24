@@ -2,10 +2,10 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-FOUNDATION_EXPORT void YTKACEDownloadLog(NSString *identifier,
+FOUNDATION_EXPORT void YTzoomDownloadLog(NSString *identifier,
                                          NSString *format, ...)
     NS_FORMAT_FUNCTION(2, 3);
-FOUNDATION_EXPORT NSString *YTKACEDownloadLogContents(void);
-FOUNDATION_EXPORT void YTKACEClearDownloadLog(void);
+FOUNDATION_EXPORT NSString *YTzoomDownloadLogContents(void);
+FOUNDATION_EXPORT void YTzoomClearDownloadLog(void);
 
 NS_ASSUME_NONNULL_END

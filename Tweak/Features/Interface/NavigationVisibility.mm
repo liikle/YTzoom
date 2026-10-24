@@ -19,56 +19,56 @@ static IMP OriginalNavigationImageSetImage;
 static IMP OriginalYTImageViewLayout;
 static IMP OriginalMainWindowTraitChanged;
 static IMP OriginalRightNavigationTraitChanged;
-static NSMutableDictionary<NSString *, NSValue *> *YTKACENavigationOriginals;
-static const void *YTKACENavigationHiddenAssociation = &YTKACENavigationHiddenAssociation;
-static BOOL YTKACENavigationObserverInstalled;
-static NSHashTable<UIView *> *YTKACENavigationOwners;
-static UIUserInterfaceStyle YTKACENavigationStyle = UIUserInterfaceStyleUnspecified;
+static NSMutableDictionary<NSString *, NSValue *> *YTzoomNavigationOriginals;
+static const void *YTzoomNavigationHiddenAssociation = &YTzoomNavigationHiddenAssociation;
+static BOOL YTzoomNavigationObserverInstalled;
+static NSHashTable<UIView *> *YTzoomNavigationOwners;
+static UIUserInterfaceStyle YTzoomNavigationStyle = UIUserInterfaceStyleUnspecified;
 
-static void YTKACEApplyNavigationWindows(void);
-static void YTKACEApplyNavigationSelectors(id owner);
-static BOOL YTKACEInsideRightNavigation(UIView *view);
-static BOOL YTKACEIsNavigationIcon(UIView *view);
+static void YTzoomApplyNavigationWindows(void);
+static void YTzoomApplyNavigationSelectors(id owner);
+static BOOL YTzoomInsideRightNavigation(UIView *view);
+static BOOL YTzoomIsNavigationIcon(UIView *view);
 
-static NSValue *YTKACENavigationIMPValue(IMP implementation) {
+static NSValue *YTzoomNavigationIMPValue(IMP implementation) {
     return [NSValue value:&implementation withObjCType:@encode(IMP)];
 }
 
-static IMP YTKACENavigationIMP(NSValue *value) {
+static IMP YTzoomNavigationIMP(NSValue *value) {
     IMP implementation = NULL;
     [value getValue:&implementation];
     return implementation;
 }
 
-static NSString *YTKACENavigationHookKey(Class cls, SEL selector) {
+static NSString *YTzoomNavigationHookKey(Class cls, SEL selector) {
     return [NSString stringWithFormat:@"%@|%@",
             NSStringFromClass(cls), NSStringFromSelector(selector)];
 }
 
-static IMP YTKACENavigationOriginal(id receiver, SEL selector) {
+static IMP YTzoomNavigationOriginal(id receiver, SEL selector) {
     for (Class cls = object_getClass(receiver); cls != Nil; cls = class_getSuperclass(cls)) {
-        NSValue *value = YTKACENavigationOriginals[
-            YTKACENavigationHookKey(cls, selector)
+        NSValue *value = YTzoomNavigationOriginals[
+            YTzoomNavigationHookKey(cls, selector)
         ];
-        if (value != nil) return YTKACENavigationIMP(value);
+        if (value != nil) return YTzoomNavigationIMP(value);
     }
     return NULL;
 }
 
-static void YTKACESetNavigationHidden(UIView *view, BOOL hidden) {
+static void YTzoomSetNavigationHidden(UIView *view, BOOL hidden) {
     if (view == nil ||
-        [view.accessibilityLabel hasPrefix:@"YTKACE"] ||
-        [view.accessibilityIdentifier hasPrefix:@"YTKACE"]) {
+        [view.accessibilityLabel hasPrefix:@"YTzoom"] ||
+        [view.accessibilityIdentifier hasPrefix:@"YTzoom"]) {
         return;
     }
     NSNumber *baseline = objc_getAssociatedObject(
         view,
-        YTKACENavigationHiddenAssociation
+        YTzoomNavigationHiddenAssociation
     );
     if (hidden) {
         if (baseline == nil) {
             objc_setAssociatedObject(view,
-                                     YTKACENavigationHiddenAssociation,
+                                     YTzoomNavigationHiddenAssociation,
                                      @(view.hidden),
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
@@ -78,13 +78,13 @@ static void YTKACESetNavigationHidden(UIView *view, BOOL hidden) {
         view.hidden = baseline.boolValue;
         view.userInteractionEnabled = YES;
         objc_setAssociatedObject(view,
-                                 YTKACENavigationHiddenAssociation,
+                                 YTzoomNavigationHiddenAssociation,
                                  nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
-static BOOL YTKACEIsMessagesToken(NSString *token) {
+static BOOL YTzoomIsMessagesToken(NSString *token) {
     return [token containsString:@"id.connections.inbox.button"] ||
         [token containsString:@"connectionsinboxbutton"] ||
         [token containsString:@"connections_inbox"] ||
@@ -95,52 +95,52 @@ static BOOL YTKACEIsMessagesToken(NSString *token) {
         [token containsString:@"inboxbutton"];
 }
 
-static id YTKACENavigationButton(id receiver, SEL selector) {
-    IMP original = YTKACENavigationOriginal(receiver, selector);
+static id YTzoomNavigationButton(id receiver, SEL selector) {
+    IMP original = YTzoomNavigationOriginal(receiver, selector);
     id value = original == NULL
         ? nil
         : ((id (*)(id, SEL))original)(receiver, selector);
     if ([value isKindOfClass:UIView.class]) {
         NSString *selectorName = NSStringFromSelector(selector).lowercaseString;
-        BOOL messages = YTKACEIsMessagesToken(selectorName) ||
+        BOOL messages = YTzoomIsMessagesToken(selectorName) ||
             [selectorName isEqualToString:@"connectionsbutton"] ||
             [selectorName isEqualToString:@"messagesbutton"] ||
             [selectorName isEqualToString:@"messagebutton"] ||
             [selectorName isEqualToString:@"chatbutton"] ||
             [selectorName isEqualToString:@"inboxbutton"];
-        YTKACESetNavigationHidden(
+        YTzoomSetNavigationHidden(
             value,
-            YTKACEFeatureEnabled(messages
-                ? @"YTKACE.Preference.Navigation.MessagesHidden"
-                : @"YTKACE.Preference.Navigation.NotificationsHidden")
+            YTzoomFeatureEnabled(messages
+                ? @"YTzoom.Preference.Navigation.MessagesHidden"
+                : @"YTzoom.Preference.Navigation.NotificationsHidden")
         );
     }
     return value;
 }
 
-static void YTKACEInstallNavigationMethodHooks(void) {
-    if (YTKACENavigationOriginals == nil) {
-        YTKACENavigationOriginals = [NSMutableDictionary dictionary];
+static void YTzoomInstallNavigationMethodHooks(void) {
+    if (YTzoomNavigationOriginals == nil) {
+        YTzoomNavigationOriginals = [NSMutableDictionary dictionary];
     }
     NSString *version = NSBundle.mainBundle
         .infoDictionary[@"CFBundleShortVersionString"] ?: @"unknown";
     NSString *cacheKey =
-        [@"YTKACENavigationHookTargets." stringByAppendingString:version];
+        [@"YTzoomNavigationHookTargets." stringByAppendingString:version];
     NSDictionary<NSString *, NSValue *> *replacements = @{
         @"notificationButton":
-            YTKACENavigationIMPValue((IMP)YTKACENavigationButton),
+            YTzoomNavigationIMPValue((IMP)YTzoomNavigationButton),
         @"newNotificationButton":
-            YTKACENavigationIMPValue((IMP)YTKACENavigationButton),
+            YTzoomNavigationIMPValue((IMP)YTzoomNavigationButton),
         @"connectionsButton":
-            YTKACENavigationIMPValue((IMP)YTKACENavigationButton),
+            YTzoomNavigationIMPValue((IMP)YTzoomNavigationButton),
         @"messagesButton":
-            YTKACENavigationIMPValue((IMP)YTKACENavigationButton),
+            YTzoomNavigationIMPValue((IMP)YTzoomNavigationButton),
         @"messageButton":
-            YTKACENavigationIMPValue((IMP)YTKACENavigationButton),
+            YTzoomNavigationIMPValue((IMP)YTzoomNavigationButton),
         @"chatButton":
-            YTKACENavigationIMPValue((IMP)YTKACENavigationButton),
+            YTzoomNavigationIMPValue((IMP)YTzoomNavigationButton),
         @"inboxButton":
-            YTKACENavigationIMPValue((IMP)YTKACENavigationButton)
+            YTzoomNavigationIMPValue((IMP)YTzoomNavigationButton)
     };
     void (^applyTargets)(NSArray<NSString *> *) =
         ^(NSArray<NSString *> *targets) {
@@ -153,19 +153,19 @@ static void YTKACEInstallNavigationMethodHooks(void) {
                 Method method = class_getInstanceMethod(cls, selector);
                 NSValue *replacement = replacements[parts[1]];
                 if (method == NULL || replacement == nil) continue;
-                IMP hook = YTKACENavigationIMP(replacement);
+                IMP hook = YTzoomNavigationIMP(replacement);
                 IMP original = method_getImplementation(method);
                 if (original == hook) continue;
-                YTKACENavigationOriginals[
-                    YTKACENavigationHookKey(cls, selector)
-                ] = YTKACENavigationIMPValue(original);
+                YTzoomNavigationOriginals[
+                    YTzoomNavigationHookKey(cls, selector)
+                ] = YTzoomNavigationIMPValue(original);
                 method_setImplementation(method, hook);
             }
         };
     applyTargets([NSUserDefaults.standardUserDefaults arrayForKey:cacheKey]);
 }
 
-static void YTKACEDiscoverNavigationMethodHooks(void) {
+static void YTzoomDiscoverNavigationMethodHooks(void) {
     NSSet<NSString *> *selectors = [NSSet setWithArray:@[
         @"notificationButton",
         @"newNotificationButton",
@@ -176,7 +176,7 @@ static void YTKACEDiscoverNavigationMethodHooks(void) {
         @"inboxButton"
     ]];
     NSMutableOrderedSet<NSString *> *targets = [NSMutableOrderedSet orderedSet];
-    for (NSString *scanName in YTKACEAppClassNames()) {
+    for (NSString *scanName in YTzoomAppClassNames()) {
         Class cls = NSClassFromString(scanName);
         if (cls == Nil) continue;
         unsigned int methodCount = 0;
@@ -195,16 +195,16 @@ static void YTKACEDiscoverNavigationMethodHooks(void) {
     NSString *version = NSBundle.mainBundle
         .infoDictionary[@"CFBundleShortVersionString"] ?: @"unknown";
     NSString *cacheKey =
-        [@"YTKACENavigationHookTargets." stringByAppendingString:version];
+        [@"YTzoomNavigationHookTargets." stringByAppendingString:version];
     NSArray<NSString *> *result = targets.array;
     [NSUserDefaults.standardUserDefaults setObject:result forKey:cacheKey];
     dispatch_async(dispatch_get_main_queue(), ^{
-        YTKACEInstallNavigationMethodHooks();
-        YTKACEApplyNavigationWindows();
+        YTzoomInstallNavigationMethodHooks();
+        YTzoomApplyNavigationWindows();
     });
 }
 
-static BOOL YTKACEMatchesAncestorButton(UIView *view, NSString *accessor) {
+static BOOL YTzoomMatchesAncestorButton(UIView *view, NSString *accessor) {
     SEL selector = NSSelectorFromString(accessor);
     for (UIView *ancestor = view.superview; ancestor != nil;
          ancestor = ancestor.superview) {
@@ -216,42 +216,42 @@ static BOOL YTKACEMatchesAncestorButton(UIView *view, NSString *accessor) {
     return NO;
 }
 
-static BOOL YTKACENavigationShouldHide(UIView *view) {
-    if (!YTKACEIsNavigationIcon(view)) return NO;
+static BOOL YTzoomNavigationShouldHide(UIView *view) {
+    if (!YTzoomIsNavigationIcon(view)) return NO;
     NSString *token = [[NSString stringWithFormat:@"%@ %@ %@",
                         NSStringFromClass(view.class),
                         view.accessibilityIdentifier ?: @"",
                         view.accessibilityLabel ?: @""] lowercaseString];
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.AccountHidden") &&
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.AccountHidden") &&
         ([token containsString:@"account"] ||
          [token containsString:@"avatar"] ||
          [token containsString:@"profile"])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.SearchHidden") &&
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.SearchHidden") &&
         [token containsString:@"search"]) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.CastHidden") &&
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.CastHidden") &&
         ([token containsString:@"cast"] ||
          [token containsString:@"airplay"] ||
          [token containsString:@"routebutton"] ||
-         YTKACEMatchesAncestorButton(view, @"MDXButton"))) {
+         YTzoomMatchesAncestorButton(view, @"MDXButton"))) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.NotificationsHidden") &&
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.NotificationsHidden") &&
         ([token containsString:@"notification"] ||
          [token containsString:@"bell"])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.MessagesHidden") &&
-        YTKACEInsideRightNavigation(view) && YTKACEIsMessagesToken(token)) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.MessagesHidden") &&
+        YTzoomInsideRightNavigation(view) && YTzoomIsMessagesToken(token)) {
         return YES;
     }
     return NO;
 }
 
-static BOOL YTKACEIsNavigationIcon(UIView *view) {
+static BOOL YTzoomIsNavigationIcon(UIView *view) {
     NSString *token = [[NSString stringWithFormat:@"%@ %@ %@",
                         NSStringFromClass(view.class),
                         view.accessibilityIdentifier ?: @"",
@@ -266,7 +266,7 @@ static BOOL YTKACEIsNavigationIcon(UIView *view) {
         [token containsString:@"cast"] ||
         [token containsString:@"airplay"] ||
         [token containsString:@"routebutton"] ||
-        (YTKACEInsideRightNavigation(view) && YTKACEIsMessagesToken(token))) {
+        (YTzoomInsideRightNavigation(view) && YTzoomIsMessagesToken(token))) {
         return YES;
     }
     if (![view isKindOfClass:UIButton.class] &&
@@ -281,9 +281,9 @@ static BOOL YTKACEIsNavigationIcon(UIView *view) {
     return NO;
 }
 
-static UIColor *YTKACENavigationForeground(UIView *view) {
-    if (YTKACEInsideRightNavigation(view)) {
-        UIUserInterfaceStyle style = YTKACENavigationStyle;
+static UIColor *YTzoomNavigationForeground(UIView *view) {
+    if (YTzoomInsideRightNavigation(view)) {
+        UIUserInterfaceStyle style = YTzoomNavigationStyle;
         if (style == UIUserInterfaceStyleUnspecified) {
             style = view.window.traitCollection.userInterfaceStyle;
         }
@@ -308,7 +308,7 @@ static UIColor *YTKACENavigationForeground(UIView *view) {
         ? UIColor.whiteColor : UIColor.blackColor;
 }
 
-static BOOL YTKACEInsideRightNavigation(UIView *view) {
+static BOOL YTzoomInsideRightNavigation(UIView *view) {
     for (UIView *current = view; current != nil; current = current.superview) {
         if ([NSStringFromClass(current.class)
                 isEqualToString:@"YTRightNavigationButtons"]) return YES;
@@ -316,7 +316,7 @@ static BOOL YTKACEInsideRightNavigation(UIView *view) {
     return NO;
 }
 
-static void YTKACEApplyNavigationTint(UIView *view, UIColor *color) {
+static void YTzoomApplyNavigationTint(UIView *view, UIColor *color) {
     view.tintColor = color;
     if ([view isKindOfClass:UIButton.class]) {
         UIButton *button = (UIButton *)view;
@@ -338,43 +338,43 @@ static void YTKACEApplyNavigationTint(UIView *view, UIColor *color) {
         }
     }
     for (UIView *subview in view.subviews) {
-        YTKACEApplyNavigationTint(subview, color);
+        YTzoomApplyNavigationTint(subview, color);
     }
 }
 
-static void YTKACEApplyNavigationTree(UIView *view) {
+static void YTzoomApplyNavigationTree(UIView *view) {
     if ([NSStringFromClass(view.class) isEqualToString:@"YTRightNavigationButtons"]) {
-        YTKACEApplyNavigationSelectors(view);
+        YTzoomApplyNavigationSelectors(view);
     }
-    YTKACESetNavigationHidden(view, YTKACENavigationShouldHide(view));
-    if (YTKACEFeatureEnabled(YTKACEOLEDKey) &&
-        YTKACEIsNavigationIcon(view)) {
-        YTKACEApplyNavigationTint(view, YTKACENavigationForeground(view));
+    YTzoomSetNavigationHidden(view, YTzoomNavigationShouldHide(view));
+    if (YTzoomFeatureEnabled(YTzoomOLEDKey) &&
+        YTzoomIsNavigationIcon(view)) {
+        YTzoomApplyNavigationTint(view, YTzoomNavigationForeground(view));
     }
     for (UIView *subview in view.subviews) {
-        YTKACEApplyNavigationTree(subview);
+        YTzoomApplyNavigationTree(subview);
     }
 }
 
-void YTKACERefreshNavigationAppearance(void) {
-    if (!YTKACEFeatureEnabled(YTKACEOLEDKey)) return;
-    YTKACEApplyNavigationWindows();
-    for (UIView *owner in YTKACENavigationOwners.allObjects) {
-        YTKACEApplyNavigationSelectors(owner);
+void YTzoomRefreshNavigationAppearance(void) {
+    if (!YTzoomFeatureEnabled(YTzoomOLEDKey)) return;
+    YTzoomApplyNavigationWindows();
+    for (UIView *owner in YTzoomNavigationOwners.allObjects) {
+        YTzoomApplyNavigationSelectors(owner);
     }
 }
 
-static void YTKACEApplyNavigationWindows(void) {
+static void YTzoomApplyNavigationWindows(void) {
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class] ||
             scene.activationState != UISceneActivationStateForegroundActive) continue;
         for (UIWindow *window in ((UIWindowScene *)scene).windows) {
-            if (!window.hidden) YTKACEApplyNavigationTree(window);
+            if (!window.hidden) YTzoomApplyNavigationTree(window);
         }
     }
 }
 
-static UIView *YTKACENavigationValue(id owner, NSString *name) {
+static UIView *YTzoomNavigationValue(id owner, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     if ([owner respondsToSelector:selector]) {
         id value = ((id (*)(id, SEL))objc_msgSend)(owner, selector);
@@ -388,68 +388,68 @@ static UIView *YTKACENavigationValue(id owner, NSString *name) {
     }
 }
 
-static void YTKACEApplyNavigationSelectors(id owner) {
+static void YTzoomApplyNavigationSelectors(id owner) {
     NSDictionary<NSString *, NSArray<NSString *> *> *groups = @{
-        @"YTKACE.Preference.Navigation.NotificationsHidden": @[
+        @"YTzoom.Preference.Navigation.NotificationsHidden": @[
             @"notificationButton", @"newNotificationButton",
             @"notificationBellButton", @"notificationBellView"
         ],
-        @"YTKACE.Preference.Navigation.MessagesHidden": @[
+        @"YTzoom.Preference.Navigation.MessagesHidden": @[
             @"connectionsButton", @"messagesButton", @"messageButton",
             @"chatButton", @"inboxButton"
         ],
-        @"YTKACE.Preference.Navigation.SearchHidden": @[@"searchButton"],
-        @"YTKACE.Preference.Navigation.CastHidden": @[@"castButton", @"MDXButton"],
-        @"YTKACE.Preference.Navigation.AccountHidden": @[@"accountButton", @"avatarButton"]
+        @"YTzoom.Preference.Navigation.SearchHidden": @[@"searchButton"],
+        @"YTzoom.Preference.Navigation.CastHidden": @[@"castButton", @"MDXButton"],
+        @"YTzoom.Preference.Navigation.AccountHidden": @[@"accountButton", @"avatarButton"]
     };
     for (NSString *key in groups) {
-        BOOL hidden = YTKACEFeatureEnabled(key);
+        BOOL hidden = YTzoomFeatureEnabled(key);
         for (NSString *name in groups[key]) {
-            UIView *target = YTKACENavigationValue(owner, name);
-            YTKACESetNavigationHidden(target, hidden);
+            UIView *target = YTzoomNavigationValue(owner, name);
+            YTzoomSetNavigationHidden(target, hidden);
             if (target != nil && !hidden &&
-                YTKACEFeatureEnabled(YTKACEOLEDKey)) {
-                YTKACEApplyNavigationTint(
-                    target, YTKACENavigationForeground(target));
+                YTzoomFeatureEnabled(YTzoomOLEDKey)) {
+                YTzoomApplyNavigationTint(
+                    target, YTzoomNavigationForeground(target));
             }
         }
     }
 }
 
-void YTKACEApplyRightNavigationVisibility(UIView *view) {
-    if (YTKACENavigationOwners == nil) {
-        YTKACENavigationOwners = [NSHashTable weakObjectsHashTable];
+void YTzoomApplyRightNavigationVisibility(UIView *view) {
+    if (YTzoomNavigationOwners == nil) {
+        YTzoomNavigationOwners = [NSHashTable weakObjectsHashTable];
     }
-    [YTKACENavigationOwners addObject:view];
-    YTKACEApplyNavigationSelectors(view);
-    YTKACEApplyNavigationTree(view);
+    [YTzoomNavigationOwners addObject:view];
+    YTzoomApplyNavigationSelectors(view);
+    YTzoomApplyNavigationTree(view);
 }
 
-static void YTKACEHeaderLogoLayout(UIView *receiver, SEL selector) {
+static void YTzoomHeaderLogoLayout(UIView *receiver, SEL selector) {
     if (OriginalHeaderLogoLayout != NULL) {
         ((void (*)(id, SEL))OriginalHeaderLogoLayout)(receiver, selector);
     }
-    YTKACESetNavigationHidden(
+    YTzoomSetNavigationHidden(
         receiver,
-        YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.LogoHidden")
+        YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.LogoHidden")
     );
 }
 
-static void YTKACELogoViewLayout(UIView *receiver, SEL selector) {
+static void YTzoomLogoViewLayout(UIView *receiver, SEL selector) {
     if (OriginalLogoViewLayout != NULL) {
         ((void (*)(id, SEL))OriginalLogoViewLayout)(receiver, selector);
     }
-    YTKACESetNavigationHidden(
+    YTzoomSetNavigationHidden(
         receiver,
-        YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.LogoHidden")
+        YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.LogoHidden")
     );
 }
 
-static void YTKACEHeaderLogoSetHidden(UIView *receiver,
+static void YTzoomHeaderLogoSetHidden(UIView *receiver,
                                       SEL selector,
                                       BOOL hidden) {
-    if (hidden || !YTKACEFeatureEnabled(
-            @"YTKACE.Preference.Navigation.LogoHidden")) {
+    if (hidden || !YTzoomFeatureEnabled(
+            @"YTzoom.Preference.Navigation.LogoHidden")) {
         if (OriginalHeaderLogoSetHidden != NULL) {
             ((void (*)(id, SEL, BOOL))OriginalHeaderLogoSetHidden)(
                 receiver, selector, hidden);
@@ -462,11 +462,11 @@ static void YTKACEHeaderLogoSetHidden(UIView *receiver,
     }
 }
 
-static void YTKACELogoViewSetHidden(UIView *receiver,
+static void YTzoomLogoViewSetHidden(UIView *receiver,
                                     SEL selector,
                                     BOOL hidden) {
-    if (hidden || !YTKACEFeatureEnabled(
-            @"YTKACE.Preference.Navigation.LogoHidden")) {
+    if (hidden || !YTzoomFeatureEnabled(
+            @"YTzoom.Preference.Navigation.LogoHidden")) {
         if (OriginalLogoViewSetHidden != NULL) {
             ((void (*)(id, SEL, BOOL))OriginalLogoViewSetHidden)(
                 receiver, selector, hidden);
@@ -479,7 +479,7 @@ static void YTKACELogoViewSetHidden(UIView *receiver,
     }
 }
 
-static void YTKACEYTImageSetHidden(UIView *receiver,
+static void YTzoomYTImageSetHidden(UIView *receiver,
                                    SEL selector,
                                    BOOL hidden) {
     NSString *label = receiver.accessibilityLabel;
@@ -487,7 +487,7 @@ static void YTKACEYTImageSetHidden(UIView *receiver,
         (![receiver.accessibilityIdentifier isEqualToString:@"id.youtube.logo"] &&
          !(label.length != 0 &&
            [label caseInsensitiveCompare:@"YouTube"] == NSOrderedSame)) ||
-        !YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.LogoHidden")) {
+        !YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.LogoHidden")) {
         if (OriginalYTImageSetHidden != NULL) {
             ((void (*)(id, SEL, BOOL))OriginalYTImageSetHidden)(
                 receiver, selector, hidden);
@@ -500,16 +500,16 @@ static void YTKACEYTImageSetHidden(UIView *receiver,
     }
 }
 
-static void YTKACEQTMButtonLayout(UIView *receiver, SEL selector) {
+static void YTzoomQTMButtonLayout(UIView *receiver, SEL selector) {
     if (OriginalQTMButtonLayout != NULL) {
         ((void (*)(id, SEL))OriginalQTMButtonLayout)(receiver, selector);
     }
     NSString *label = receiver.accessibilityLabel.lowercaseString;
     if ([label isEqualToString:@"notifications"] ||
         [label isEqualToString:@"notification"]) {
-        YTKACESetNavigationHidden(
+        YTzoomSetNavigationHidden(
             receiver,
-            YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.NotificationsHidden")
+            YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.NotificationsHidden")
         );
     } else if ([label isEqualToString:@"messages"] ||
                [label isEqualToString:@"message"] ||
@@ -517,31 +517,31 @@ static void YTKACEQTMButtonLayout(UIView *receiver, SEL selector) {
                [label isEqualToString:@"inbox"] ||
                [receiver.accessibilityIdentifier.lowercaseString
                    isEqualToString:@"id.connections.inbox.button"]) {
-        YTKACESetNavigationHidden(
+        YTzoomSetNavigationHidden(
             receiver,
-            YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.MessagesHidden")
+            YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.MessagesHidden")
         );
     } else if ([label isEqualToString:@"search"] ||
                [receiver.accessibilityIdentifier
                    isEqualToString:@"id.ui.navigation.search.button"]) {
-        YTKACESetNavigationHidden(
+        YTzoomSetNavigationHidden(
             receiver,
-            YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.SearchHidden")
+            YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.SearchHidden")
         );
     }
-    if (YTKACEFeatureEnabled(YTKACEOLEDKey) &&
-        YTKACEIsNavigationIcon(receiver)) {
-        YTKACEApplyNavigationTint(receiver,
-                                  YTKACENavigationForeground(receiver));
+    if (YTzoomFeatureEnabled(YTzoomOLEDKey) &&
+        YTzoomIsNavigationIcon(receiver)) {
+        YTzoomApplyNavigationTint(receiver,
+                                  YTzoomNavigationForeground(receiver));
     }
 }
 
-static void YTKACEQTMButtonSetTint(UIView *receiver,
+static void YTzoomQTMButtonSetTint(UIView *receiver,
                                    SEL selector,
                                    UIColor *color) {
-    if (YTKACEFeatureEnabled(YTKACEOLEDKey) &&
-        YTKACEInsideRightNavigation(receiver)) {
-        color = YTKACENavigationForeground(receiver);
+    if (YTzoomFeatureEnabled(YTzoomOLEDKey) &&
+        YTzoomInsideRightNavigation(receiver)) {
+        color = YTzoomNavigationForeground(receiver);
     }
     if (OriginalQTMButtonSetTint != NULL) {
         ((void (*)(id, SEL, id))OriginalQTMButtonSetTint)(
@@ -549,12 +549,12 @@ static void YTKACEQTMButtonSetTint(UIView *receiver,
     }
 }
 
-static void YTKACENavigationImageSetTint(UIView *receiver,
+static void YTzoomNavigationImageSetTint(UIView *receiver,
                                          SEL selector,
                                          UIColor *color) {
-    if (YTKACEFeatureEnabled(YTKACEOLEDKey) &&
-        YTKACEInsideRightNavigation(receiver)) {
-        color = YTKACENavigationForeground(receiver);
+    if (YTzoomFeatureEnabled(YTzoomOLEDKey) &&
+        YTzoomInsideRightNavigation(receiver)) {
+        color = YTzoomNavigationForeground(receiver);
     }
     if (OriginalNavigationImageSetTint != NULL) {
         ((void (*)(id, SEL, id))OriginalNavigationImageSetTint)(
@@ -562,12 +562,12 @@ static void YTKACENavigationImageSetTint(UIView *receiver,
     }
 }
 
-static void YTKACEQTMButtonSetImage(UIButton *receiver,
+static void YTzoomQTMButtonSetImage(UIButton *receiver,
                                     SEL selector,
                                     UIImage *image,
                                     UIControlState state) {
-    BOOL styled = YTKACEFeatureEnabled(YTKACEOLEDKey) &&
-        YTKACEInsideRightNavigation(receiver);
+    BOOL styled = YTzoomFeatureEnabled(YTzoomOLEDKey) &&
+        YTzoomInsideRightNavigation(receiver);
     if (styled && image != nil) {
         image = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     }
@@ -578,15 +578,15 @@ static void YTKACEQTMButtonSetImage(UIButton *receiver,
     if (styled && OriginalQTMButtonSetTint != NULL) {
         ((void (*)(id, SEL, id))OriginalQTMButtonSetTint)(
             receiver, @selector(setTintColor:),
-            YTKACENavigationForeground(receiver));
+            YTzoomNavigationForeground(receiver));
     }
 }
 
-static void YTKACENavigationImageSetImage(UIImageView *receiver,
+static void YTzoomNavigationImageSetImage(UIImageView *receiver,
                                           SEL selector,
                                           UIImage *image) {
-    BOOL styled = YTKACEFeatureEnabled(YTKACEOLEDKey) &&
-        YTKACEInsideRightNavigation(receiver);
+    BOOL styled = YTzoomFeatureEnabled(YTzoomOLEDKey) &&
+        YTzoomInsideRightNavigation(receiver);
     if (styled && image != nil) {
         image = [image imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     }
@@ -597,11 +597,11 @@ static void YTKACENavigationImageSetImage(UIImageView *receiver,
     if (styled && OriginalNavigationImageSetTint != NULL) {
         ((void (*)(id, SEL, id))OriginalNavigationImageSetTint)(
             receiver, @selector(setTintColor:),
-            YTKACENavigationForeground(receiver));
+            YTzoomNavigationForeground(receiver));
     }
 }
 
-static void YTKACEMainWindowTraitChanged(UIWindow *receiver,
+static void YTzoomMainWindowTraitChanged(UIWindow *receiver,
                                          SEL selector,
                                          UITraitCollection *previous) {
     if (OriginalMainWindowTraitChanged != NULL) {
@@ -611,13 +611,13 @@ static void YTKACEMainWindowTraitChanged(UIWindow *receiver,
     UIUserInterfaceStyle style = receiver.traitCollection.userInterfaceStyle;
     if (style == UIUserInterfaceStyleUnspecified ||
         style == previous.userInterfaceStyle) return;
-    YTKACENavigationStyle = style;
-    if (YTKACEFeatureEnabled(YTKACEOLEDKey)) {
-        YTKACERefreshNavigationAppearance();
+    YTzoomNavigationStyle = style;
+    if (YTzoomFeatureEnabled(YTzoomOLEDKey)) {
+        YTzoomRefreshNavigationAppearance();
     }
 }
 
-static void YTKACERightNavigationTraitChanged(UIView *receiver,
+static void YTzoomRightNavigationTraitChanged(UIView *receiver,
                                               SEL selector,
                                               UITraitCollection *previous) {
     if (OriginalRightNavigationTraitChanged != NULL) {
@@ -626,14 +626,14 @@ static void YTKACERightNavigationTraitChanged(UIView *receiver,
     }
     UIUserInterfaceStyle style = receiver.traitCollection.userInterfaceStyle;
     if (style != UIUserInterfaceStyleUnspecified) {
-        YTKACENavigationStyle = style;
+        YTzoomNavigationStyle = style;
     }
-    if (YTKACEFeatureEnabled(YTKACEOLEDKey)) {
-        YTKACEApplyRightNavigationVisibility(receiver);
+    if (YTzoomFeatureEnabled(YTzoomOLEDKey)) {
+        YTzoomApplyRightNavigationVisibility(receiver);
     }
 }
 
-static void YTKACEYTImageViewLayout(UIView *receiver, SEL selector) {
+static void YTzoomYTImageViewLayout(UIView *receiver, SEL selector) {
     if (OriginalYTImageViewLayout != NULL) {
         ((void (*)(id, SEL))OriginalYTImageViewLayout)(receiver, selector);
     }
@@ -641,77 +641,77 @@ static void YTKACEYTImageViewLayout(UIView *receiver, SEL selector) {
     if ([receiver.accessibilityIdentifier isEqualToString:@"id.youtube.logo"] ||
         (label.length != 0 &&
          [label caseInsensitiveCompare:@"YouTube"] == NSOrderedSame)) {
-        YTKACESetNavigationHidden(
+        YTzoomSetNavigationHidden(
             receiver,
-            YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.LogoHidden")
+            YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.LogoHidden")
         );
     }
 }
 
-void YTKACEInstallNavigationVisibilityHooks(void) {
-    YTKACEInstallNavigationMethodHooks();
-    YTKACEInstallInstanceHook(@"YTHeaderLogoView",
+void YTzoomInstallNavigationVisibilityHooks(void) {
+    YTzoomInstallNavigationMethodHooks();
+    YTzoomInstallInstanceHook(@"YTHeaderLogoView",
                               @"layoutSubviews",
-                              (IMP)YTKACEHeaderLogoLayout,
+                              (IMP)YTzoomHeaderLogoLayout,
                               &OriginalHeaderLogoLayout);
-    YTKACEInstallInstanceHook(@"YTHeaderLogoView",
+    YTzoomInstallInstanceHook(@"YTHeaderLogoView",
                               @"setHidden:",
-                              (IMP)YTKACEHeaderLogoSetHidden,
+                              (IMP)YTzoomHeaderLogoSetHidden,
                               &OriginalHeaderLogoSetHidden);
-    YTKACEInstallInstanceHook(@"YTLogoView",
+    YTzoomInstallInstanceHook(@"YTLogoView",
                               @"layoutSubviews",
-                              (IMP)YTKACELogoViewLayout,
+                              (IMP)YTzoomLogoViewLayout,
                               &OriginalLogoViewLayout);
-    YTKACEInstallInstanceHook(@"YTLogoView",
+    YTzoomInstallInstanceHook(@"YTLogoView",
                               @"setHidden:",
-                              (IMP)YTKACELogoViewSetHidden,
+                              (IMP)YTzoomLogoViewSetHidden,
                               &OriginalLogoViewSetHidden);
-    YTKACEInstallInstanceHook(@"YTQTMButton",
+    YTzoomInstallInstanceHook(@"YTQTMButton",
                               @"layoutSubviews",
-                              (IMP)YTKACEQTMButtonLayout,
+                              (IMP)YTzoomQTMButtonLayout,
                               &OriginalQTMButtonLayout);
-    YTKACEInstallInstanceHook(@"YTQTMButton",
+    YTzoomInstallInstanceHook(@"YTQTMButton",
                               @"setTintColor:",
-                              (IMP)YTKACEQTMButtonSetTint,
+                              (IMP)YTzoomQTMButtonSetTint,
                               &OriginalQTMButtonSetTint);
-    YTKACEInstallInstanceHook(@"YTQTMButton",
+    YTzoomInstallInstanceHook(@"YTQTMButton",
                               @"setImage:forState:",
-                              (IMP)YTKACEQTMButtonSetImage,
+                              (IMP)YTzoomQTMButtonSetImage,
                               &OriginalQTMButtonSetImage);
-    YTKACEInstallInstanceHook(@"UIImageView",
+    YTzoomInstallInstanceHook(@"UIImageView",
                               @"setTintColor:",
-                              (IMP)YTKACENavigationImageSetTint,
+                              (IMP)YTzoomNavigationImageSetTint,
                               &OriginalNavigationImageSetTint);
-    YTKACEInstallInstanceHook(@"UIImageView",
+    YTzoomInstallInstanceHook(@"UIImageView",
                               @"setImage:",
-                              (IMP)YTKACENavigationImageSetImage,
+                              (IMP)YTzoomNavigationImageSetImage,
                               &OriginalNavigationImageSetImage);
-    YTKACEInstallInstanceHook(@"YTImageView",
+    YTzoomInstallInstanceHook(@"YTImageView",
                               @"layoutSubviews",
-                              (IMP)YTKACEYTImageViewLayout,
+                              (IMP)YTzoomYTImageViewLayout,
                               &OriginalYTImageViewLayout);
-    YTKACEInstallInstanceHook(@"YTImageView",
+    YTzoomInstallInstanceHook(@"YTImageView",
                               @"setHidden:",
-                              (IMP)YTKACEYTImageSetHidden,
+                              (IMP)YTzoomYTImageSetHidden,
                               &OriginalYTImageSetHidden);
-    YTKACEInstallInstanceHook(@"YTMainWindow",
+    YTzoomInstallInstanceHook(@"YTMainWindow",
                               @"traitCollectionDidChange:",
-                              (IMP)YTKACEMainWindowTraitChanged,
+                              (IMP)YTzoomMainWindowTraitChanged,
                               &OriginalMainWindowTraitChanged);
-    YTKACEInstallInstanceHook(@"YTRightNavigationButtons",
+    YTzoomInstallInstanceHook(@"YTRightNavigationButtons",
                               @"traitCollectionDidChange:",
-                              (IMP)YTKACERightNavigationTraitChanged,
+                              (IMP)YTzoomRightNavigationTraitChanged,
                               &OriginalRightNavigationTraitChanged);
-    YTKACEApplyNavigationWindows();
-    if (!YTKACENavigationObserverInstalled) {
-        YTKACENavigationObserverInstalled = YES;
+    YTzoomApplyNavigationWindows();
+    if (!YTzoomNavigationObserverInstalled) {
+        YTzoomNavigationObserverInstalled = YES;
         [NSNotificationCenter.defaultCenter
             addObserverForName:UIApplicationDidBecomeActiveNotification
             object:nil queue:NSOperationQueue.mainQueue
             usingBlock:^(__unused NSNotification *notification) {
                 NSString *version = NSBundle.mainBundle
                     .infoDictionary[@"CFBundleShortVersionString"] ?: @"unknown";
-                NSString *cacheKey = [@"YTKACENavigationHookTargets."
+                NSString *cacheKey = [@"YTzoomNavigationHookTargets."
                     stringByAppendingString:version];
                 if ([NSUserDefaults.standardUserDefaults
                         arrayForKey:cacheKey].count == 0) {
@@ -719,14 +719,14 @@ void YTKACEInstallNavigationVisibilityHooks(void) {
                     dispatch_once(&discoveryToken, ^{
                         dispatch_async(
                             dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-                                YTKACEDiscoverNavigationMethodHooks();
+                                YTzoomDiscoverNavigationMethodHooks();
                             }
                         );
                     });
                 }
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                     (int64_t)(1.0 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                        YTKACEApplyNavigationWindows();
+                        YTzoomApplyNavigationWindows();
                     });
             }];
     }

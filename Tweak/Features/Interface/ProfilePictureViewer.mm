@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Preferences.h"
 #import "../../UI/Notice.h"
 
@@ -7,21 +7,21 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static const NSTimeInterval YTKACEAvatarHoldDuration = 0.8;
-static const NSTimeInterval YTKACEAvatarWindowHoldDuration = 0.3;
+static const NSTimeInterval YTzoomAvatarHoldDuration = 0.8;
+static const NSTimeInterval YTzoomAvatarWindowHoldDuration = 0.3;
 
-static const void *YTKACEAvatarGestureAssociation = &YTKACEAvatarGestureAssociation;
-static const void *YTKACEAvatarNodeAssociation = &YTKACEAvatarNodeAssociation;
+static const void *YTzoomAvatarGestureAssociation = &YTzoomAvatarGestureAssociation;
+static const void *YTzoomAvatarNodeAssociation = &YTzoomAvatarNodeAssociation;
 
-static id YTKACEAvatarValue(id object, NSString *key);
+static id YTzoomAvatarValue(id object, NSString *key);
 
-@interface YTKACEAvatarNodeTarget : NSObject <UIGestureRecognizerDelegate>
+@interface YTzoomAvatarNodeTarget : NSObject <UIGestureRecognizerDelegate>
 + (instancetype)sharedTarget;
 - (void)avatarNodeHeld:(UILongPressGestureRecognizer *)gesture;
 - (void)presentBestForView:(UIView *)view node:(id)node fallback:(UIImage *)fallback;
 @end
 
-static UIViewController *YTKACEAvatarPresenter(UIView *view) {
+static UIViewController *YTzoomAvatarPresenter(UIView *view) {
     UIResponder *responder = view;
     while (responder != nil) {
         if ([responder isKindOfClass:UIViewController.class]) {
@@ -36,14 +36,14 @@ static UIViewController *YTKACEAvatarPresenter(UIView *view) {
     return controller;
 }
 
-static BOOL YTKACEAvatarToken(UIView *view) {
+static BOOL YTzoomAvatarToken(UIView *view) {
     UIView *candidate = view;
     for (NSUInteger depth = 0; candidate != nil && depth < 7; depth++) {
         NSString *token = [NSString stringWithFormat:@"%@ %@ %@",
             NSStringFromClass(candidate.class) ?: @"",
             candidate.accessibilityIdentifier ?: @"",
             candidate.accessibilityLabel ?: @""].lowercaseString;
-        if ([token containsString:@"ytkace"]) return NO;
+        if ([token containsString:@"ytzoom"]) return NO;
         if ([token containsString:@"avatar"] ||
             [token containsString:@"profile"] ||
             [token containsString:@"account"] ||
@@ -56,7 +56,7 @@ static BOOL YTKACEAvatarToken(UIView *view) {
     return NO;
 }
 
-static UIImage *YTKACEAvatarImage(UIView *view) {
+static UIImage *YTzoomAvatarImage(UIView *view) {
     if ([view isKindOfClass:UIImageView.class] &&
         ((UIImageView *)view).image != nil) {
         return ((UIImageView *)view).image;
@@ -85,7 +85,7 @@ static UIImage *YTKACEAvatarImage(UIView *view) {
     return best;
 }
 
-static BOOL YTKACEAvatarImageShape(UIImageView *view) {
+static BOOL YTzoomAvatarImageShape(UIImageView *view) {
     CGFloat width = CGRectGetWidth(view.bounds);
     CGFloat height = CGRectGetHeight(view.bounds);
     if (width < 18.0 || height < 18.0 || width > 240.0 || height > 240.0) {
@@ -94,16 +94,16 @@ static BOOL YTKACEAvatarImageShape(UIImageView *view) {
     CGFloat ratio = width / MAX(height, 1.0);
     if (ratio < 0.82 || ratio > 1.18) return NO;
     return view.layer.cornerRadius >= MIN(width, height) * 0.28 ||
-        view.layer.mask != nil || YTKACEAvatarToken(view);
+        view.layer.mask != nil || YTzoomAvatarToken(view);
 }
 
-static UIView *YTKACEAvatarViewAtPoint(UIWindow *window,
+static UIView *YTzoomAvatarViewAtPoint(UIWindow *window,
                                        CGPoint point,
                                        UIImage **imageOutput) {
     UIView *hit = [window hitTest:point withEvent:nil];
     for (UIView *candidate = hit; candidate != nil; candidate = candidate.superview) {
-        if (!YTKACEAvatarToken(candidate)) continue;
-        UIImage *image = YTKACEAvatarImage(candidate);
+        if (!YTzoomAvatarToken(candidate)) continue;
+        UIImage *image = YTzoomAvatarImage(candidate);
         if (image != nil) {
             if (imageOutput != NULL) *imageOutput = image;
             return candidate;
@@ -116,7 +116,7 @@ static UIView *YTKACEAvatarViewAtPoint(UIWindow *window,
         NSIndexPath *indexPath = [collection indexPathForItemAtPoint:local];
         UICollectionViewCell *cell = indexPath == nil
             ? nil : [collection cellForItemAtIndexPath:indexPath];
-        UIImage *image = YTKACEAvatarImage(cell);
+        UIImage *image = YTzoomAvatarImage(cell);
         if (image != nil) {
             if (imageOutput != NULL) *imageOutput = image;
             return cell;
@@ -139,7 +139,7 @@ static UIView *YTKACEAvatarViewAtPoint(UIWindow *window,
                 CGRectGetHeight(imageView.bounds);
             if (imageView.image != nil &&
                 [imageView pointInside:local withEvent:nil] &&
-                YTKACEAvatarImageShape(imageView) && area < bestArea) {
+                YTzoomAvatarImageShape(imageView) && area < bestArea) {
                 bestView = imageView;
                 bestArea = area;
             }
@@ -170,8 +170,8 @@ static UIView *YTKACEAvatarViewAtPoint(UIWindow *window,
     return nil;
 }
 
-static NSString *YTKACEAvatarURLString(id node) {
-    id URL = YTKACEAvatarValue(node, @"URL");
+static NSString *YTzoomAvatarURLString(id node) {
+    id URL = YTzoomAvatarValue(node, @"URL");
     NSString *absolute = [URL isKindOfClass:NSURL.class]
         ? ((NSURL *)URL).absoluteString : nil;
     if (absolute.length == 0) return nil;
@@ -183,41 +183,41 @@ static NSString *YTKACEAvatarURLString(id node) {
     return absolute;
 }
 
-static id YTKACEAvatarNodeInTree(id node, NSUInteger depth) {
+static id YTzoomAvatarNodeInTree(id node, NSUInteger depth) {
     if (node == nil || depth > 10) return nil;
-    if (YTKACEAvatarURLString(node) != nil) return node;
-    id subnodes = YTKACEAvatarValue(node, @"subnodes");
+    if (YTzoomAvatarURLString(node) != nil) return node;
+    id subnodes = YTzoomAvatarValue(node, @"subnodes");
     if (![subnodes isKindOfClass:NSArray.class]) {
-        subnodes = YTKACEAvatarValue(node, @"yogaChildren");
+        subnodes = YTzoomAvatarValue(node, @"yogaChildren");
     }
     if ([subnodes isKindOfClass:NSArray.class]) {
         for (id child in subnodes) {
-            id found = YTKACEAvatarNodeInTree(child, depth + 1);
+            id found = YTzoomAvatarNodeInTree(child, depth + 1);
             if (found != nil) return found;
         }
     }
     return nil;
 }
 
-static id YTKACEAvatarNodeUnderPoint(UIView *view, UIWindow *window,
+static id YTzoomAvatarNodeUnderPoint(UIView *view, UIWindow *window,
                                      CGPoint point, NSUInteger depth) {
     if (view == nil || depth > 30 || view.hidden || view.alpha < 0.05) return nil;
     CGPoint local = [window convertPoint:point toView:view];
     if (depth != 0 && ![view pointInside:local withEvent:nil]) return nil;
 
-    id found = YTKACEAvatarNodeInTree(
-        YTKACEAvatarValue(view, @"keepalive_node"), 0);
+    id found = YTzoomAvatarNodeInTree(
+        YTzoomAvatarValue(view, @"keepalive_node"), 0);
     if (found != nil) return found;
 
     for (UIView *subview in view.subviews.reverseObjectEnumerator) {
-        id found = YTKACEAvatarNodeUnderPoint(subview, window, point, depth + 1);
+        id found = YTzoomAvatarNodeUnderPoint(subview, window, point, depth + 1);
         if (found != nil) return found;
     }
     return nil;
 }
 
 
-static CGSize YTKACENativePoints(UIImage *image) {
+static CGSize YTzoomNativePoints(UIImage *image) {
     CGFloat scale = UIScreen.mainScreen.scale > 0.0
         ? UIScreen.mainScreen.scale : 2.0;
     CGFloat pixelsWide = image.size.width * (image.scale > 0.0 ? image.scale : 1.0);
@@ -226,12 +226,12 @@ static CGSize YTKACENativePoints(UIImage *image) {
     return CGSizeMake(pixelsWide / scale, pixelsHigh / scale);
 }
 
-@interface YTKACEAvatarViewerController : UIViewController
+@interface YTzoomAvatarViewerController : UIViewController
     <UIScrollViewDelegate>
 - (instancetype)initWithImage:(UIImage *)image;
 @end
 
-@implementation YTKACEAvatarViewerController {
+@implementation YTzoomAvatarViewerController {
     UIImage *_image;
     UIScrollView *_scrollView;
     UIImageView *_imageView;
@@ -303,9 +303,9 @@ static CGSize YTKACENativePoints(UIImage *image) {
         [_imageView.widthAnchor constraintEqualToAnchor:_scrollView.frameLayoutGuide.widthAnchor],
         [_imageView.heightAnchor constraintEqualToAnchor:_scrollView.frameLayoutGuide.heightAnchor],
         [_imageView.widthAnchor constraintLessThanOrEqualToConstant:
-            YTKACENativePoints(_image).width],
+            YTzoomNativePoints(_image).width],
         [_imageView.heightAnchor constraintLessThanOrEqualToConstant:
-            YTKACENativePoints(_image).height],
+            YTzoomNativePoints(_image).height],
         [close.leadingAnchor constraintEqualToAnchor:safe.leadingAnchor constant:16.0],
         [close.topAnchor constraintEqualToAnchor:safe.topAnchor constant:12.0],
         [close.widthAnchor constraintEqualToConstant:38.0],
@@ -348,7 +348,7 @@ static CGSize YTKACENativePoints(UIImage *image) {
         [PHAssetChangeRequest creationRequestForAssetFromImage:image];
     } completionHandler:^(BOOL success, __unused NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            YTKACEShowNotice(success ? @"Profile picture saved" :
+            YTzoomShowNotice(success ? @"Profile picture saved" :
                 @"Profile picture could not be saved");
         });
     }];
@@ -356,50 +356,50 @@ static CGSize YTKACENativePoints(UIImage *image) {
 
 @end
 
-@interface YTKACEAvatarTarget : NSObject <UIGestureRecognizerDelegate>
+@interface YTzoomAvatarTarget : NSObject <UIGestureRecognizerDelegate>
 + (instancetype)sharedTarget;
 - (void)avatarHeld:(UILongPressGestureRecognizer *)gesture;
 @end
 
-@implementation YTKACEAvatarTarget
+@implementation YTzoomAvatarTarget
 
 + (instancetype)sharedTarget {
-    static YTKACEAvatarTarget *target;
+    static YTzoomAvatarTarget *target;
     static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{ target = [YTKACEAvatarTarget new]; });
+    dispatch_once(&onceToken, ^{ target = [YTzoomAvatarTarget new]; });
     return target;
 }
 
 - (void)avatarHeld:(UILongPressGestureRecognizer *)gesture {
     if (gesture.state != UIGestureRecognizerStateBegan ||
-        !YTKACEFeatureEnabled(@"YTKACE.Preference.Profiles.Preview")) {
+        !YTzoomFeatureEnabled(@"YTzoom.Preference.Profiles.Preview")) {
         return;
     }
     UIWindow *window = [gesture.view isKindOfClass:UIWindow.class]
         ? (UIWindow *)gesture.view : gesture.view.window;
     CGPoint point = [gesture locationInView:window];
     UIImage *image = nil;
-    UIView *view = YTKACEAvatarViewAtPoint(window, point, &image);
+    UIView *view = YTzoomAvatarViewAtPoint(window, point, &image);
     if (image == nil) return;
     UIImpactFeedbackGenerator *feedback = [[UIImpactFeedbackGenerator alloc]
         initWithStyle:UIImpactFeedbackStyleMedium];
     [feedback impactOccurred];
-    UIViewController *presenter = YTKACEAvatarPresenter(view);
+    UIViewController *presenter = YTzoomAvatarPresenter(view);
     while (presenter.presentedViewController != nil) {
         presenter = presenter.presentedViewController;
     }
-    if ([presenter isKindOfClass:YTKACEAvatarViewerController.class]) return;
-    id node = objc_getAssociatedObject(view, YTKACEAvatarNodeAssociation);
-    if (YTKACEAvatarURLString(node) == nil) {
-        node = YTKACEAvatarValue(view, @"keepalive_node");
+    if ([presenter isKindOfClass:YTzoomAvatarViewerController.class]) return;
+    id node = objc_getAssociatedObject(view, YTzoomAvatarNodeAssociation);
+    if (YTzoomAvatarURLString(node) == nil) {
+        node = YTzoomAvatarValue(view, @"keepalive_node");
     }
-    if (YTKACEAvatarURLString(node) == nil) {
-        node = YTKACEAvatarNodeUnderPoint(view, window, point, 0);
+    if (YTzoomAvatarURLString(node) == nil) {
+        node = YTzoomAvatarNodeUnderPoint(view, window, point, 0);
     }
-    if (YTKACEAvatarURLString(node) == nil) {
-        node = YTKACEAvatarNodeUnderPoint(window, window, point, 0);
+    if (YTzoomAvatarURLString(node) == nil) {
+        node = YTzoomAvatarNodeUnderPoint(window, window, point, 0);
     }
-    [YTKACEAvatarNodeTarget.sharedTarget presentBestForView:view
+    [YTzoomAvatarNodeTarget.sharedTarget presentBestForView:view
                                                        node:node
                                                    fallback:image];
 }
@@ -414,7 +414,7 @@ static CGSize YTKACENativePoints(UIImage *image) {
 
 @end
 
-static id YTKACEAvatarValue(id object, NSString *key) {
+static id YTzoomAvatarValue(id object, NSString *key) {
     if (object == nil || key.length == 0) return nil;
     @try {
         SEL selector = NSSelectorFromString(key);
@@ -425,7 +425,7 @@ static id YTKACEAvatarValue(id object, NSString *key) {
     }
 }
 
-static NSString *YTKACEHighResAvatarURL(NSString *absolute) {
+static NSString *YTzoomHighResAvatarURL(NSString *absolute) {
     if (absolute.length == 0) return nil;
     NSRange size = [absolute rangeOfString:@"=s"];
     if (size.location == NSNotFound) return nil;
@@ -443,28 +443,28 @@ static NSString *YTKACEHighResAvatarURL(NSString *absolute) {
         withString:[NSString stringWithFormat:@"%ld", (long)requested]];
 }
 
-static const void *YTKACEAvatarViewGestureAssociation =
-    &YTKACEAvatarViewGestureAssociation;
+static const void *YTzoomAvatarViewGestureAssociation =
+    &YTzoomAvatarViewGestureAssociation;
 
 
-@implementation YTKACEAvatarNodeTarget
+@implementation YTzoomAvatarNodeTarget
 
 + (instancetype)sharedTarget {
-    static YTKACEAvatarNodeTarget *target;
+    static YTzoomAvatarNodeTarget *target;
     static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{ target = [YTKACEAvatarNodeTarget new]; });
+    dispatch_once(&onceToken, ^{ target = [YTzoomAvatarNodeTarget new]; });
     return target;
 }
 
 - (void)present:(UIImage *)image fromView:(UIView *)view {
     if (image == nil) return;
-    UIViewController *presenter = YTKACEAvatarPresenter(view);
+    UIViewController *presenter = YTzoomAvatarPresenter(view);
     while (presenter.presentedViewController != nil) {
         presenter = presenter.presentedViewController;
     }
-    if ([presenter isKindOfClass:YTKACEAvatarViewerController.class]) return;
+    if ([presenter isKindOfClass:YTzoomAvatarViewerController.class]) return;
     [presenter presentViewController:
-        [[YTKACEAvatarViewerController alloc] initWithImage:image]
+        [[YTzoomAvatarViewerController alloc] initWithImage:image]
                             animated:YES completion:nil];
 }
 
@@ -493,8 +493,8 @@ static const void *YTKACEAvatarViewGestureAssociation =
 }
 
 - (void)presentBestForView:(UIView *)view node:(id)node fallback:(UIImage *)fallback {
-    NSString *absolute = YTKACEAvatarURLString(node);
-    NSString *upgraded = YTKACEHighResAvatarURL(absolute);
+    NSString *absolute = YTzoomAvatarURLString(node);
+    NSString *upgraded = YTzoomHighResAvatarURL(absolute);
     if (upgraded == nil) return;
     __weak UIView *weakView = view;
     [[NSURLSession.sharedSession dataTaskWithURL:[NSURL URLWithString:upgraded]
@@ -509,30 +509,30 @@ static const void *YTKACEAvatarViewGestureAssociation =
 
 - (void)avatarNodeHeld:(UILongPressGestureRecognizer *)gesture {
     if (gesture.state != UIGestureRecognizerStateBegan ||
-        !YTKACEFeatureEnabled(@"YTKACE.Preference.Profiles.Preview")) {
+        !YTzoomFeatureEnabled(@"YTzoom.Preference.Profiles.Preview")) {
         return;
     }
     UIView *view = gesture.view;
-    id node = objc_getAssociatedObject(view, YTKACEAvatarNodeAssociation);
-    if (node == nil) node = YTKACEAvatarValue(view, @"keepalive_node");
+    id node = objc_getAssociatedObject(view, YTzoomAvatarNodeAssociation);
+    if (node == nil) node = YTzoomAvatarValue(view, @"keepalive_node");
 
-    if (YTKACEAvatarURLString(node) == nil) return;
+    if (YTzoomAvatarURLString(node) == nil) return;
     UIImpactFeedbackGenerator *feedback = [[UIImpactFeedbackGenerator alloc]
         initWithStyle:UIImpactFeedbackStyleMedium];
     [feedback impactOccurred];
-    [self presentBestForView:view node:node fallback:YTKACEAvatarImage(view)];
+    [self presentBestForView:view node:node fallback:YTzoomAvatarImage(view)];
 }
 
 @end
 
-void YTKACEProfileConsiderDisplayView(UIView *view, id node) {
-    if (view == nil || !YTKACEFeatureEnabled(@"YTKACE.Preference.Profiles.Preview")) return;
+void YTzoomProfileConsiderDisplayView(UIView *view, id node) {
+    if (view == nil || !YTzoomFeatureEnabled(@"YTzoom.Preference.Profiles.Preview")) return;
     if (![[view description] containsString:@"ELMImageNode-View"]) return;
     if (node != nil) {
-        objc_setAssociatedObject(view, YTKACEAvatarNodeAssociation, node,
+        objc_setAssociatedObject(view, YTzoomAvatarNodeAssociation, node,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    if (objc_getAssociatedObject(view, YTKACEAvatarViewGestureAssociation) != nil) {
+    if (objc_getAssociatedObject(view, YTzoomAvatarViewGestureAssociation) != nil) {
         return;
     }
     for (id<UIInteraction> interaction in [view.interactions copy]) {
@@ -542,36 +542,36 @@ void YTKACEProfileConsiderDisplayView(UIView *view, id node) {
     }
 
     UILongPressGestureRecognizer *gesture = [[UILongPressGestureRecognizer alloc]
-        initWithTarget:YTKACEAvatarNodeTarget.sharedTarget
+        initWithTarget:YTzoomAvatarNodeTarget.sharedTarget
                 action:@selector(avatarNodeHeld:)];
-    gesture.minimumPressDuration = YTKACEAvatarHoldDuration;
+    gesture.minimumPressDuration = YTzoomAvatarHoldDuration;
     gesture.cancelsTouchesInView = NO;
     gesture.delaysTouchesBegan = NO;
     gesture.delaysTouchesEnded = NO;
-    gesture.delegate = YTKACEAvatarNodeTarget.sharedTarget;
+    gesture.delegate = YTzoomAvatarNodeTarget.sharedTarget;
     [view addGestureRecognizer:gesture];
     view.userInteractionEnabled = YES;
-    objc_setAssociatedObject(view, YTKACEAvatarViewGestureAssociation, gesture,
+    objc_setAssociatedObject(view, YTzoomAvatarViewGestureAssociation, gesture,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-static void YTKACEAttachAvatarGesture(UIWindow *window) {
+static void YTzoomAttachAvatarGesture(UIWindow *window) {
     if (window == nil ||
-        objc_getAssociatedObject(window, YTKACEAvatarGestureAssociation) != nil) {
+        objc_getAssociatedObject(window, YTzoomAvatarGestureAssociation) != nil) {
         return;
     }
     UILongPressGestureRecognizer *gesture = [[UILongPressGestureRecognizer alloc]
-        initWithTarget:YTKACEAvatarTarget.sharedTarget
+        initWithTarget:YTzoomAvatarTarget.sharedTarget
                 action:@selector(avatarHeld:)];
-    gesture.minimumPressDuration = YTKACEAvatarWindowHoldDuration;
+    gesture.minimumPressDuration = YTzoomAvatarWindowHoldDuration;
     gesture.cancelsTouchesInView = NO;
-    gesture.delegate = YTKACEAvatarTarget.sharedTarget;
+    gesture.delegate = YTzoomAvatarTarget.sharedTarget;
     [window addGestureRecognizer:gesture];
-    objc_setAssociatedObject(window, YTKACEAvatarGestureAssociation, gesture,
+    objc_setAssociatedObject(window, YTzoomAvatarGestureAssociation, gesture,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-static void YTKACEAttachAvatarWindows(void) {
+static void YTzoomAttachAvatarWindows(void) {
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class]) continue;
         for (UIWindow *window in ((UIWindowScene *)scene).windows) {
@@ -580,22 +580,22 @@ static void YTKACEAttachAvatarWindows(void) {
                 [name containsString:@"keyboard"]) {
                 continue;
             }
-            YTKACEAttachAvatarGesture(window);
+            YTzoomAttachAvatarGesture(window);
         }
     }
 }
 
-void YTKACEInstallProfilePictureHooks(void) {
+void YTzoomInstallProfilePictureHooks(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         [NSNotificationCenter.defaultCenter addObserverForName:
             UIWindowDidBecomeKeyNotification object:nil
             queue:NSOperationQueue.mainQueue
             usingBlock:^(__unused NSNotification *notification) {
-                YTKACEAttachAvatarWindows();
+                YTzoomAttachAvatarWindows();
             }];
     });
-    dispatch_async(dispatch_get_main_queue(), ^{ YTKACEAttachAvatarWindows(); });
+    dispatch_async(dispatch_get_main_queue(), ^{ YTzoomAttachAvatarWindows(); });
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(1.5 * NSEC_PER_SEC)),
-                   dispatch_get_main_queue(), ^{ YTKACEAttachAvatarWindows(); });
+                   dispatch_get_main_queue(), ^{ YTzoomAttachAvatarWindows(); });
 }

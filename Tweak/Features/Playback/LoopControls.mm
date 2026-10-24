@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../../UI/Assets.h"
@@ -10,12 +10,12 @@
 static IMP OriginalSetLoopMode;
 static IMP OriginalAutonavInit;
 
-static BOOL YTKACELoopActive(void) {
-    return YTKACEFeatureEnabled(YTKACELoopKey) &&
+static BOOL YTzoomLoopActive(void) {
+    return YTzoomFeatureEnabled(YTzoomLoopKey) &&
         [NSUserDefaults.standardUserDefaults boolForKey:@"defaultLoop_enabled"];
 }
 
-@interface YTKACELoopCoordinator : NSObject
+@interface YTzoomLoopCoordinator : NSObject
 + (instancetype)sharedCoordinator;
 @property(nonatomic, weak) UIView *overlay;
 @property(nonatomic, weak) UIButton *button;
@@ -24,13 +24,13 @@ static BOOL YTKACELoopActive(void) {
 - (void)updateButton;
 @end
 
-@implementation YTKACELoopCoordinator
+@implementation YTzoomLoopCoordinator
 
 + (instancetype)sharedCoordinator {
-    static YTKACELoopCoordinator *coordinator;
+    static YTzoomLoopCoordinator *coordinator;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        coordinator = [YTKACELoopCoordinator new];
+        coordinator = [YTzoomLoopCoordinator new];
         [NSNotificationCenter.defaultCenter
             addObserver:coordinator
                selector:@selector(playerFinished:)
@@ -41,7 +41,7 @@ static BOOL YTKACELoopActive(void) {
 }
 
 - (void)updateButton {
-    self.button.tintColor = YTKACELoopActive()
+    self.button.tintColor = YTzoomLoopActive()
         ? UIColor.systemRedColor
         : UIColor.whiteColor;
 }
@@ -91,7 +91,7 @@ static BOOL YTKACELoopActive(void) {
 }
 
 - (void)playerFinished:(NSNotification *)notification {
-    if (!YTKACELoopActive() || notification.object != self.player.currentItem) {
+    if (!YTzoomLoopActive() || notification.object != self.player.currentItem) {
         return;
     }
     [self.player seekToTime:kCMTimeZero
@@ -123,8 +123,8 @@ static BOOL YTKACELoopActive(void) {
 
 @end
 
-static void YTKACESetLoopMode(id receiver, SEL selector, NSInteger mode) {
-    NSInteger effective = YTKACELoopActive() ? 2 : mode;
+static void YTzoomSetLoopMode(id receiver, SEL selector, NSInteger mode) {
+    NSInteger effective = YTzoomLoopActive() ? 2 : mode;
     if (OriginalSetLoopMode != NULL) {
         ((void (*)(id, SEL, NSInteger))OriginalSetLoopMode)(
             receiver, selector, effective
@@ -132,13 +132,13 @@ static void YTKACESetLoopMode(id receiver, SEL selector, NSInteger mode) {
     }
 }
 
-static id YTKACEAutonavInit(id receiver, SEL selector, id parentResponder) {
+static id YTzoomAutonavInit(id receiver, SEL selector, id parentResponder) {
     id result = OriginalAutonavInit == NULL
         ? receiver
         : ((id (*)(id, SEL, id))OriginalAutonavInit)(
             receiver, selector, parentResponder
         );
-    if (YTKACELoopActive()) {
+    if (YTzoomLoopActive()) {
         SEL loopSelector = NSSelectorFromString(@"setLoopMode:");
         if ([result respondsToSelector:loopSelector]) {
             ((void (*)(id, SEL, NSInteger))objc_msgSend)(
@@ -149,22 +149,22 @@ static id YTKACEAutonavInit(id receiver, SEL selector, id parentResponder) {
     return result;
 }
 
-void YTKACEInstallLoopHooks(void) {
-    YTKACEInstallInstanceHook(@"YTAutoplayAutonavController",
+void YTzoomInstallLoopHooks(void) {
+    YTzoomInstallInstanceHook(@"YTAutoplayAutonavController",
                               @"setLoopMode:",
-                              (IMP)YTKACESetLoopMode,
+                              (IMP)YTzoomSetLoopMode,
                               &OriginalSetLoopMode);
-    YTKACEInstallInstanceHook(@"YTAutoplayAutonavController",
+    YTzoomInstallInstanceHook(@"YTAutoplayAutonavController",
                               @"initWithParentResponder:",
-                              (IMP)YTKACEAutonavInit,
+                              (IMP)YTzoomAutonavInit,
                               &OriginalAutonavInit);
 
-    YTKACERegisterOverlayConfigurator(@"loop", ^(UIView *overlay, UIStackView *stack) {
-        YTKACELoopCoordinator *coordinator = YTKACELoopCoordinator.sharedCoordinator;
+    YTzoomRegisterOverlayConfigurator(@"loop", ^(UIView *overlay, UIStackView *stack) {
+        YTzoomLoopCoordinator *coordinator = YTzoomLoopCoordinator.sharedCoordinator;
         coordinator.overlay = overlay;
-        UIButton *button = YTKACEOverlayButton(
+        UIButton *button = YTzoomOverlayButton(
             stack,
-            @"YTKACE Loop",
+            @"YTzoom Loop",
             @"repeat",
             coordinator,
             @selector(toggleLoop)
@@ -172,12 +172,12 @@ void YTKACEInstallLoopHooks(void) {
         UIImageSymbolConfiguration *configuration =
             [UIImageSymbolConfiguration configurationWithPointSize:21.0
                                                             weight:UIImageSymbolWeightMedium];
-        [button setImage:[[YTKACEAssetImage(@"repeat_24pt_3x_Normal", @"repeat")
+        [button setImage:[[YTzoomAssetImage(@"repeat_24pt_3x_Normal", @"repeat")
             imageByApplyingSymbolConfiguration:configuration]
             imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
                   forState:UIControlStateNormal];
         coordinator.button = button;
-        button.hidden = !YTKACEFeatureEnabled(YTKACELoopKey);
+        button.hidden = !YTzoomFeatureEnabled(YTzoomLoopKey);
         [coordinator updateButton];
     });
 }

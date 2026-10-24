@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 
@@ -19,27 +19,27 @@ static IMP OriginalSetRightItem;
 static IMP OriginalMultiSearchMoveToWindow;
 static IMP OriginalHeaderMoveToWindow;
 
-static const void *YTKACETopGlassAssociation = &YTKACETopGlassAssociation;
-static const void *YTKACESearchBoxGlassAssociation = &YTKACESearchBoxGlassAssociation;
-static const void *YTKACESearchBarGlassAssociation = &YTKACESearchBarGlassAssociation;
-static const void *YTKACESearchBackGlassAssociation = &YTKACESearchBackGlassAssociation;
-static const void *YTKACEHeaderGlassAssociation = &YTKACEHeaderGlassAssociation;
-static const void *YTKACEHeaderTouchedAssociation = &YTKACEHeaderTouchedAssociation;
-static const void *YTKACESettingsTouchedAssociation = &YTKACESettingsTouchedAssociation;
-static const void *YTKACEPillGlassAssociation = &YTKACEPillGlassAssociation;
-static const void *YTKACELeftGlassAssociation = &YTKACELeftGlassAssociation;
-static const void *YTKACEWrapGlassAssociation = &YTKACEWrapGlassAssociation;
-static const void *YTKACESideGlassAssociation = &YTKACESideGlassAssociation;
-static const void *YTKACESideButtonsAssociation = &YTKACESideButtonsAssociation;
+static const void *YTzoomTopGlassAssociation = &YTzoomTopGlassAssociation;
+static const void *YTzoomSearchBoxGlassAssociation = &YTzoomSearchBoxGlassAssociation;
+static const void *YTzoomSearchBarGlassAssociation = &YTzoomSearchBarGlassAssociation;
+static const void *YTzoomSearchBackGlassAssociation = &YTzoomSearchBackGlassAssociation;
+static const void *YTzoomHeaderGlassAssociation = &YTzoomHeaderGlassAssociation;
+static const void *YTzoomHeaderTouchedAssociation = &YTzoomHeaderTouchedAssociation;
+static const void *YTzoomSettingsTouchedAssociation = &YTzoomSettingsTouchedAssociation;
+static const void *YTzoomPillGlassAssociation = &YTzoomPillGlassAssociation;
+static const void *YTzoomLeftGlassAssociation = &YTzoomLeftGlassAssociation;
+static const void *YTzoomWrapGlassAssociation = &YTzoomWrapGlassAssociation;
+static const void *YTzoomSideGlassAssociation = &YTzoomSideGlassAssociation;
+static const void *YTzoomSideButtonsAssociation = &YTzoomSideButtonsAssociation;
 
 
 
 
-static BOOL YTKACEGlassChromeEnabled(void) {
-    return YTKACELiquidGlassAvailable() && YTKACEFeatureEnabled(@"YTKACE.Preference.Glass.TopBar");
+static BOOL YTzoomGlassChromeEnabled(void) {
+    return YTzoomLiquidGlassAvailable() && YTzoomFeatureEnabled(@"YTzoom.Preference.Glass.TopBar");
 }
 
-static UIVisualEffectView *YTKACEChromeGlass(UIView *owner, const void *key) {
+static UIVisualEffectView *YTzoomChromeGlass(UIView *owner, const void *key) {
     UIVisualEffectView *glass = objc_getAssociatedObject(owner, key);
     if (glass != nil) return glass;
     Class effectClass = NSClassFromString(@"UIGlassEffect");
@@ -56,15 +56,15 @@ static UIVisualEffectView *YTKACEChromeGlass(UIView *owner, const void *key) {
     return glass;
 }
 
-static const void *YTKACETouchesMovedAssociation = &YTKACETouchesMovedAssociation;
+static const void *YTzoomTouchesMovedAssociation = &YTzoomTouchesMovedAssociation;
 
 
-static void YTKACERemoveChromeGlass(UIView *owner, const void *key) {
+static void YTzoomRemoveChromeGlass(UIView *owner, const void *key) {
     UIVisualEffectView *glass = objc_getAssociatedObject(owner, key);
     [glass removeFromSuperview];
 }
 
-static void YTKACEPlaceBehind(UIVisualEffectView *glass, UIView *view, CGRect frame) {
+static void YTzoomPlaceBehind(UIVisualEffectView *glass, UIView *view, CGRect frame) {
     UIView *host = view.superview;
     if (host == nil) return;
     if (glass.superview != host) {
@@ -81,26 +81,26 @@ static void YTKACEPlaceBehind(UIVisualEffectView *glass, UIView *view, CGRect fr
     glass.layer.cornerRadius = MIN(CGRectGetHeight(frame) * 0.5, 24.0);
 }
 
-static void YTKACECollectControls(UIView *view, NSMutableArray<UIView *> *controls) {
+static void YTzoomCollectControls(UIView *view, NSMutableArray<UIView *> *controls) {
     for (UIView *subview in view.subviews) {
         if (subview.hidden || subview.alpha <= 0.01 || CGRectIsEmpty(subview.bounds)) continue;
         if ([subview isKindOfClass:UIControl.class]) {
             [controls addObject:subview];
             continue;
         }
-        YTKACECollectControls(subview, controls);
+        YTzoomCollectControls(subview, controls);
     }
 }
 
-@interface YTKACETapProbe : NSObject
+@interface YTzoomTapProbe : NSObject
 + (instancetype)shared;
 @end
 
-@implementation YTKACETapProbe
+@implementation YTzoomTapProbe
 + (instancetype)shared {
-    static YTKACETapProbe *probe;
+    static YTzoomTapProbe *probe;
     static dispatch_once_t once;
-    dispatch_once(&once, ^{ probe = [YTKACETapProbe new]; });
+    dispatch_once(&once, ^{ probe = [YTzoomTapProbe new]; });
     return probe;
 }
 - (void)forward:(UITapGestureRecognizer *)recognizer {
@@ -114,24 +114,24 @@ static void YTKACECollectControls(UIView *view, NSMutableArray<UIView *> *contro
 
 @end
 
-static BOOL YTKACENativeButtons(void) {
-    id value = YTKACEPreferenceObject(@"YTKACE.Preference.Glass.NativeButtons");
+static BOOL YTzoomNativeButtons(void) {
+    id value = YTzoomPreferenceObject(@"YTzoom.Preference.Glass.NativeButtons");
     return value == nil || [value boolValue];
 }
 
-static void YTKACERestoreButtonsForKey(UIView *container, const void *key) {
+static void YTzoomRestoreButtonsForKey(UIView *container, const void *key) {
     UIVisualEffectView *glass = objc_getAssociatedObject(container, key);
     if (glass.superview != container) return;
     for (UIView *subview in glass.contentView.subviews.copy) [container addSubview:subview];
 }
 
-static void YTKACERestoreButtons(UIView *container) {
-    YTKACERestoreButtonsForKey(container, YTKACETopGlassAssociation);
+static void YTzoomRestoreButtons(UIView *container) {
+    YTzoomRestoreButtonsForKey(container, YTzoomTopGlassAssociation);
 }
 
-static void YTKACEQuietButtonsIn(UIView *view);
+static void YTzoomQuietButtonsIn(UIView *view);
 
-static CGFloat YTKACEResultsSearchHeight(UIView *container) {
+static CGFloat YTzoomResultsSearchHeight(UIView *container) {
     UIView *header = container.superview;
     while (header != nil && ![NSStringFromClass(header.class) isEqualToString:@"YTHeaderView"]) header = header.superview;
     if (header == nil) return 0.0;
@@ -149,8 +149,8 @@ static CGFloat YTKACEResultsSearchHeight(UIView *container) {
     return 0.0;
 }
 
-static void YTKACEApplyNativeGlass(UIView *container, const void *key) {
-    UIVisualEffectView *glass = YTKACEChromeGlass(container, key);
+static void YTzoomApplyNativeGlass(UIView *container, const void *key) {
+    UIVisualEffectView *glass = YTzoomChromeGlass(container, key);
     if (glass.superview != container) {
         [glass removeFromSuperview];
         UIVisualEffect *effect = glass.effect;
@@ -165,7 +165,7 @@ static void YTKACEApplyNativeGlass(UIView *container, const void *key) {
     glass.userInteractionEnabled = YES;
     glass.clipsToBounds = NO;
     CGRect target = container.bounds;
-    CGFloat compact = YTKACEResultsSearchHeight(container);
+    CGFloat compact = YTzoomResultsSearchHeight(container);
     if (compact > 20.0 && compact < CGRectGetHeight(target) - 1.0) {
         CGFloat inset = (CGRectGetHeight(target) - compact) * 0.5;
         target = CGRectInset(target, inset, inset);
@@ -193,15 +193,15 @@ static void YTKACEApplyNativeGlass(UIView *container, const void *key) {
         }
     }
     container.backgroundColor = UIColor.clearColor;
-    YTKACEQuietButtonsIn(glass.contentView);
+    YTzoomQuietButtonsIn(glass.contentView);
 }
 
-static void YTKACEApplyNativeTopGlass(UIView *container) {
-    YTKACEApplyNativeGlass(container, YTKACETopGlassAssociation);
+static void YTzoomApplyNativeTopGlass(UIView *container) {
+    YTzoomApplyNativeGlass(container, YTzoomTopGlassAssociation);
 }
 
-UIView *YTKACEMakeSettingsGlass(void) {
-    if (!YTKACELiquidGlassAvailable() || !YTKACEFeatureEnabled(@"YTKACE.Preference.Tabs.Glass")) return nil;
+UIView *YTzoomMakeSettingsGlass(void) {
+    if (!YTzoomLiquidGlassAvailable() || !YTzoomFeatureEnabled(@"YTzoom.Preference.Tabs.Glass")) return nil;
     Class effectClass = NSClassFromString(@"UIGlassEffect");
     SEL styleSelector = NSSelectorFromString(@"effectWithStyle:");
     UIVisualEffect *effect = [effectClass respondsToSelector:styleSelector]
@@ -215,22 +215,22 @@ UIView *YTKACEMakeSettingsGlass(void) {
     return glass;
 }
 
-void YTKACEApplyTopNavigationGlass(UIView *container) {
-    if (!YTKACEGlassChromeEnabled() || container.window == nil || container.superview == nil ||
+void YTzoomApplyTopNavigationGlass(UIView *container) {
+    if (!YTzoomGlassChromeEnabled() || container.window == nil || container.superview == nil ||
         CGRectIsEmpty(container.bounds)) {
-        YTKACERestoreButtons(container);
-        YTKACERemoveChromeGlass(container, YTKACETopGlassAssociation);
+        YTzoomRestoreButtons(container);
+        YTzoomRemoveChromeGlass(container, YTzoomTopGlassAssociation);
         return;
     }
     NSMutableArray<UIView *> *controls = [NSMutableArray array];
-    YTKACECollectControls(container, controls);
+    YTzoomCollectControls(container, controls);
     CGRect area = controls.count != 0 ? container.bounds : CGRectNull;
     if (CGRectIsNull(area)) {
-        YTKACERemoveChromeGlass(container, YTKACETopGlassAssociation);
+        YTzoomRemoveChromeGlass(container, YTzoomTopGlassAssociation);
         return;
     }
-    if (YTKACENativeButtons()) {
-        YTKACEApplyNativeTopGlass(container);
+    if (YTzoomNativeButtons()) {
+        YTzoomApplyNativeTopGlass(container);
         return;
     }
     area = CGRectInset(area, -6.0, -4.0);
@@ -239,9 +239,9 @@ void YTKACEApplyTopNavigationGlass(UIView *container) {
     CGFloat width = MAX(height, CGRectGetWidth(area));
     CGRect local = CGRectMake(CGRectGetMidX(area) - width * 0.5, CGRectGetMidY(area) - height * 0.5,
                               width, height);
-    UIVisualEffectView *glass = YTKACEChromeGlass(container, YTKACETopGlassAssociation);
+    UIVisualEffectView *glass = YTzoomChromeGlass(container, YTzoomTopGlassAssociation);
     if (CGAffineTransformIsIdentity(glass.transform)) {
-        YTKACEPlaceBehind(glass, container, [container convertRect:local toView:container.superview]);
+        YTzoomPlaceBehind(glass, container, [container convertRect:local toView:container.superview]);
     }
     UIView *screen = container.superview;
     while (screen != nil && ![screen.nextResponder isKindOfClass:UIViewController.class]) screen = screen.superview;
@@ -259,8 +259,8 @@ void YTKACEApplyTopNavigationGlass(UIView *container) {
 
 
 
-static void YTKACEPlaceCircle(UIView *owner, const void *key, UIView *button, UIView *host) {
-    UIVisualEffectView *glass = YTKACEChromeGlass(owner, key);
+static void YTzoomPlaceCircle(UIView *owner, const void *key, UIView *button, UIView *host) {
+    UIVisualEffectView *glass = YTzoomChromeGlass(owner, key);
     if (glass.superview != host) {
         [glass removeFromSuperview];
         UIView *branch = button;
@@ -289,7 +289,7 @@ static void YTKACEPlaceCircle(UIView *owner, const void *key, UIView *button, UI
 
 
 
-static BOOL YTKACEButtonHasContent(UIButton *button) {
+static BOOL YTzoomButtonHasContent(UIButton *button) {
     if (button.hidden || button.alpha <= 0.01) return NO;
     if (button.currentImage != nil || button.currentTitle.length != 0 || button.currentBackgroundImage != nil) {
         return YES;
@@ -309,24 +309,24 @@ static BOOL YTKACEButtonHasContent(UIButton *button) {
     return NO;
 }
 
-static void YTKACECollectHeaderButtons(UIView *view, NSMutableArray<UIButton *> *buttons) {
+static void YTzoomCollectHeaderButtons(UIView *view, NSMutableArray<UIButton *> *buttons) {
     for (UIView *subview in view.subviews) {
         if (subview.hidden || subview.alpha <= 0.01 || CGRectIsEmpty(subview.bounds)) continue;
         CGSize size = subview.bounds.size;
         if ([subview isKindOfClass:UIButton.class] && size.width <= 64.0 && size.height <= 64.0 &&
-            YTKACEButtonHasContent((UIButton *)subview)) {
+            YTzoomButtonHasContent((UIButton *)subview)) {
             [buttons addObject:(UIButton *)subview];
             continue;
         }
-        YTKACECollectHeaderButtons(subview, buttons);
+        YTzoomCollectHeaderButtons(subview, buttons);
     }
 }
 
-static void YTKACEUpdateHeader(UIView *header) {
-    UIVisualEffectView *existing = objc_getAssociatedObject(header, YTKACEHeaderGlassAssociation);
-    if (!YTKACEGlassChromeEnabled() || header.window == nil || CGRectIsEmpty(header.bounds)) {
-        if (objc_getAssociatedObject(header, YTKACEHeaderTouchedAssociation) == nil) return;
-        objc_setAssociatedObject(header, YTKACEHeaderTouchedAssociation, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+static void YTzoomUpdateHeader(UIView *header) {
+    UIVisualEffectView *existing = objc_getAssociatedObject(header, YTzoomHeaderGlassAssociation);
+    if (!YTzoomGlassChromeEnabled() || header.window == nil || CGRectIsEmpty(header.bounds)) {
+        if (objc_getAssociatedObject(header, YTzoomHeaderTouchedAssociation) == nil) return;
+        objc_setAssociatedObject(header, YTzoomHeaderTouchedAssociation, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         [existing removeFromSuperview];
         NSMutableArray<UIView *> *rows = [NSMutableArray array];
         NSMutableArray<UIView *> *queue = [NSMutableArray arrayWithObject:header];
@@ -337,14 +337,14 @@ static void YTKACEUpdateHeader(UIView *header) {
             else [queue addObjectsFromArray:node.subviews];
         }
         for (UIView *row in rows) {
-            YTKACERestoreButtonsForKey(row, YTKACELeftGlassAssociation);
-            YTKACERemoveChromeGlass(row, YTKACELeftGlassAssociation);
+            YTzoomRestoreButtonsForKey(row, YTzoomLeftGlassAssociation);
+            YTzoomRemoveChromeGlass(row, YTzoomLeftGlassAssociation);
         }
         return;
     }
-    objc_setAssociatedObject(header, YTKACEHeaderTouchedAssociation, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(header, YTzoomHeaderTouchedAssociation, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     NSMutableArray<UIButton *> *buttons = [NSMutableArray array];
-    YTKACECollectHeaderButtons(header, buttons);
+    YTzoomCollectHeaderButtons(header, buttons);
     CGFloat width = CGRectGetWidth(header.bounds);
     UIButton *best = nil;
     CGFloat bestMinX = CGFLOAT_MAX;
@@ -364,50 +364,50 @@ static void YTKACEUpdateHeader(UIView *header) {
     while (row != nil && row != header && ![NSStringFromClass(row.class) isEqualToString:@"YTLeftNavigationButtons"]) {
         row = row.superview;
     }
-    if (YTKACENativeButtons() && row != nil && row != header) {
+    if (YTzoomNativeButtons() && row != nil && row != header) {
         [existing removeFromSuperview];
-        YTKACEApplyNativeGlass(row, YTKACELeftGlassAssociation);
+        YTzoomApplyNativeGlass(row, YTzoomLeftGlassAssociation);
         return;
     }
-    YTKACEPlaceCircle(header, YTKACEHeaderGlassAssociation, best, header);
+    YTzoomPlaceCircle(header, YTzoomHeaderGlassAssociation, best, header);
 }
 
-static void YTKACEHeaderLayout(UIView *receiver, SEL selector) {
+static void YTzoomHeaderLayout(UIView *receiver, SEL selector) {
     if (OriginalHeaderLayout != NULL) ((void (*)(id, SEL))OriginalHeaderLayout)(receiver, selector);
-    YTKACEUpdateHeader(receiver);
+    YTzoomUpdateHeader(receiver);
 }
 
-static void YTKACEHeaderMoveToWindow(UIView *receiver, SEL selector) {
+static void YTzoomHeaderMoveToWindow(UIView *receiver, SEL selector) {
     if (OriginalHeaderMoveToWindow != NULL) ((void (*)(id, SEL))OriginalHeaderMoveToWindow)(receiver, selector);
     if (receiver.window != nil) {
-        dispatch_async(dispatch_get_main_queue(), ^{ YTKACEUpdateHeader(receiver); });
+        dispatch_async(dispatch_get_main_queue(), ^{ YTzoomUpdateHeader(receiver); });
     }
 }
 
-static const void *YTKACEInsideGlassAssociation = &YTKACEInsideGlassAssociation;
-static const void *YTKACEMirrorAssociation = &YTKACEMirrorAssociation;
-static const void *YTKACEMirroredIconAssociation = &YTKACEMirroredIconAssociation;
+static const void *YTzoomInsideGlassAssociation = &YTzoomInsideGlassAssociation;
+static const void *YTzoomMirrorAssociation = &YTzoomMirrorAssociation;
+static const void *YTzoomMirroredIconAssociation = &YTzoomMirroredIconAssociation;
 
-static UIImageView *YTKACEFindIcon(UIView *view, UIView *skip) {
+static UIImageView *YTzoomFindIcon(UIView *view, UIView *skip) {
     for (UIView *subview in view.subviews) {
         if (subview == skip || subview.hidden) continue;
         if ([subview isKindOfClass:UIImageView.class] && ((UIImageView *)subview).image != nil &&
             !CGRectIsEmpty(subview.bounds)) {
             return (UIImageView *)subview;
         }
-        UIImageView *found = YTKACEFindIcon(subview, skip);
+        UIImageView *found = YTzoomFindIcon(subview, skip);
         if (found != nil) return found;
     }
     return nil;
 }
 
-static BOOL YTKACEMirrorIcon(UIView *button, UIVisualEffectView *glass) {
-    UIImageView *icon = objc_getAssociatedObject(button, YTKACEMirroredIconAssociation);
+static BOOL YTzoomMirrorIcon(UIView *button, UIVisualEffectView *glass) {
+    UIImageView *icon = objc_getAssociatedObject(button, YTzoomMirroredIconAssociation);
     if (icon == nil || icon.superview == nil || ![icon isDescendantOfView:button]) {
-        icon = YTKACEFindIcon(button, glass);
-        objc_setAssociatedObject(button, YTKACEMirroredIconAssociation, icon, OBJC_ASSOCIATION_ASSIGN);
+        icon = YTzoomFindIcon(button, glass);
+        objc_setAssociatedObject(button, YTzoomMirroredIconAssociation, icon, OBJC_ASSOCIATION_ASSIGN);
     }
-    UIImageView *mirror = objc_getAssociatedObject(button, YTKACEMirrorAssociation);
+    UIImageView *mirror = objc_getAssociatedObject(button, YTzoomMirrorAssociation);
     if (icon == nil) {
         [mirror removeFromSuperview];
         return NO;
@@ -415,7 +415,7 @@ static BOOL YTKACEMirrorIcon(UIView *button, UIVisualEffectView *glass) {
     if (mirror == nil) {
         mirror = [UIImageView new];
         mirror.userInteractionEnabled = NO;
-        objc_setAssociatedObject(button, YTKACEMirrorAssociation, mirror, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(button, YTzoomMirrorAssociation, mirror, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     if (mirror.superview != glass.contentView) [glass.contentView addSubview:mirror];
     mirror.image = icon.image;
@@ -426,15 +426,15 @@ static BOOL YTKACEMirrorIcon(UIView *button, UIVisualEffectView *glass) {
     return YES;
 }
 
-static const void *YTKACEQuietButtonAssociation = &YTKACEQuietButtonAssociation;
+static const void *YTzoomQuietButtonAssociation = &YTzoomQuietButtonAssociation;
 static IMP OriginalQTMSetBackground;
 static IMP OriginalQTMTouchesBegan;
 
-static BOOL YTKACEButtonIsQuiet(UIView *button) {
-    return YTKACEGlassChromeEnabled() && objc_getAssociatedObject(button, YTKACEQuietButtonAssociation) != nil;
+static BOOL YTzoomButtonIsQuiet(UIView *button) {
+    return YTzoomGlassChromeEnabled() && objc_getAssociatedObject(button, YTzoomQuietButtonAssociation) != nil;
 }
 
-static void YTKACEHideButtonFeedback(UIView *button) {
+static void YTzoomHideButtonFeedback(UIView *button) {
     for (NSString *key in @[@"_touchFeedbackView", @"_inkView", @"_hitTargetBorderView"]) {
         id view = nil;
         @try { view = [button valueForKey:key]; } @catch (__unused NSException *exception) {}
@@ -445,7 +445,7 @@ static void YTKACEHideButtonFeedback(UIView *button) {
     }
 }
 
-static void YTKACEQuietSystemButton(UIView *button) {
+static void YTzoomQuietSystemButton(UIView *button) {
     if (![button isKindOfClass:UIButton.class]) return;
     for (UIView *subview in button.subviews) {
         if (![NSStringFromClass(subview.class) isEqualToString:@"_UISystemBackgroundView"]) continue;
@@ -458,13 +458,13 @@ static void YTKACEQuietSystemButton(UIView *button) {
     }
 }
 
-static void YTKACEQuietButton(UIView *button) {
+static void YTzoomQuietButton(UIView *button) {
     static Class qtmClass;
     if (qtmClass == Nil) qtmClass = NSClassFromString(@"YTLightweightQTMButton");
-    YTKACEQuietSystemButton(button);
+    YTzoomQuietSystemButton(button);
     if (qtmClass == Nil || ![button isKindOfClass:qtmClass]) return;
-    objc_setAssociatedObject(button, YTKACEQuietButtonAssociation, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    YTKACEHideButtonFeedback(button);
+    objc_setAssociatedObject(button, YTzoomQuietButtonAssociation, @YES, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    YTzoomHideButtonFeedback(button);
     SEL enabled = NSSelectorFromString(@"setEnabledBackgroundColor:");
     if ([button respondsToSelector:enabled]) {
         ((void (*)(id, SEL, id))objc_msgSend)(button, enabled, UIColor.clearColor);
@@ -473,40 +473,40 @@ static void YTKACEQuietButton(UIView *button) {
     button.layer.backgroundColor = UIColor.clearColor.CGColor;
 }
 
-static void YTKACEQuietButtonsIn(UIView *view) {
+static void YTzoomQuietButtonsIn(UIView *view) {
     for (UIView *subview in view.subviews) {
-        if ([subview isKindOfClass:UIButton.class]) YTKACEQuietButton(subview);
-        YTKACEQuietButtonsIn(subview);
+        if ([subview isKindOfClass:UIButton.class]) YTzoomQuietButton(subview);
+        YTzoomQuietButtonsIn(subview);
     }
 }
 
-static void YTKACEQTMSetBackground(UIView *receiver, SEL selector, UIColor *color) {
-    if (YTKACEButtonIsQuiet(receiver)) color = UIColor.clearColor;
+static void YTzoomQTMSetBackground(UIView *receiver, SEL selector, UIColor *color) {
+    if (YTzoomButtonIsQuiet(receiver)) color = UIColor.clearColor;
     if (OriginalQTMSetBackground != NULL) ((void (*)(id, SEL, id))OriginalQTMSetBackground)(receiver, selector, color);
 }
 
-static void YTKACEQTMTouchesBegan(UIView *receiver, SEL selector, NSSet *touches, UIEvent *event) {
+static void YTzoomQTMTouchesBegan(UIView *receiver, SEL selector, NSSet *touches, UIEvent *event) {
     if (OriginalQTMTouchesBegan != NULL) {
         ((void (*)(id, SEL, id, id))OriginalQTMTouchesBegan)(receiver, selector, touches, event);
     }
-    if (YTKACEButtonIsQuiet(receiver)) YTKACEHideButtonFeedback(receiver);
+    if (YTzoomButtonIsQuiet(receiver)) YTzoomHideButtonFeedback(receiver);
 }
 
-static BOOL YTKACEInsideGlassView(UIView *view, UIView *stop) {
+static BOOL YTzoomInsideGlassView(UIView *view, UIView *stop) {
     for (UIView *current = view.superview; current != nil && current != stop; current = current.superview) {
         if ([current isKindOfClass:UIVisualEffectView.class]) return YES;
     }
     return NO;
 }
 
-static void YTKACEGlassInsideButton(UIView *button, CGFloat side) {
-    YTKACEQuietButton(button);
+static void YTzoomGlassInsideButton(UIView *button, CGFloat side) {
+    YTzoomQuietButton(button);
     if ([button.superview isKindOfClass:NSClassFromString(@"_UIVisualEffectContentView")]) {
         return;
     }
-    UIVisualEffectView *glass = objc_getAssociatedObject(button, YTKACEInsideGlassAssociation);
+    UIVisualEffectView *glass = objc_getAssociatedObject(button, YTzoomInsideGlassAssociation);
     if (glass == nil) {
-        glass = YTKACEChromeGlass(button, YTKACEInsideGlassAssociation);
+        glass = YTzoomChromeGlass(button, YTzoomInsideGlassAssociation);
         UIVisualEffect *effect = glass.effect;
         SEL interactive = NSSelectorFromString(@"setInteractive:");
         if ([effect respondsToSelector:interactive]) {
@@ -517,7 +517,7 @@ static void YTKACEGlassInsideButton(UIView *button, CGFloat side) {
         glass.userInteractionEnabled = YES;
         glass.clipsToBounds = YES;
         if ([button isKindOfClass:UIControl.class]) {
-            UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:YTKACETapProbe.shared
+            UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc] initWithTarget:YTzoomTapProbe.shared
                                                                                   action:@selector(forward:)];
             tap.cancelsTouchesInView = NO;
             [glass addGestureRecognizer:tap];
@@ -530,36 +530,36 @@ static void YTKACEGlassInsideButton(UIView *button, CGFloat side) {
     glass.layer.cornerRadius = side * 0.5;
     glass.hidden = NO;
     button.clipsToBounds = NO;
-    YTKACEMirrorIcon(button, glass);
+    YTzoomMirrorIcon(button, glass);
 }
 
-static void YTKACEClearInsideGlass(UIView *button) {
-    UIView *glass = objc_getAssociatedObject(button, YTKACEInsideGlassAssociation);
+static void YTzoomClearInsideGlass(UIView *button) {
+    UIView *glass = objc_getAssociatedObject(button, YTzoomInsideGlassAssociation);
     [glass removeFromSuperview];
-    UIImageView *icon = objc_getAssociatedObject(button, YTKACEMirroredIconAssociation);
+    UIImageView *icon = objc_getAssociatedObject(button, YTzoomMirroredIconAssociation);
     icon.alpha = 1.0;
 }
 
-static void YTKACECollectButtons(UIView *view, NSMutableArray<UIView *> *buttons) {
+static void YTzoomCollectButtons(UIView *view, NSMutableArray<UIView *> *buttons) {
     for (UIView *subview in view.subviews) {
         if (subview.hidden || subview.alpha <= 0.01 || CGRectIsEmpty(subview.bounds)) continue;
         if ([subview isKindOfClass:UIButton.class]) {
             [buttons addObject:subview];
             continue;
         }
-        YTKACECollectButtons(subview, buttons);
+        YTzoomCollectButtons(subview, buttons);
     }
 }
 
-static void YTKACEUpdateMultiSearch(UIView *field) {
+static void YTzoomUpdateMultiSearch(UIView *field) {
     UIView *pill = field.superview;
     UIView *strip = pill.superview;
     if (pill == nil || strip == nil) return;
-    if (!YTKACEGlassChromeEnabled() || field.window == nil || CGRectIsEmpty(pill.bounds)) {
-        YTKACERemoveChromeGlass(pill, YTKACEPillGlassAssociation);
+    if (!YTzoomGlassChromeEnabled() || field.window == nil || CGRectIsEmpty(pill.bounds)) {
+        YTzoomRemoveChromeGlass(pill, YTzoomPillGlassAssociation);
         return;
     }
-    UIVisualEffectView *glass = YTKACEChromeGlass(pill, YTKACEPillGlassAssociation);
+    UIVisualEffectView *glass = YTzoomChromeGlass(pill, YTzoomPillGlassAssociation);
     if (glass.superview != pill) [pill insertSubview:glass atIndex:0];
     else [pill sendSubviewToBack:glass];
     glass.frame = pill.bounds;
@@ -567,23 +567,23 @@ static void YTKACEUpdateMultiSearch(UIView *field) {
     pill.backgroundColor = UIColor.clearColor;
     pill.layer.backgroundColor = UIColor.clearColor.CGColor;
     CGRect pillFrame = [pill convertRect:pill.bounds toView:strip];
-    NSHashTable<UIView *> *known = objc_getAssociatedObject(strip, YTKACESideButtonsAssociation);
+    NSHashTable<UIView *> *known = objc_getAssociatedObject(strip, YTzoomSideButtonsAssociation);
     for (UIView *button in known) {
-        UIView *wrap = objc_getAssociatedObject(button, YTKACEWrapGlassAssociation);
+        UIView *wrap = objc_getAssociatedObject(button, YTzoomWrapGlassAssociation);
         if (wrap != nil && !button.hidden && button.alpha > 0.01) wrap.hidden = NO;
     }
     NSMutableArray<UIView *> *buttons = [NSMutableArray array];
     for (UIView *subview in strip.subviews) {
         if (subview == pill || subview.hidden || subview.alpha <= 0.01) continue;
         if ([subview isKindOfClass:UIButton.class]) [buttons addObject:subview];
-        else YTKACECollectButtons(subview, buttons);
+        else YTzoomCollectButtons(subview, buttons);
     }
     NSUInteger rightSide = 0;
     for (UIView *button in buttons) {
         CGRect frame = [button convertRect:button.bounds toView:strip];
         if (CGRectGetMinX(frame) >= CGRectGetMaxX(pillFrame) - 2.0 && CGRectGetWidth(frame) <= 64.0) rightSide++;
     }
-    NSHashTable<UIView *> *previous = objc_getAssociatedObject(strip, YTKACESideButtonsAssociation);
+    NSHashTable<UIView *> *previous = objc_getAssociatedObject(strip, YTzoomSideButtonsAssociation);
     NSHashTable<UIView *> *current = [NSHashTable weakObjectsHashTable];
     for (UIView *button in buttons) {
         CGRect frame = [button convertRect:button.bounds toView:strip];
@@ -592,33 +592,33 @@ static void YTKACEUpdateMultiSearch(UIView *field) {
         BOOL small = CGRectGetWidth(frame) <= 64.0 && CGRectGetHeight(frame) <= 64.0;
         if (!beside || !small) continue;
         BOOL grouped = CGRectGetMinX(frame) >= CGRectGetMaxX(pillFrame) - 2.0 && rightSide > 1;
-        if (grouped || YTKACEInsideGlassView(button, strip)) {
-            YTKACEClearInsideGlass(button);
-            YTKACEQuietButton(button);
+        if (grouped || YTzoomInsideGlassView(button, strip)) {
+            YTzoomClearInsideGlass(button);
+            YTzoomQuietButton(button);
             continue;
         }
-        YTKACEGlassInsideButton(button, CGRectGetHeight(pillFrame));
-        YTKACERemoveChromeGlass(button, YTKACESideGlassAssociation);
+        YTzoomGlassInsideButton(button, CGRectGetHeight(pillFrame));
+        YTzoomRemoveChromeGlass(button, YTzoomSideGlassAssociation);
         [current addObject:button];
     }
     for (UIView *button in previous) {
         if ([current containsObject:button]) continue;
-        YTKACERemoveChromeGlass(button, YTKACESideGlassAssociation);
-        UIView *wrap = objc_getAssociatedObject(button, YTKACEWrapGlassAssociation);
+        YTzoomRemoveChromeGlass(button, YTzoomSideGlassAssociation);
+        UIView *wrap = objc_getAssociatedObject(button, YTzoomWrapGlassAssociation);
         wrap.hidden = YES;
     }
-    objc_setAssociatedObject(strip, YTKACESideButtonsAssociation, current, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    objc_setAssociatedObject(strip, YTzoomSideButtonsAssociation, current, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 static IMP OriginalSearchBarLayout;
 
-static void YTKACESearchBarLayout(UIView *receiver, SEL selector) {
+static void YTzoomSearchBarLayout(UIView *receiver, SEL selector) {
     if (OriginalSearchBarLayout != NULL) ((void (*)(id, SEL))OriginalSearchBarLayout)(receiver, selector);
-    if (!YTKACEGlassChromeEnabled() || CGRectIsEmpty(receiver.bounds)) {
-        YTKACERemoveChromeGlass(receiver, YTKACESearchBarGlassAssociation);
+    if (!YTzoomGlassChromeEnabled() || CGRectIsEmpty(receiver.bounds)) {
+        YTzoomRemoveChromeGlass(receiver, YTzoomSearchBarGlassAssociation);
         return;
     }
-    UIVisualEffectView *glass = YTKACEChromeGlass(receiver, YTKACESearchBarGlassAssociation);
+    UIVisualEffectView *glass = YTzoomChromeGlass(receiver, YTzoomSearchBarGlassAssociation);
     if (glass.superview != receiver) [receiver insertSubview:glass atIndex:0];
     else if (receiver.subviews.firstObject != glass) [receiver sendSubviewToBack:glass];
     glass.frame = receiver.bounds;
@@ -626,25 +626,25 @@ static void YTKACESearchBarLayout(UIView *receiver, SEL selector) {
     receiver.backgroundColor = UIColor.clearColor;
 }
 
-static void YTKACEMultiSearchLayout(UIView *receiver, SEL selector) {
+static void YTzoomMultiSearchLayout(UIView *receiver, SEL selector) {
     if (OriginalMultiSearchLayout != NULL) ((void (*)(id, SEL))OriginalMultiSearchLayout)(receiver, selector);
-    YTKACEUpdateMultiSearch(receiver);
+    YTzoomUpdateMultiSearch(receiver);
 }
 
-static void YTKACEMultiSearchMoveToWindow(UIView *receiver, SEL selector) {
+static void YTzoomMultiSearchMoveToWindow(UIView *receiver, SEL selector) {
     if (OriginalMultiSearchMoveToWindow != NULL) {
         ((void (*)(id, SEL))OriginalMultiSearchMoveToWindow)(receiver, selector);
     }
-    dispatch_async(dispatch_get_main_queue(), ^{ YTKACEUpdateMultiSearch(receiver); });
+    dispatch_async(dispatch_get_main_queue(), ^{ YTzoomUpdateMultiSearch(receiver); });
 }
 
-static void YTKACECollectTopButtons(UIView *view, UIView *window, NSMutableArray<UIView *> *buttons) {
+static void YTzoomCollectTopButtons(UIView *view, UIView *window, NSMutableArray<UIView *> *buttons) {
     for (UIView *subview in view.subviews) {
         if (subview.hidden || subview.alpha <= 0.01 || CGRectIsEmpty(subview.bounds)) continue;
         CGRect frame = [subview convertRect:subview.bounds toView:window];
         if (CGRectGetMinY(frame) > 140.0) continue;
         BOOL isButton = [subview isKindOfClass:UIButton.class]
-            ? YTKACEButtonHasContent((UIButton *)subview)
+            ? YTzoomButtonHasContent((UIButton *)subview)
             : ([subview isKindOfClass:UIControl.class] && ![subview isKindOfClass:UITextField.class] &&
                ![subview isKindOfClass:UISearchBar.class] && subview.subviews.count != 0);
         if (isButton && CGRectGetWidth(frame) <= 64.0 && CGRectGetHeight(frame) <= 64.0 &&
@@ -652,11 +652,11 @@ static void YTKACECollectTopButtons(UIView *view, UIView *window, NSMutableArray
             [buttons addObject:subview];
             continue;
         }
-        YTKACECollectTopButtons(subview, window, buttons);
+        YTzoomCollectTopButtons(subview, window, buttons);
     }
 }
 
-static void YTKACEShareBarItems(UINavigationItem *item) {
+static void YTzoomShareBarItems(UINavigationItem *item) {
     if (item == nil) return;
     NSMutableArray<UIBarButtonItem *> *items = [NSMutableArray array];
     [items addObjectsFromArray:item.leftBarButtonItems ?: @[]];
@@ -664,7 +664,7 @@ static void YTKACEShareBarItems(UINavigationItem *item) {
     if (item.backBarButtonItem != nil) [items addObject:item.backBarButtonItem];
     SEL getter = NSSelectorFromString(@"hidesSharedBackground");
     SEL setter = NSSelectorFromString(@"setHidesSharedBackground:");
-    BOOL wanted = !YTKACEGlassChromeEnabled();
+    BOOL wanted = !YTzoomGlassChromeEnabled();
     for (UIBarButtonItem *barItem in items) {
         if (![barItem respondsToSelector:getter] || ![barItem respondsToSelector:setter]) continue;
         BOOL before = ((BOOL (*)(id, SEL))objc_msgSend)(barItem, getter);
@@ -672,121 +672,121 @@ static void YTKACEShareBarItems(UINavigationItem *item) {
     }
 }
 
-static void YTKACEUpdateSettingsButtons(UIViewController *controller) {
+static void YTzoomUpdateSettingsButtons(UIViewController *controller) {
     UIView *window = controller.view.window;
     if (window == nil) return;
-    BOOL enabled = YTKACEGlassChromeEnabled();
-    if (!enabled && objc_getAssociatedObject(controller, YTKACESettingsTouchedAssociation) == nil) return;
-    objc_setAssociatedObject(controller, YTKACESettingsTouchedAssociation, enabled ? @YES : nil,
+    BOOL enabled = YTzoomGlassChromeEnabled();
+    if (!enabled && objc_getAssociatedObject(controller, YTzoomSettingsTouchedAssociation) == nil) return;
+    objc_setAssociatedObject(controller, YTzoomSettingsTouchedAssociation, enabled ? @YES : nil,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    YTKACEShareBarItems(controller.navigationItem);
+    YTzoomShareBarItems(controller.navigationItem);
     UIViewController *top = controller.navigationController.topViewController;
-    if (top != nil && top != controller) YTKACEShareBarItems(top.navigationItem);
+    if (top != nil && top != controller) YTzoomShareBarItems(top.navigationItem);
     NSMutableArray<UIView *> *roots = [NSMutableArray arrayWithObject:controller.view];
     UINavigationBar *bar = controller.navigationController.navigationBar;
     if (bar != nil && !bar.hidden) [roots addObject:bar];
     NSMutableArray<UIView *> *buttons = [NSMutableArray array];
-    for (UIView *root in roots) YTKACECollectTopButtons(root, window, buttons);
+    for (UIView *root in roots) YTzoomCollectTopButtons(root, window, buttons);
     for (UIView *button in buttons) {
         BOOL inBar = bar != nil && [button isDescendantOfView:bar];
         if (enabled && inBar) {
-            YTKACEClearInsideGlass(button);
-            YTKACEQuietButton(button);
+            YTzoomClearInsideGlass(button);
+            YTzoomQuietButton(button);
         } else if (enabled) {
-            YTKACEGlassInsideButton(button, 36.0);
+            YTzoomGlassInsideButton(button, 36.0);
         } else {
-            YTKACEClearInsideGlass(button);
+            YTzoomClearInsideGlass(button);
         }
     }
 }
 
-static void YTKACESettingsLayout(UIViewController *receiver, SEL selector) {
+static void YTzoomSettingsLayout(UIViewController *receiver, SEL selector) {
     if (OriginalSettingsLayout != NULL) ((void (*)(id, SEL))OriginalSettingsLayout)(receiver, selector);
-    YTKACEUpdateSettingsButtons(receiver);
+    YTzoomUpdateSettingsButtons(receiver);
 }
 
-static void YTKACEBarItemSetHidesShared(UIBarButtonItem *receiver, SEL selector, BOOL hides) {
-    BOOL applied = YTKACEGlassChromeEnabled() ? NO : hides;
+static void YTzoomBarItemSetHidesShared(UIBarButtonItem *receiver, SEL selector, BOOL hides) {
+    BOOL applied = YTzoomGlassChromeEnabled() ? NO : hides;
     if (hides && !applied) {
     }
     if (OriginalSetHidesShared != NULL) ((void (*)(id, SEL, BOOL))OriginalSetHidesShared)(receiver, selector, applied);
 }
 
-static void YTKACEShareItems(NSArray<UIBarButtonItem *> *items) {
-    if (!YTKACEGlassChromeEnabled()) return;
+static void YTzoomShareItems(NSArray<UIBarButtonItem *> *items) {
+    if (!YTzoomGlassChromeEnabled()) return;
     SEL setter = NSSelectorFromString(@"setHidesSharedBackground:");
     for (UIBarButtonItem *item in items) {
         if ([item respondsToSelector:setter]) ((void (*)(id, SEL, BOOL))objc_msgSend)(item, setter, NO);
     }
 }
 
-static void YTKACESetLeftItems(UINavigationItem *receiver, SEL selector, NSArray *items, BOOL animated) {
-    YTKACEShareItems(items);
+static void YTzoomSetLeftItems(UINavigationItem *receiver, SEL selector, NSArray *items, BOOL animated) {
+    YTzoomShareItems(items);
     if (OriginalSetLeftItems != NULL) ((void (*)(id, SEL, id, BOOL))OriginalSetLeftItems)(receiver, selector, items, animated);
 }
 
-static void YTKACESetRightItems(UINavigationItem *receiver, SEL selector, NSArray *items, BOOL animated) {
-    YTKACEShareItems(items);
+static void YTzoomSetRightItems(UINavigationItem *receiver, SEL selector, NSArray *items, BOOL animated) {
+    YTzoomShareItems(items);
     if (OriginalSetRightItems != NULL) ((void (*)(id, SEL, id, BOOL))OriginalSetRightItems)(receiver, selector, items, animated);
 }
 
-static void YTKACESetLeftItem(UINavigationItem *receiver, SEL selector, UIBarButtonItem *item, BOOL animated) {
-    if (item != nil) YTKACEShareItems(@[item]);
+static void YTzoomSetLeftItem(UINavigationItem *receiver, SEL selector, UIBarButtonItem *item, BOOL animated) {
+    if (item != nil) YTzoomShareItems(@[item]);
     if (OriginalSetLeftItem != NULL) ((void (*)(id, SEL, id, BOOL))OriginalSetLeftItem)(receiver, selector, item, animated);
 }
 
-static void YTKACESetRightItem(UINavigationItem *receiver, SEL selector, UIBarButtonItem *item, BOOL animated) {
-    if (item != nil) YTKACEShareItems(@[item]);
+static void YTzoomSetRightItem(UINavigationItem *receiver, SEL selector, UIBarButtonItem *item, BOOL animated) {
+    if (item != nil) YTzoomShareItems(@[item]);
     if (OriginalSetRightItem != NULL) ((void (*)(id, SEL, id, BOOL))OriginalSetRightItem)(receiver, selector, item, animated);
 }
 
-static void YTKACETopRefreshSoon(UIView *container) {
+static void YTzoomTopRefreshSoon(UIView *container) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        YTKACEApplyTopNavigationGlass(container);
+        YTzoomApplyTopNavigationGlass(container);
     });
 }
 
-static void YTKACETopMoveToWindow(UIView *receiver, SEL selector) {
+static void YTzoomTopMoveToWindow(UIView *receiver, SEL selector) {
     if (OriginalTopMoveToWindow != NULL) ((void (*)(id, SEL))OriginalTopMoveToWindow)(receiver, selector);
-    YTKACETopRefreshSoon(receiver);
+    YTzoomTopRefreshSoon(receiver);
 }
 
-static void YTKACETopMoveToSuperview(UIView *receiver, SEL selector) {
+static void YTzoomTopMoveToSuperview(UIView *receiver, SEL selector) {
     if (OriginalTopMoveToSuperview != NULL) ((void (*)(id, SEL))OriginalTopMoveToSuperview)(receiver, selector);
-    YTKACETopRefreshSoon(receiver);
+    YTzoomTopRefreshSoon(receiver);
 }
 
-__attribute__((constructor)) static void YTKACEInstallGlassChrome(void) {
-    if (!YTKACELiquidGlassAvailable()) return;
-    YTKACEInstallInstanceHook(@"YTLightweightQTMButton", @"setBackgroundColor:",
-                              (IMP)YTKACEQTMSetBackground, &OriginalQTMSetBackground);
-    YTKACEInstallInstanceHook(@"YTLightweightQTMButton", @"touchesBegan:withEvent:",
-                              (IMP)YTKACEQTMTouchesBegan, &OriginalQTMTouchesBegan);
-    YTKACEInstallInstanceHook(@"YTRightNavigationButtons", @"didMoveToWindow",
-                              (IMP)YTKACETopMoveToWindow, &OriginalTopMoveToWindow);
-    YTKACEInstallInstanceHook(@"YTRightNavigationButtons", @"didMoveToSuperview",
-                              (IMP)YTKACETopMoveToSuperview, &OriginalTopMoveToSuperview);
-    if (!YTKACEGlassChromeEnabled()) return;
-    YTKACEInstallInstanceHook(@"YTMultiLineSearchBarView", @"layoutSubviews",
-                                           (IMP)YTKACEMultiSearchLayout, &OriginalMultiSearchLayout);
-    YTKACEInstallInstanceHook(@"YTSearchBarView", @"layoutSubviews",
-                              (IMP)YTKACESearchBarLayout, &OriginalSearchBarLayout);
-    YTKACEInstallInstanceHook(@"YTMultiLineSearchBarView", @"didMoveToWindow",
-                              (IMP)YTKACEMultiSearchMoveToWindow, &OriginalMultiSearchMoveToWindow);
-    YTKACEInstallInstanceHook(@"UIBarButtonItem", @"setHidesSharedBackground:",
-                                            (IMP)YTKACEBarItemSetHidesShared, &OriginalSetHidesShared);
-    YTKACEInstallInstanceHook(@"UINavigationItem", @"setLeftBarButtonItems:animated:",
-                                               (IMP)YTKACESetLeftItems, &OriginalSetLeftItems);
-    YTKACEInstallInstanceHook(@"UINavigationItem", @"setRightBarButtonItems:animated:",
-                                                (IMP)YTKACESetRightItems, &OriginalSetRightItems);
-    YTKACEInstallInstanceHook(@"UINavigationItem", @"setLeftBarButtonItem:animated:",
-                                              (IMP)YTKACESetLeftItem, &OriginalSetLeftItem);
-    YTKACEInstallInstanceHook(@"UINavigationItem", @"setRightBarButtonItem:animated:",
-                                               (IMP)YTKACESetRightItem, &OriginalSetRightItem);
-    YTKACEInstallInstanceHook(@"YTSettingsViewController", @"viewDidLayoutSubviews",
-                                              (IMP)YTKACESettingsLayout, &OriginalSettingsLayout);
-    YTKACEInstallInstanceHook(@"YTHeaderView", @"layoutSubviews",
-                                            (IMP)YTKACEHeaderLayout, &OriginalHeaderLayout);
-    YTKACEInstallInstanceHook(@"YTHeaderView", @"didMoveToWindow",
-                              (IMP)YTKACEHeaderMoveToWindow, &OriginalHeaderMoveToWindow);
+__attribute__((constructor)) static void YTzoomInstallGlassChrome(void) {
+    if (!YTzoomLiquidGlassAvailable()) return;
+    YTzoomInstallInstanceHook(@"YTLightweightQTMButton", @"setBackgroundColor:",
+                              (IMP)YTzoomQTMSetBackground, &OriginalQTMSetBackground);
+    YTzoomInstallInstanceHook(@"YTLightweightQTMButton", @"touchesBegan:withEvent:",
+                              (IMP)YTzoomQTMTouchesBegan, &OriginalQTMTouchesBegan);
+    YTzoomInstallInstanceHook(@"YTRightNavigationButtons", @"didMoveToWindow",
+                              (IMP)YTzoomTopMoveToWindow, &OriginalTopMoveToWindow);
+    YTzoomInstallInstanceHook(@"YTRightNavigationButtons", @"didMoveToSuperview",
+                              (IMP)YTzoomTopMoveToSuperview, &OriginalTopMoveToSuperview);
+    if (!YTzoomGlassChromeEnabled()) return;
+    YTzoomInstallInstanceHook(@"YTMultiLineSearchBarView", @"layoutSubviews",
+                                           (IMP)YTzoomMultiSearchLayout, &OriginalMultiSearchLayout);
+    YTzoomInstallInstanceHook(@"YTSearchBarView", @"layoutSubviews",
+                              (IMP)YTzoomSearchBarLayout, &OriginalSearchBarLayout);
+    YTzoomInstallInstanceHook(@"YTMultiLineSearchBarView", @"didMoveToWindow",
+                              (IMP)YTzoomMultiSearchMoveToWindow, &OriginalMultiSearchMoveToWindow);
+    YTzoomInstallInstanceHook(@"UIBarButtonItem", @"setHidesSharedBackground:",
+                                            (IMP)YTzoomBarItemSetHidesShared, &OriginalSetHidesShared);
+    YTzoomInstallInstanceHook(@"UINavigationItem", @"setLeftBarButtonItems:animated:",
+                                               (IMP)YTzoomSetLeftItems, &OriginalSetLeftItems);
+    YTzoomInstallInstanceHook(@"UINavigationItem", @"setRightBarButtonItems:animated:",
+                                                (IMP)YTzoomSetRightItems, &OriginalSetRightItems);
+    YTzoomInstallInstanceHook(@"UINavigationItem", @"setLeftBarButtonItem:animated:",
+                                              (IMP)YTzoomSetLeftItem, &OriginalSetLeftItem);
+    YTzoomInstallInstanceHook(@"UINavigationItem", @"setRightBarButtonItem:animated:",
+                                               (IMP)YTzoomSetRightItem, &OriginalSetRightItem);
+    YTzoomInstallInstanceHook(@"YTSettingsViewController", @"viewDidLayoutSubviews",
+                                              (IMP)YTzoomSettingsLayout, &OriginalSettingsLayout);
+    YTzoomInstallInstanceHook(@"YTHeaderView", @"layoutSubviews",
+                                            (IMP)YTzoomHeaderLayout, &OriginalHeaderLayout);
+    YTzoomInstallInstanceHook(@"YTHeaderView", @"didMoveToWindow",
+                              (IMP)YTzoomHeaderMoveToWindow, &OriginalHeaderMoveToWindow);
 }

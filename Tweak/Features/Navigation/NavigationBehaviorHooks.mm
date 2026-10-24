@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Localization.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
@@ -9,10 +9,10 @@
 #import <objc/runtime.h>
 
 static IMP OriginalControlSendAction;
-static NSMutableDictionary<NSString *, NSValue *> *YTKACEStatusOriginals;
-static BOOL YTKACECastBypass;
+static NSMutableDictionary<NSString *, NSValue *> *YTzoomStatusOriginals;
+static BOOL YTzoomCastBypass;
 
-static BOOL YTKACEIsCastControl(UIControl *control, SEL action, id target) {
+static BOOL YTzoomIsCastControl(UIControl *control, SEL action, id target) {
     (void)target;
     NSString *token = [[NSString stringWithFormat:@"%@ %@ %@ %@",
         NSStringFromClass(control.class),
@@ -26,7 +26,7 @@ static BOOL YTKACEIsCastControl(UIControl *control, SEL action, id target) {
         [token containsString:@"mdx"];
 }
 
-static void YTKACEControlSendAction(UIControl *receiver,
+static void YTzoomControlSendAction(UIControl *receiver,
                                     SEL selector,
                                     SEL action,
                                     id target,
@@ -34,12 +34,12 @@ static void YTKACEControlSendAction(UIControl *receiver,
     if (OriginalControlSendAction == NULL) {
         return;
     }
-    BOOL castControl = YTKACEIsCastControl(receiver, action, target);
+    BOOL castControl = YTzoomIsCastControl(receiver, action, target);
     if (castControl) {
-        YTKACEStartCastDiscovery();
+        YTzoomStartCastDiscovery();
     }
-    if (YTKACECastBypass ||
-        !YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.CastConfirmation") ||
+    if (YTzoomCastBypass ||
+        !YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.CastConfirmation") ||
         !castControl) {
         ((void (*)(id, SEL, SEL, id, id))OriginalControlSendAction)(
             receiver, selector, action, target, event
@@ -48,20 +48,20 @@ static void YTKACEControlSendAction(UIControl *receiver,
     }
     __weak UIControl *weakReceiver = receiver;
     __weak id weakTarget = target;
-    BOOL shown = YTKACEShowYouTubeConfirmation(
-        YTKACELocalized(@"Connect to a device?"),
-        YTKACELocalized(@"YouTube is about to open the Cast menu."),
-        YTKACELocalized(@"Continue"),
+    BOOL shown = YTzoomShowYouTubeConfirmation(
+        YTzoomLocalized(@"Connect to a device?"),
+        YTzoomLocalized(@"YouTube is about to open the Cast menu."),
+        YTzoomLocalized(@"Continue"),
         ^{
             UIControl *strongReceiver = weakReceiver;
             if (strongReceiver == nil) {
                 return;
             }
-            YTKACECastBypass = YES;
+            YTzoomCastBypass = YES;
             ((void (*)(id, SEL, SEL, id, id))OriginalControlSendAction)(
                 strongReceiver, selector, action, weakTarget, event
             );
-            YTKACECastBypass = NO;
+            YTzoomCastBypass = NO;
         }
     );
     if (!shown) {
@@ -71,15 +71,15 @@ static void YTKACEControlSendAction(UIControl *receiver,
     }
 }
 
-static NSString *YTKACEStatusKey(Class cls, SEL selector) {
+static NSString *YTzoomStatusKey(Class cls, SEL selector) {
     return [NSString stringWithFormat:@"%@|%@", NSStringFromClass(cls),
                                       NSStringFromSelector(selector)];
 }
 
-static IMP YTKACEStatusOriginal(id receiver, SEL selector) {
+static IMP YTzoomStatusOriginal(id receiver, SEL selector) {
     for (Class cls = object_getClass(receiver); cls != Nil; cls = class_getSuperclass(cls)) {
-        IMP original = (IMP)[YTKACEStatusOriginals[
-            YTKACEStatusKey(cls, selector)] pointerValue];
+        IMP original = (IMP)[YTzoomStatusOriginals[
+            YTzoomStatusKey(cls, selector)] pointerValue];
         if (original != NULL) {
             return original;
         }
@@ -87,26 +87,26 @@ static IMP YTKACEStatusOriginal(id receiver, SEL selector) {
     return NULL;
 }
 
-static BOOL YTKACEPrefersStatusHidden(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.StatusBarHidden")) {
+static BOOL YTzoomPrefersStatusHidden(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.StatusBarHidden")) {
         return YES;
     }
     NSString *name = NSStringFromClass([receiver class]).lowercaseString;
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.StatusBarVisible") &&
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.StatusBarVisible") &&
         ([name containsString:@"player"] || [name containsString:@"watch"])) {
         return NO;
     }
-    IMP original = YTKACEStatusOriginal(receiver, selector);
+    IMP original = YTzoomStatusOriginal(receiver, selector);
     return original != NULL ? ((BOOL (*)(id, SEL))original)(receiver, selector) : NO;
 }
 
-void YTKACEInstallNavigationBehaviorHooks(void) {
-    if (YTKACEStatusOriginals == nil) {
-        YTKACEStatusOriginals = [NSMutableDictionary dictionary];
+void YTzoomInstallNavigationBehaviorHooks(void) {
+    if (YTzoomStatusOriginals == nil) {
+        YTzoomStatusOriginals = [NSMutableDictionary dictionary];
     }
-    YTKACEInstallInstanceHook(@"UIControl",
+    YTzoomInstallInstanceHook(@"UIControl",
                               @"sendAction:to:forEvent:",
-                              (IMP)YTKACEControlSendAction,
+                              (IMP)YTzoomControlSendAction,
                               &OriginalControlSendAction);
     for (NSString *className in @[
         @"YTAppViewController",
@@ -116,12 +116,12 @@ void YTKACEInstallNavigationBehaviorHooks(void) {
         @"YTShortsPlayerViewController"
     ]) {
         IMP original = NULL;
-        if (YTKACEInstallInstanceHook(className,
+        if (YTzoomInstallInstanceHook(className,
                                       @"prefersStatusBarHidden",
-                                      (IMP)YTKACEPrefersStatusHidden,
+                                      (IMP)YTzoomPrefersStatusHidden,
                                       &original) && original != NULL) {
             Class cls = NSClassFromString(className);
-            YTKACEStatusOriginals[YTKACEStatusKey(
+            YTzoomStatusOriginals[YTzoomStatusKey(
                 cls,
                 NSSelectorFromString(@"prefersStatusBarHidden")
             )] = [NSValue valueWithPointer:(const void *)original];

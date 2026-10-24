@@ -8,73 +8,73 @@
 #import <os/lock.h>
 #import <stdatomic.h>
 
-NSString * const YTKACEDeArrowThumbModeKey = @"YTKACE.Preference.DeArrow.ThumbnailMode";
-NSString * const YTKACEDeArrowTitlesKey = @"YTKACE.Preference.DeArrow.Titles";
+NSString * const YTzoomDeArrowThumbModeKey = @"YTzoom.Preference.DeArrow.ThumbnailMode";
+NSString * const YTzoomDeArrowTitlesKey = @"YTzoom.Preference.DeArrow.Titles";
 
-static NSString * const YTKACEBrandingStoreKey = @"YTKACE.Preference.DeArrow.Branding";
+static NSString * const YTzoomBrandingStoreKey = @"YTzoom.Preference.DeArrow.Branding";
 
-static const NSUInteger YTKACEStoreLimit = 800;
-static const NSUInteger YTKACEMaxConcurrent = 4;
-static const NSUInteger YTKACERequestsPerMinute = 90;
-static const NSUInteger YTKACEPendingLimit = 300;
-static const NSUInteger YTKACEAncestorDepth = 12;
-static const NSUInteger YTKACECellTextDepth = 10;
-static const NSUInteger YTKACEMaxCellText = 10;
-static const NSTimeInterval YTKACENegativeTTL = 7 * 24 * 60 * 60;
-static const NSInteger YTKACEStoreVersion = 2;
+static const NSUInteger YTzoomStoreLimit = 800;
+static const NSUInteger YTzoomMaxConcurrent = 4;
+static const NSUInteger YTzoomRequestsPerMinute = 90;
+static const NSUInteger YTzoomPendingLimit = 300;
+static const NSUInteger YTzoomAncestorDepth = 12;
+static const NSUInteger YTzoomCellTextDepth = 10;
+static const NSUInteger YTzoomMaxCellText = 10;
+static const NSTimeInterval YTzoomNegativeTTL = 7 * 24 * 60 * 60;
+static const NSInteger YTzoomStoreVersion = 2;
 
 static IMP OriginalDownloadImage;
 static IMP OriginalCachedImage;
 static IMP OriginalApplyProperties;
 
-static const void *YTKACENodeVideoIDKey = &YTKACENodeVideoIDKey;
-static const void *YTKACECellVideoIDKey = &YTKACECellVideoIDKey;
+static const void *YTzoomNodeVideoIDKey = &YTzoomNodeVideoIDKey;
+static const void *YTzoomCellVideoIDKey = &YTzoomCellVideoIDKey;
 
-static os_unfair_lock YTKACELock = OS_UNFAIR_LOCK_INIT;
-static NSUInteger YTKACEActiveRequests;
-static NSUInteger YTKACEWindowCount;
-static NSTimeInterval YTKACEWindowStart;
-static NSMutableSet<NSString *> *YTKACEInFlight;
-static NSMutableSet<NSString *> *YTKACEThumbInFlight;
-static NSMutableArray<NSString *> *YTKACEPendingIDs;
-static NSMapTable *YTKACEPendingNodes;
-static NSMapTable *YTKACEPendingCells;
-static NSMutableDictionary<NSString *, NSDictionary *> *YTKACEStore;
-static NSCache<NSString *, UIImage *> *YTKACEImageCache;
+static os_unfair_lock YTzoomLock = OS_UNFAIR_LOCK_INIT;
+static NSUInteger YTzoomActiveRequests;
+static NSUInteger YTzoomWindowCount;
+static NSTimeInterval YTzoomWindowStart;
+static NSMutableSet<NSString *> *YTzoomInFlight;
+static NSMutableSet<NSString *> *YTzoomThumbInFlight;
+static NSMutableArray<NSString *> *YTzoomPendingIDs;
+static NSMapTable *YTzoomPendingNodes;
+static NSMapTable *YTzoomPendingCells;
+static NSMutableDictionary<NSString *, NSDictionary *> *YTzoomStore;
+static NSCache<NSString *, UIImage *> *YTzoomImageCache;
 
-static atomic_int YTKACEModeCache = -1;
-static atomic_int YTKACETitlesCache = -1;
+static atomic_int YTzoomModeCache = -1;
+static atomic_int YTzoomTitlesCache = -1;
 
-static void YTKACEPumpQueue(void);
-static void YTKACEApplyTitleToCell(id root, NSString *videoID);
+static void YTzoomPumpQueue(void);
+static void YTzoomApplyTitleToCell(id root, NSString *videoID);
 
-static NSInteger YTKACEThumbMode(void) {
-    int cached = atomic_load(&YTKACEModeCache);
+static NSInteger YTzoomThumbMode(void) {
+    int cached = atomic_load(&YTzoomModeCache);
     if (cached >= 0) return cached;
-    id stored = YTKACEPreferenceObject(YTKACEDeArrowThumbModeKey);
+    id stored = YTzoomPreferenceObject(YTzoomDeArrowThumbModeKey);
     NSInteger mode = [stored respondsToSelector:@selector(integerValue)]
         ? MAX(0, MIN([stored integerValue], 1)) : 0;
-    atomic_store(&YTKACEModeCache, (int)mode);
+    atomic_store(&YTzoomModeCache, (int)mode);
     return mode;
 }
 
-static BOOL YTKACEReplacingTitles(void) {
-    int cached = atomic_load(&YTKACETitlesCache);
+static BOOL YTzoomReplacingTitles(void) {
+    int cached = atomic_load(&YTzoomTitlesCache);
     if (cached >= 0) return cached != 0;
-    BOOL enabled = YTKACEFeatureEnabled(YTKACEDeArrowTitlesKey);
-    atomic_store(&YTKACETitlesCache, enabled ? 1 : 0);
+    BOOL enabled = YTzoomFeatureEnabled(YTzoomDeArrowTitlesKey);
+    atomic_store(&YTzoomTitlesCache, enabled ? 1 : 0);
     return enabled;
 }
 
-static BOOL YTKACEReplacingThumbs(void) {
-    return YTKACEThumbMode() > 0;
+static BOOL YTzoomReplacingThumbs(void) {
+    return YTzoomThumbMode() > 0;
 }
 
-static BOOL YTKACEAnyFeatureOn(void) {
-    return YTKACEReplacingThumbs() || YTKACEReplacingTitles();
+static BOOL YTzoomAnyFeatureOn(void) {
+    return YTzoomReplacingThumbs() || YTzoomReplacingTitles();
 }
 
-static id YTKACESend(id object, SEL selector) {
+static id YTzoomSend(id object, SEL selector) {
     if (object == nil || selector == NULL) return nil;
     @try {
         if (![object respondsToSelector:selector]) return nil;
@@ -84,24 +84,24 @@ static id YTKACESend(id object, SEL selector) {
     }
 }
 
-static id YTKACESupernode(id node) {
-    return YTKACESend(node, @selector(supernode));
+static id YTzoomSupernode(id node) {
+    return YTzoomSend(node, @selector(supernode));
 }
 
-static NSArray *YTKACESubnodes(id node) {
-    id value = YTKACESend(node, @selector(subnodes));
+static NSArray *YTzoomSubnodes(id node) {
+    id value = YTzoomSend(node, @selector(subnodes));
     return [value isKindOfClass:NSArray.class] ? value : nil;
 }
 
-static NSString *YTKACENodeText(id node) {
-    id value = YTKACESend(node, @selector(attributedText));
+static NSString *YTzoomNodeText(id node) {
+    id value = YTzoomSend(node, @selector(attributedText));
     if ([value isKindOfClass:NSAttributedString.class]) {
         return ((NSAttributedString *)value).string;
     }
     return [value isKindOfClass:NSString.class] ? value : nil;
 }
 
-static id YTKACECellRoot(id node) {
+static id YTzoomCellRoot(id node) {
     static Class cellClass;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -109,15 +109,15 @@ static id YTKACECellRoot(id node) {
     });
     if (cellClass == Nil) return nil;
     id current = node;
-    for (NSUInteger level = 0; level < YTKACEAncestorDepth; level++) {
+    for (NSUInteger level = 0; level < YTzoomAncestorDepth; level++) {
         if ([current isKindOfClass:cellClass]) return current;
-        current = YTKACESupernode(current);
+        current = YTzoomSupernode(current);
         if (current == nil) break;
     }
     return nil;
 }
 
-static NSString *YTKACEVideoIDFromURL(NSString *absolute) {
+static NSString *YTzoomVideoIDFromURL(NSString *absolute) {
     if (absolute.length == 0) return nil;
     if ([absolute rangeOfString:@"/vi"].location == NSNotFound) return nil;
     static NSRegularExpression *expression;
@@ -133,102 +133,102 @@ static NSString *YTKACEVideoIDFromURL(NSString *absolute) {
     return [absolute substringWithRange:[match rangeAtIndex:1]];
 }
 
-static NSString *YTKACEURLString(id value) {
+static NSString *YTzoomURLString(id value) {
     if ([value isKindOfClass:NSURL.class]) return ((NSURL *)value).absoluteString;
     if ([value isKindOfClass:NSString.class]) return (NSString *)value;
-    id resolved = YTKACESend(value, @selector(absoluteString));
+    id resolved = YTzoomSend(value, @selector(absoluteString));
     return [resolved isKindOfClass:NSString.class] ? resolved : nil;
 }
 
-static void YTKACELoadStore(void) {
-    if (YTKACEStore != nil) return;
+static void YTzoomLoadStore(void) {
+    if (YTzoomStore != nil) return;
     NSDictionary *stored =
-        [NSUserDefaults.standardUserDefaults dictionaryForKey:YTKACEBrandingStoreKey];
-    YTKACEStore = [stored isKindOfClass:NSDictionary.class]
+        [NSUserDefaults.standardUserDefaults dictionaryForKey:YTzoomBrandingStoreKey];
+    YTzoomStore = [stored isKindOfClass:NSDictionary.class]
         ? [stored mutableCopy] : [NSMutableDictionary dictionary];
-    YTKACEImageCache = [NSCache new];
-    YTKACEImageCache.countLimit = 160;
-    YTKACEInFlight = [NSMutableSet set];
-    YTKACEThumbInFlight = [NSMutableSet set];
-    YTKACEPendingIDs = [NSMutableArray array];
-    YTKACEPendingNodes = [NSMapTable strongToWeakObjectsMapTable];
-    YTKACEPendingCells = [NSMapTable strongToWeakObjectsMapTable];
+    YTzoomImageCache = [NSCache new];
+    YTzoomImageCache.countLimit = 160;
+    YTzoomInFlight = [NSMutableSet set];
+    YTzoomThumbInFlight = [NSMutableSet set];
+    YTzoomPendingIDs = [NSMutableArray array];
+    YTzoomPendingNodes = [NSMapTable strongToWeakObjectsMapTable];
+    YTzoomPendingCells = [NSMapTable strongToWeakObjectsMapTable];
 }
 
-static void YTKACEEvictLocked(void) {
-    if (YTKACEStore.count <= YTKACEStoreLimit) return;
-    NSArray<NSString *> *ordered = [YTKACEStore.allKeys sortedArrayUsingComparator:
+static void YTzoomEvictLocked(void) {
+    if (YTzoomStore.count <= YTzoomStoreLimit) return;
+    NSArray<NSString *> *ordered = [YTzoomStore.allKeys sortedArrayUsingComparator:
         ^NSComparisonResult(NSString *left, NSString *right) {
-            double a = [YTKACEStore[left][@"a"] doubleValue];
-            double b = [YTKACEStore[right][@"a"] doubleValue];
+            double a = [YTzoomStore[left][@"a"] doubleValue];
+            double b = [YTzoomStore[right][@"a"] doubleValue];
             if (a < b) return NSOrderedAscending;
             if (a > b) return NSOrderedDescending;
             return NSOrderedSame;
         }];
-    NSUInteger drop = YTKACEStore.count - (YTKACEStoreLimit * 3 / 4);
+    NSUInteger drop = YTzoomStore.count - (YTzoomStoreLimit * 3 / 4);
     if (drop > ordered.count) drop = ordered.count;
     for (NSUInteger index = 0; index < drop; index++) {
-        [YTKACEStore removeObjectForKey:ordered[index]];
+        [YTzoomStore removeObjectForKey:ordered[index]];
     }
 }
 
-static void YTKACEPersistStore(void) {
-    os_unfair_lock_lock(&YTKACELock);
-    YTKACEEvictLocked();
-    NSDictionary *snapshot = [YTKACEStore copy];
-    os_unfair_lock_unlock(&YTKACELock);
+static void YTzoomPersistStore(void) {
+    os_unfair_lock_lock(&YTzoomLock);
+    YTzoomEvictLocked();
+    NSDictionary *snapshot = [YTzoomStore copy];
+    os_unfair_lock_unlock(&YTzoomLock);
     if (snapshot != nil) {
         [NSUserDefaults.standardUserDefaults setObject:snapshot
-                                                forKey:YTKACEBrandingStoreKey];
+                                                forKey:YTzoomBrandingStoreKey];
     }
 }
 
-static NSDictionary *YTKACEFreshEntryLocked(NSString *videoID) {
-    NSDictionary *entry = YTKACEStore[videoID];
+static NSDictionary *YTzoomFreshEntryLocked(NSString *videoID) {
+    NSDictionary *entry = YTzoomStore[videoID];
     if (entry == nil) return nil;
-    if ([entry[@"v"] integerValue] < YTKACEStoreVersion) {
-        [YTKACEStore removeObjectForKey:videoID];
+    if ([entry[@"v"] integerValue] < YTzoomStoreVersion) {
+        [YTzoomStore removeObjectForKey:videoID];
         return nil;
     }
     if (entry[@"t"] != nil || entry[@"ti"] != nil) return entry;
     double added = [entry[@"a"] doubleValue];
-    if (NSDate.date.timeIntervalSince1970 - added > YTKACENegativeTTL) {
-        [YTKACEStore removeObjectForKey:videoID];
+    if (NSDate.date.timeIntervalSince1970 - added > YTzoomNegativeTTL) {
+        [YTzoomStore removeObjectForKey:videoID];
         return nil;
     }
     return entry;
 }
 
-static void YTKACEStoreBranding(NSString *videoID, NSNumber *timestamp,
+static void YTzoomStoreBranding(NSString *videoID, NSNumber *timestamp,
                                 NSString *title) {
     if (videoID.length == 0) return;
     NSMutableDictionary *entry = [NSMutableDictionary dictionary];
     entry[@"a"] = @(NSDate.date.timeIntervalSince1970);
-    entry[@"v"] = @(YTKACEStoreVersion);
+    entry[@"v"] = @(YTzoomStoreVersion);
     if (timestamp != nil) entry[@"t"] = timestamp;
     if (title.length != 0) entry[@"ti"] = title;
     if (timestamp == nil && title.length == 0) entry[@"n"] = @YES;
-    os_unfair_lock_lock(&YTKACELock);
-    YTKACEStore[videoID] = entry;
-    [YTKACEInFlight removeObject:videoID];
-    if (YTKACEActiveRequests > 0) YTKACEActiveRequests--;
-    os_unfair_lock_unlock(&YTKACELock);
-    YTKACEPersistStore();
-    YTKACEPumpQueue();
+    os_unfair_lock_lock(&YTzoomLock);
+    YTzoomStore[videoID] = entry;
+    [YTzoomInFlight removeObject:videoID];
+    if (YTzoomActiveRequests > 0) YTzoomActiveRequests--;
+    os_unfair_lock_unlock(&YTzoomLock);
+    YTzoomPersistStore();
+    YTzoomPumpQueue();
 }
 
-static NSString *YTKACEStoredTitle(NSString *videoID) {
+static NSString *YTzoomStoredTitle(NSString *videoID) {
     if (videoID.length == 0) return nil;
-    os_unfair_lock_lock(&YTKACELock);
-    id title = YTKACEStore[videoID][@"ti"];
-    os_unfair_lock_unlock(&YTKACELock);
+    os_unfair_lock_lock(&YTzoomLock);
+    id title = YTzoomStore[videoID][@"ti"];
+    os_unfair_lock_unlock(&YTzoomLock);
     return [title isKindOfClass:NSString.class] ? title : nil;
 }
 
-static void YTKACEApplyImage(id node, NSString *videoID, UIImage *image) {
+static void YTzoomApplyImage(id node, NSString *videoID, UIImage *image) {
     if (node == nil || image == nil) return;
     dispatch_async(dispatch_get_main_queue(), ^{
-        id current = objc_getAssociatedObject(node, YTKACENodeVideoIDKey);
+        id current = objc_getAssociatedObject(node, YTzoomNodeVideoIDKey);
         if (![current isEqual:videoID]) return;
         SEL setter = NSSelectorFromString(@"setImage:");
         if (![node respondsToSelector:setter]) return;
@@ -239,12 +239,12 @@ static void YTKACEApplyImage(id node, NSString *videoID, UIImage *image) {
     });
 }
 
-static void YTKACEFetchThumbnail(NSString *videoID, double timestamp, id node) {
-    if (!YTKACEReplacingThumbs()) return;
-    os_unfair_lock_lock(&YTKACELock);
-    BOOL busy = [YTKACEThumbInFlight containsObject:videoID];
-    if (!busy) [YTKACEThumbInFlight addObject:videoID];
-    os_unfair_lock_unlock(&YTKACELock);
+static void YTzoomFetchThumbnail(NSString *videoID, double timestamp, id node) {
+    if (!YTzoomReplacingThumbs()) return;
+    os_unfair_lock_lock(&YTzoomLock);
+    BOOL busy = [YTzoomThumbInFlight containsObject:videoID];
+    if (!busy) [YTzoomThumbInFlight addObject:videoID];
+    os_unfair_lock_unlock(&YTzoomLock);
     if (busy) return;
 
     NSString *address = [NSString stringWithFormat:
@@ -252,9 +252,9 @@ static void YTKACEFetchThumbnail(NSString *videoID, double timestamp, id node) {
         videoID, timestamp];
     NSURL *URL = [NSURL URLWithString:address];
     if (URL == nil) {
-        os_unfair_lock_lock(&YTKACELock);
-        [YTKACEThumbInFlight removeObject:videoID];
-        os_unfair_lock_unlock(&YTKACELock);
+        os_unfair_lock_lock(&YTzoomLock);
+        [YTzoomThumbInFlight removeObject:videoID];
+        os_unfair_lock_unlock(&YTzoomLock);
         return;
     }
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:URL];
@@ -262,24 +262,24 @@ static void YTKACEFetchThumbnail(NSString *videoID, double timestamp, id node) {
     __weak id weakNode = node;
     [[NSURLSession.sharedSession dataTaskWithRequest:request
         completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
-        os_unfair_lock_lock(&YTKACELock);
-        [YTKACEThumbInFlight removeObject:videoID];
-        os_unfair_lock_unlock(&YTKACELock);
+        os_unfair_lock_lock(&YTzoomLock);
+        [YTzoomThumbInFlight removeObject:videoID];
+        os_unfair_lock_unlock(&YTzoomLock);
         NSHTTPURLResponse *http = [response isKindOfClass:NSHTTPURLResponse.class]
             ? (NSHTTPURLResponse *)response : nil;
         UIImage *decoded = (error == nil && http.statusCode == 200 && data.length != 0)
             ? [UIImage imageWithData:data] : nil;
         if (decoded == nil) return;
-        os_unfair_lock_lock(&YTKACELock);
-        [YTKACEImageCache setObject:decoded forKey:videoID];
-        os_unfair_lock_unlock(&YTKACELock);
-        YTKACEApplyImage(weakNode, videoID, decoded);
+        os_unfair_lock_lock(&YTzoomLock);
+        [YTzoomImageCache setObject:decoded forKey:videoID];
+        os_unfair_lock_unlock(&YTzoomLock);
+        YTzoomApplyImage(weakNode, videoID, decoded);
     }] resume];
 }
 
-static void YTKACECollectTextNodes(id node, NSUInteger depth, NSMutableArray *out) {
-    if (node == nil || depth > YTKACECellTextDepth ||
-        out.count >= YTKACEMaxCellText) {
+static void YTzoomCollectTextNodes(id node, NSUInteger depth, NSMutableArray *out) {
+    if (node == nil || depth > YTzoomCellTextDepth ||
+        out.count >= YTzoomMaxCellText) {
         return;
     }
     static Class textClass;
@@ -288,14 +288,14 @@ static void YTKACECollectTextNodes(id node, NSUInteger depth, NSMutableArray *ou
         textClass = NSClassFromString(@"ELMTextNode");
     });
     if (textClass != Nil && [node isKindOfClass:textClass]) {
-        if (YTKACENodeText(node).length != 0) [out addObject:node];
+        if (YTzoomNodeText(node).length != 0) [out addObject:node];
     }
-    for (id child in YTKACESubnodes(node)) {
-        YTKACECollectTextNodes(child, depth + 1, out);
+    for (id child in YTzoomSubnodes(node)) {
+        YTzoomCollectTextNodes(child, depth + 1, out);
     }
 }
 
-static BOOL YTKACELooksLikeDuration(NSString *text) {
+static BOOL YTzoomLooksLikeDuration(NSString *text) {
     static NSRegularExpression *expression;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -306,9 +306,9 @@ static BOOL YTKACELooksLikeDuration(NSString *text) {
                                          range:NSMakeRange(0, text.length)] != 0;
 }
 
-static void YTKACEWriteTitle(id textNode, NSString *title) {
+static void YTzoomWriteTitle(id textNode, NSString *title) {
     void (^work)(void) = ^{
-        id current = YTKACESend(textNode, @selector(attributedText));
+        id current = YTzoomSend(textNode, @selector(attributedText));
         if (![current isKindOfClass:NSAttributedString.class]) return;
         NSAttributedString *existing = current;
         if ([existing.string isEqualToString:title]) return;
@@ -327,49 +327,49 @@ static void YTKACEWriteTitle(id textNode, NSString *title) {
     else dispatch_async(dispatch_get_main_queue(), work);
 }
 
-static void YTKACEApplyTitleToCell(id root, NSString *videoID) {
-    if (root == nil || videoID.length == 0 || !YTKACEReplacingTitles()) return;
+static void YTzoomApplyTitleToCell(id root, NSString *videoID) {
+    if (root == nil || videoID.length == 0 || !YTzoomReplacingTitles()) return;
 
-    NSString *title = YTKACEStoredTitle(videoID);
+    NSString *title = YTzoomStoredTitle(videoID);
     if (title.length == 0) {
-        os_unfair_lock_lock(&YTKACELock);
-        [YTKACEPendingCells setObject:root forKey:videoID];
-        os_unfair_lock_unlock(&YTKACELock);
+        os_unfair_lock_lock(&YTzoomLock);
+        [YTzoomPendingCells setObject:root forKey:videoID];
+        os_unfair_lock_unlock(&YTzoomLock);
         return;
     }
 
     NSMutableArray *nodes = [NSMutableArray array];
-    YTKACECollectTextNodes(root, 0, nodes);
+    YTzoomCollectTextNodes(root, 0, nodes);
     if (nodes.count < 2) return;
     id candidate = nodes[nodes.count - 2];
-    NSString *text = YTKACENodeText(candidate);
+    NSString *text = YTzoomNodeText(candidate);
     if ([text isEqualToString:title]) return;
-    if (YTKACELooksLikeDuration(text)) return;
-    YTKACEWriteTitle(candidate, title);
+    if (YTzoomLooksLikeDuration(text)) return;
+    YTzoomWriteTitle(candidate, title);
 }
 
-static void YTKACEApplyPendingTitle(NSString *videoID) {
-    if (videoID.length == 0 || !YTKACEReplacingTitles()) return;
-    os_unfair_lock_lock(&YTKACELock);
-    id root = [YTKACEPendingCells objectForKey:videoID];
-    os_unfair_lock_unlock(&YTKACELock);
-    if (root != nil) YTKACEApplyTitleToCell(root, videoID);
+static void YTzoomApplyPendingTitle(NSString *videoID) {
+    if (videoID.length == 0 || !YTzoomReplacingTitles()) return;
+    os_unfair_lock_lock(&YTzoomLock);
+    id root = [YTzoomPendingCells objectForKey:videoID];
+    os_unfair_lock_unlock(&YTzoomLock);
+    if (root != nil) YTzoomApplyTitleToCell(root, videoID);
 }
 
-static BOOL YTKACEClaimSlotLocked(void) {
-    if (YTKACEActiveRequests >= YTKACEMaxConcurrent) return NO;
+static BOOL YTzoomClaimSlotLocked(void) {
+    if (YTzoomActiveRequests >= YTzoomMaxConcurrent) return NO;
     NSTimeInterval now = NSDate.date.timeIntervalSince1970;
-    if (now - YTKACEWindowStart >= 60.0) {
-        YTKACEWindowStart = now;
-        YTKACEWindowCount = 0;
+    if (now - YTzoomWindowStart >= 60.0) {
+        YTzoomWindowStart = now;
+        YTzoomWindowCount = 0;
     }
-    if (YTKACEWindowCount >= YTKACERequestsPerMinute) return NO;
-    YTKACEWindowCount++;
-    YTKACEActiveRequests++;
+    if (YTzoomWindowCount >= YTzoomRequestsPerMinute) return NO;
+    YTzoomWindowCount++;
+    YTzoomActiveRequests++;
     return YES;
 }
 
-static void YTKACEFetchBranding(NSString *videoID, id node) {
+static void YTzoomFetchBranding(NSString *videoID, id node) {
     NSString *address = [NSString stringWithFormat:
         @"https://sponsor.ajay.app/api/branding?videoID=%@", videoID];
     NSURL *URL = [NSURL URLWithString:address];
@@ -383,17 +383,17 @@ static void YTKACEFetchBranding(NSString *videoID, id node) {
         NSHTTPURLResponse *http = [response isKindOfClass:NSHTTPURLResponse.class]
             ? (NSHTTPURLResponse *)response : nil;
         if (error != nil) {
-            os_unfair_lock_lock(&YTKACELock);
-            [YTKACEInFlight removeObject:videoID];
-            if (YTKACEActiveRequests > 0) YTKACEActiveRequests--;
-            os_unfair_lock_unlock(&YTKACELock);
-            YTKACEPumpQueue();
+            os_unfair_lock_lock(&YTzoomLock);
+            [YTzoomInFlight removeObject:videoID];
+            if (YTzoomActiveRequests > 0) YTzoomActiveRequests--;
+            os_unfair_lock_unlock(&YTzoomLock);
+            YTzoomPumpQueue();
             return;
         }
         id json = (http.statusCode == 200 && data.length != 0)
             ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
         if (![json isKindOfClass:NSDictionary.class]) {
-            YTKACEStoreBranding(videoID, nil, nil);
+            YTzoomStoreBranding(videoID, nil, nil);
             return;
         }
         NSDictionary *payload = json;
@@ -430,154 +430,154 @@ static void YTKACEFetchBranding(NSString *videoID, id node) {
             }
         }
 
-        YTKACEStoreBranding(videoID, useTimestamp, useTitle);
-        if (useTitle.length != 0) YTKACEApplyPendingTitle(videoID);
+        YTzoomStoreBranding(videoID, useTimestamp, useTitle);
+        if (useTitle.length != 0) YTzoomApplyPendingTitle(videoID);
         if (useTimestamp != nil) {
-            YTKACEFetchThumbnail(videoID, useTimestamp.doubleValue, weakNode);
+            YTzoomFetchThumbnail(videoID, useTimestamp.doubleValue, weakNode);
         }
     }] resume];
 }
 
-static void YTKACEPumpQueue(void) {
+static void YTzoomPumpQueue(void) {
     while (YES) {
         NSString *videoID = nil;
         id node = nil;
-        os_unfair_lock_lock(&YTKACELock);
-        while (YTKACEPendingIDs.count != 0 && videoID == nil) {
-            NSString *candidate = YTKACEPendingIDs.firstObject;
-            [YTKACEPendingIDs removeObjectAtIndex:0];
-            if (YTKACEFreshEntryLocked(candidate) != nil ||
-                [YTKACEInFlight containsObject:candidate]) {
-                [YTKACEPendingNodes removeObjectForKey:candidate];
+        os_unfair_lock_lock(&YTzoomLock);
+        while (YTzoomPendingIDs.count != 0 && videoID == nil) {
+            NSString *candidate = YTzoomPendingIDs.firstObject;
+            [YTzoomPendingIDs removeObjectAtIndex:0];
+            if (YTzoomFreshEntryLocked(candidate) != nil ||
+                [YTzoomInFlight containsObject:candidate]) {
+                [YTzoomPendingNodes removeObjectForKey:candidate];
                 continue;
             }
-            if (!YTKACEClaimSlotLocked()) {
-                [YTKACEPendingIDs insertObject:candidate atIndex:0];
+            if (!YTzoomClaimSlotLocked()) {
+                [YTzoomPendingIDs insertObject:candidate atIndex:0];
                 break;
             }
-            [YTKACEInFlight addObject:candidate];
-            node = [YTKACEPendingNodes objectForKey:candidate];
-            [YTKACEPendingNodes removeObjectForKey:candidate];
+            [YTzoomInFlight addObject:candidate];
+            node = [YTzoomPendingNodes objectForKey:candidate];
+            [YTzoomPendingNodes removeObjectForKey:candidate];
             videoID = candidate;
         }
-        os_unfair_lock_unlock(&YTKACELock);
+        os_unfair_lock_unlock(&YTzoomLock);
         if (videoID == nil) return;
-        YTKACEFetchBranding(videoID, node);
+        YTzoomFetchBranding(videoID, node);
     }
 }
 
-static void YTKACEEnqueueLookup(NSString *videoID, id node) {
-    os_unfair_lock_lock(&YTKACELock);
-    BOOL known = YTKACEFreshEntryLocked(videoID) != nil ||
-        [YTKACEInFlight containsObject:videoID] ||
-        [YTKACEPendingIDs containsObject:videoID];
+static void YTzoomEnqueueLookup(NSString *videoID, id node) {
+    os_unfair_lock_lock(&YTzoomLock);
+    BOOL known = YTzoomFreshEntryLocked(videoID) != nil ||
+        [YTzoomInFlight containsObject:videoID] ||
+        [YTzoomPendingIDs containsObject:videoID];
     if (!known) {
-        if (YTKACEPendingIDs.count >= YTKACEPendingLimit) {
-            [YTKACEPendingIDs removeObjectAtIndex:0];
+        if (YTzoomPendingIDs.count >= YTzoomPendingLimit) {
+            [YTzoomPendingIDs removeObjectAtIndex:0];
         }
-        [YTKACEPendingIDs addObject:videoID];
-        if (node != nil) [YTKACEPendingNodes setObject:node forKey:videoID];
+        [YTzoomPendingIDs addObject:videoID];
+        if (node != nil) [YTzoomPendingNodes setObject:node forKey:videoID];
     }
-    os_unfair_lock_unlock(&YTKACELock);
-    if (!known) YTKACEPumpQueue();
+    os_unfair_lock_unlock(&YTzoomLock);
+    if (!known) YTzoomPumpQueue();
 }
 
-static void YTKACEConsiderVideo(id node, NSString *videoID) {
-    BOOL replacing = YTKACEReplacingThumbs();
-    os_unfair_lock_lock(&YTKACELock);
-    YTKACELoadStore();
-    UIImage *ready = replacing ? [YTKACEImageCache objectForKey:videoID] : nil;
-    NSDictionary *known = YTKACEFreshEntryLocked(videoID);
-    os_unfair_lock_unlock(&YTKACELock);
+static void YTzoomConsiderVideo(id node, NSString *videoID) {
+    BOOL replacing = YTzoomReplacingThumbs();
+    os_unfair_lock_lock(&YTzoomLock);
+    YTzoomLoadStore();
+    UIImage *ready = replacing ? [YTzoomImageCache objectForKey:videoID] : nil;
+    NSDictionary *known = YTzoomFreshEntryLocked(videoID);
+    os_unfair_lock_unlock(&YTzoomLock);
 
     if (ready != nil) {
-        YTKACEApplyImage(node, videoID, ready);
+        YTzoomApplyImage(node, videoID, ready);
         return;
     }
     if (known != nil) {
         NSNumber *timestamp = known[@"t"];
         if (replacing && [timestamp isKindOfClass:NSNumber.class]) {
-            YTKACEFetchThumbnail(videoID, timestamp.doubleValue, node);
+            YTzoomFetchThumbnail(videoID, timestamp.doubleValue, node);
         }
         return;
     }
-    YTKACEEnqueueLookup(videoID, node);
+    YTzoomEnqueueLookup(videoID, node);
 }
 
-static void YTKACENoteImage(id receiver, id URL) {
-    NSString *videoID = YTKACEVideoIDFromURL(YTKACEURLString(URL));
+static void YTzoomNoteImage(id receiver, id URL) {
+    NSString *videoID = YTzoomVideoIDFromURL(YTzoomURLString(URL));
     if (videoID.length == 0) return;
 
-    objc_setAssociatedObject(receiver, YTKACENodeVideoIDKey, videoID,
+    objc_setAssociatedObject(receiver, YTzoomNodeVideoIDKey, videoID,
                              OBJC_ASSOCIATION_COPY_NONATOMIC);
-    id root = YTKACECellRoot(receiver);
+    id root = YTzoomCellRoot(receiver);
     if (root != nil) {
-        objc_setAssociatedObject(root, YTKACECellVideoIDKey, videoID,
+        objc_setAssociatedObject(root, YTzoomCellVideoIDKey, videoID,
                                  OBJC_ASSOCIATION_COPY_NONATOMIC);
     }
-    YTKACEConsiderVideo(receiver, videoID);
-    if (root != nil) YTKACEApplyTitleToCell(root, videoID);
+    YTzoomConsiderVideo(receiver, videoID);
+    if (root != nil) YTzoomApplyTitleToCell(root, videoID);
 }
 
-static id YTKACEDownloadImage(id receiver, SEL selector, id URL, BOOL shouldRetry,
+static id YTzoomDownloadImage(id receiver, SEL selector, id URL, BOOL shouldRetry,
                               id callbackQueue, id progress, id completion) {
-    if (YTKACEAnyFeatureOn()) YTKACENoteImage(receiver, URL);
+    if (YTzoomAnyFeatureOn()) YTzoomNoteImage(receiver, URL);
     if (OriginalDownloadImage == NULL) return nil;
     return ((id (*)(id, SEL, id, BOOL, id, id, id))OriginalDownloadImage)(
         receiver, selector, URL, shouldRetry, callbackQueue, progress, completion);
 }
 
-static void YTKACECachedImage(id receiver, SEL selector, id URL,
+static void YTzoomCachedImage(id receiver, SEL selector, id URL,
                               id callbackQueue, id completion) {
-    if (YTKACEAnyFeatureOn()) YTKACENoteImage(receiver, URL);
+    if (YTzoomAnyFeatureOn()) YTzoomNoteImage(receiver, URL);
     if (OriginalCachedImage == NULL) return;
     ((void (*)(id, SEL, id, id, id))OriginalCachedImage)(
         receiver, selector, URL, callbackQueue, completion);
 }
 
-static void YTKACEApplyProperties(id receiver, SEL selector) {
+static void YTzoomApplyProperties(id receiver, SEL selector) {
     if (OriginalApplyProperties != NULL) {
         ((void (*)(id, SEL))OriginalApplyProperties)(receiver, selector);
     }
-    if (!YTKACEReplacingTitles()) return;
-    id root = YTKACECellRoot(receiver);
+    if (!YTzoomReplacingTitles()) return;
+    id root = YTzoomCellRoot(receiver);
     if (root == nil) return;
-    id stored = objc_getAssociatedObject(root, YTKACECellVideoIDKey);
+    id stored = objc_getAssociatedObject(root, YTzoomCellVideoIDKey);
     if (![stored isKindOfClass:NSString.class]) return;
-    if (YTKACEStoredTitle(stored).length == 0) return;
-    YTKACEApplyTitleToCell(root, stored);
+    if (YTzoomStoredTitle(stored).length == 0) return;
+    YTzoomApplyTitleToCell(root, stored);
 }
 
-void YTKACEDeArrowClearCache(void) {
-    os_unfair_lock_lock(&YTKACELock);
-    [YTKACEStore removeAllObjects];
-    [YTKACEImageCache removeAllObjects];
-    [YTKACEPendingIDs removeAllObjects];
-    [YTKACEPendingCells removeAllObjects];
-    os_unfair_lock_unlock(&YTKACELock);
-    [NSUserDefaults.standardUserDefaults removeObjectForKey:YTKACEBrandingStoreKey];
+void YTzoomDeArrowClearCache(void) {
+    os_unfair_lock_lock(&YTzoomLock);
+    [YTzoomStore removeAllObjects];
+    [YTzoomImageCache removeAllObjects];
+    [YTzoomPendingIDs removeAllObjects];
+    [YTzoomPendingCells removeAllObjects];
+    os_unfair_lock_unlock(&YTzoomLock);
+    [NSUserDefaults.standardUserDefaults removeObjectForKey:YTzoomBrandingStoreKey];
 }
 
-void YTKACEInstallDeArrow(void) {
-    os_unfair_lock_lock(&YTKACELock);
-    YTKACELoadStore();
-    os_unfair_lock_unlock(&YTKACELock);
+void YTzoomInstallDeArrow(void) {
+    os_unfair_lock_lock(&YTzoomLock);
+    YTzoomLoadStore();
+    os_unfair_lock_unlock(&YTzoomLock);
 
-    YTKACEInstallInstanceHook(@"ELMImageNode",
+    YTzoomInstallInstanceHook(@"ELMImageNode",
         @"downloadImageWithURL:shouldRetry:callbackQueue:downloadProgress:completion:",
-        (IMP)YTKACEDownloadImage, &OriginalDownloadImage);
-    YTKACEInstallInstanceHook(@"ELMImageNode",
+        (IMP)YTzoomDownloadImage, &OriginalDownloadImage);
+    YTzoomInstallInstanceHook(@"ELMImageNode",
         @"cachedImageWithURL:callbackQueue:completion:",
-        (IMP)YTKACECachedImage, &OriginalCachedImage);
-    YTKACEInstallInstanceHook(@"ELMTextNode",
-        @"controllerDidApplyProperties", (IMP)YTKACEApplyProperties,
+        (IMP)YTzoomCachedImage, &OriginalCachedImage);
+    YTzoomInstallInstanceHook(@"ELMTextNode",
+        @"controllerDidApplyProperties", (IMP)YTzoomApplyProperties,
         &OriginalApplyProperties);
 
     [NSNotificationCenter.defaultCenter
-        addObserverForName:YTKACEPreferencesDidChangeNotification
+        addObserverForName:YTzoomPreferencesDidChangeNotification
                     object:nil queue:nil
                 usingBlock:^(__unused NSNotification *note) {
-        atomic_store(&YTKACEModeCache, -1);
-        atomic_store(&YTKACETitlesCache, -1);
+        atomic_store(&YTzoomModeCache, -1);
+        atomic_store(&YTzoomTitlesCache, -1);
     }];
 }

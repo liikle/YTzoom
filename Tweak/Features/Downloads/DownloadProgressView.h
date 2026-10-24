@@ -2,14 +2,14 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef void (^YTKACEDownloadCancelHandler)(NSString *identifier);
+typedef void (^YTzoomDownloadCancelHandler)(NSString *identifier);
 
-FOUNDATION_EXPORT NSNotificationName const YTKACEDownloadJobsDidChangeNotification;
+FOUNDATION_EXPORT NSNotificationName const YTzoomDownloadJobsDidChangeNotification;
 
-@interface YTKACEDownloadProgressView : NSObject
+@interface YTzoomDownloadProgressView : NSObject
 + (instancetype)sharedView;
-@property(nonatomic, copy, nullable) YTKACEDownloadCancelHandler cancelHandler;
-@property(nonatomic, copy, nullable) YTKACEDownloadCancelHandler retryHandler;
+@property(nonatomic, copy, nullable) YTzoomDownloadCancelHandler cancelHandler;
+@property(nonatomic, copy, nullable) YTzoomDownloadCancelHandler retryHandler;
 @property(nonatomic, assign) BOOL suppressed;
 - (NSArray<NSDictionary *> *)jobSnapshot;
 - (void)cancelOrDismissJob:(NSString *)identifier;

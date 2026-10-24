@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 
@@ -8,13 +8,13 @@
 static IMP OriginalShowShareSheet;
 static IMP OriginalShareEntityExecute;
 
-static id YTKACEShareValue(id object, NSString *name) {
+static id YTzoomShareValue(id object, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     if (object == nil || ![object respondsToSelector:selector]) return nil;
     return ((id (*)(id, SEL))objc_msgSend)(object, selector);
 }
 
-static NSString *YTKACESerializedShareEntity(id receiver,
+static NSString *YTzoomSerializedShareEntity(id receiver,
                                                id onAppear,
                                                id context) {
     NSRegularExpression *expression = [NSRegularExpression
@@ -36,13 +36,13 @@ static NSString *YTKACESerializedShareEntity(id receiver,
     return nil;
 }
 
-static BOOL YTKACEShareBool(id object, NSString *name) {
+static BOOL YTzoomShareBool(id object, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     return object != nil && [object respondsToSelector:selector] &&
         ((BOOL (*)(id, SEL))objc_msgSend)(object, selector);
 }
 
-static id YTKACEShareExtension(id object, id descriptor) {
+static id YTzoomShareExtension(id object, id descriptor) {
     if (object == nil || descriptor == nil) return nil;
     SEL has = NSSelectorFromString(@"hasExtension:");
     SEL get = NSSelectorFromString(@"getExtension:");
@@ -54,7 +54,7 @@ static id YTKACEShareExtension(id object, id descriptor) {
     return ((id (*)(id, SEL, id))objc_msgSend)(object, get, descriptor);
 }
 
-static BOOL YTKACEShareVarint(const uint8_t *bytes, NSUInteger length, NSUInteger *offset, uint64_t *value) {
+static BOOL YTzoomShareVarint(const uint8_t *bytes, NSUInteger length, NSUInteger *offset, uint64_t *value) {
     uint64_t result = 0;
     for (NSUInteger shift = 0; shift < 64 && *offset < length; shift += 7) {
         uint8_t byte = bytes[(*offset)++];
@@ -67,25 +67,25 @@ static BOOL YTKACEShareVarint(const uint8_t *bytes, NSUInteger length, NSUIntege
     return NO;
 }
 
-static NSDictionary<NSNumber *, NSData *> *YTKACEShareFields(NSData *data) {
+static NSDictionary<NSNumber *, NSData *> *YTzoomShareFields(NSData *data) {
     NSMutableDictionary<NSNumber *, NSData *> *fields = [NSMutableDictionary dictionary];
     const uint8_t *bytes = (const uint8_t *)data.bytes;
     NSUInteger length = data.length;
     NSUInteger offset = 0;
     while (offset < length) {
         uint64_t key = 0;
-        if (!YTKACEShareVarint(bytes, length, &offset, &key)) break;
+        if (!YTzoomShareVarint(bytes, length, &offset, &key)) break;
         NSNumber *number = @(key >> 3);
         switch (key & 7) {
             case 0: {
                 uint64_t value = 0;
-                if (!YTKACEShareVarint(bytes, length, &offset, &value)) return fields;
+                if (!YTzoomShareVarint(bytes, length, &offset, &value)) return fields;
                 if (fields[number] == nil) fields[number] = [NSData data];
                 break;
             }
             case 2: {
                 uint64_t size = 0;
-                if (!YTKACEShareVarint(bytes, length, &offset, &size) || size > length - offset) return fields;
+                if (!YTzoomShareVarint(bytes, length, &offset, &size) || size > length - offset) return fields;
                 if (fields[number] == nil) fields[number] = [NSData dataWithBytes:bytes + offset length:(NSUInteger)size];
                 offset += (NSUInteger)size;
                 break;
@@ -98,13 +98,13 @@ static NSDictionary<NSNumber *, NSData *> *YTKACEShareFields(NSData *data) {
     return fields;
 }
 
-static NSString *YTKACEShareText(NSData *data) {
+static NSString *YTzoomShareText(NSData *data) {
     if (data.length == 0) return nil;
     NSString *text = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
     return text.length != 0 ? text : nil;
 }
 
-static NSURL *YTKACEShareEntityURL(NSString *serialized) {
+static NSURL *YTzoomShareEntityURL(NSString *serialized) {
     if (serialized.length == 0) return nil;
     NSString *text = [serialized stringByRemovingPercentEncoding] ?: serialized;
     text = [[text stringByReplacingOccurrencesOfString:@"-" withString:@"+"]
@@ -112,25 +112,25 @@ static NSURL *YTKACEShareEntityURL(NSString *serialized) {
     while (text.length % 4 != 0) text = [text stringByAppendingString:@"="];
     NSData *data = [[NSData alloc] initWithBase64EncodedString:text options:0];
     if (data.length == 0) return nil;
-    NSDictionary<NSNumber *, NSData *> *fields = YTKACEShareFields(data);
-    NSString *clipID = YTKACEShareText(YTKACEShareFields(fields[@8])[@1]);
+    NSDictionary<NSNumber *, NSData *> *fields = YTzoomShareFields(data);
+    NSString *clipID = YTzoomShareText(YTzoomShareFields(fields[@8])[@1]);
     if (clipID != nil) return [NSURL URLWithString:[@"https://youtube.com/clip/" stringByAppendingString:clipID]];
-    NSString *channelID = YTKACEShareText(fields[@3]);
+    NSString *channelID = YTzoomShareText(fields[@3]);
     if (channelID != nil) return [NSURL URLWithString:[@"https://youtube.com/channel/" stringByAppendingString:channelID]];
-    NSString *postID = YTKACEShareText(fields[@6]);
+    NSString *postID = YTzoomShareText(fields[@6]);
     if (postID != nil) return [NSURL URLWithString:[@"https://youtube.com/post/" stringByAppendingString:postID]];
-    NSString *playlistID = YTKACEShareText(fields[@2]);
+    NSString *playlistID = YTzoomShareText(fields[@2]);
     if (playlistID != nil) {
         NSString *suffix = [playlistID hasPrefix:@"PL"] || [playlistID hasPrefix:@"FL"] ? @"" : @"&playnext=1";
         return [NSURL URLWithString:[NSString stringWithFormat:@"https://youtube.com/playlist?list=%@%@", playlistID, suffix]];
     }
-    NSString *videoID = YTKACEShareText(fields[@1]);
+    NSString *videoID = YTzoomShareText(fields[@1]);
     if (videoID == nil) return nil;
     NSString *format = fields[@10] != nil ? @"https://youtube.com/shorts/%@" : @"https://youtube.com/watch?v=%@";
     return [NSURL URLWithString:[NSString stringWithFormat:format, videoID]];
 }
 
-static id YTKACEFindPlayerController(UIViewController *controller, NSString *videoID, NSUInteger depth) {
+static id YTzoomFindPlayerController(UIViewController *controller, NSString *videoID, NSUInteger depth) {
     if (controller == nil || depth > 14) return nil;
     SEL current = NSSelectorFromString(@"currentVideoID");
     if ([NSStringFromClass(controller.class) isEqualToString:@"YTPlayerViewController"] &&
@@ -139,14 +139,14 @@ static id YTKACEFindPlayerController(UIViewController *controller, NSString *vid
         if ([value isKindOfClass:NSString.class] && [value isEqualToString:videoID]) return controller;
     }
     for (UIViewController *child in controller.childViewControllers) {
-        id found = YTKACEFindPlayerController(child, videoID, depth + 1);
+        id found = YTzoomFindPlayerController(child, videoID, depth + 1);
         if (found != nil) return found;
     }
-    return YTKACEFindPlayerController(controller.presentedViewController, videoID, depth + 1);
+    return YTzoomFindPlayerController(controller.presentedViewController, videoID, depth + 1);
 }
 
-static NSURL *YTKACEShareURLWithTime(NSURL *URL) {
-    if (URL == nil || !YTKACEFeatureEnabled(@"YTKACE.Preference.Sharing.Timestamp")) return URL;
+static NSURL *YTzoomShareURLWithTime(NSURL *URL) {
+    if (URL == nil || !YTzoomFeatureEnabled(@"YTzoom.Preference.Sharing.Timestamp")) return URL;
     NSURLComponents *components = [NSURLComponents componentsWithURL:URL resolvingAgainstBaseURL:NO];
     if (![components.path isEqualToString:@"/watch"]) return URL;
     NSString *videoID = nil;
@@ -157,7 +157,7 @@ static NSURL *YTKACEShareURLWithTime(NSURL *URL) {
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class]) continue;
         for (UIWindow *window in ((UIWindowScene *)scene).windows) {
-            id player = YTKACEFindPlayerController(window.rootViewController, videoID, 0);
+            id player = YTzoomFindPlayerController(window.rootViewController, videoID, 0);
             SEL timeSel = NSSelectorFromString(@"currentVideoMediaTime");
             if (player == nil || ![player respondsToSelector:timeSel]) continue;
             double time = ((double (*)(id, SEL))objc_msgSend)(player, timeSel);
@@ -172,7 +172,7 @@ static NSURL *YTKACEShareURLWithTime(NSURL *URL) {
     return URL;
 }
 
-static UIViewController *YTKACESharePresenter(void) {
+static UIViewController *YTzoomSharePresenter(void) {
     Class utils = NSClassFromString(@"YTUIUtils");
     SEL top = NSSelectorFromString(@"topViewControllerForPresenting");
     if ([utils respondsToSelector:top]) {
@@ -206,12 +206,12 @@ static UIViewController *YTKACESharePresenter(void) {
     return controller;
 }
 
-static void YTKACEPresentNativeShare(NSURL *URL, UIView *source) {
+static void YTzoomPresentNativeShare(NSURL *URL, UIView *source) {
     if (URL == nil) return;
-    URL = YTKACEShareURLWithTime(URL);
+    URL = YTzoomShareURLWithTime(URL);
     __weak UIView *weakSource = source;
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIViewController *presenter = YTKACESharePresenter();
+        UIViewController *presenter = YTzoomSharePresenter();
         if (presenter == nil) return;
         UIActivityViewController *sheet =
             [[UIActivityViewController alloc] initWithActivityItems:@[URL]
@@ -239,13 +239,13 @@ static void YTKACEPresentNativeShare(NSURL *URL, UIView *source) {
     });
 }
 
-static void YTKACEShareEntityExecute(id receiver, SEL selector, id command,
+static void YTzoomShareEntityExecute(id receiver, SEL selector, id command,
                                      id entry, UIView *fromView, id sender) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Sharing.NativeSheet")) {
-        NSString *serialized = YTKACESerializedShareEntity(command, nil, nil);
-        NSURL *URL = YTKACEShareEntityURL(serialized);
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Sharing.NativeSheet")) {
+        NSString *serialized = YTzoomSerializedShareEntity(command, nil, nil);
+        NSURL *URL = YTzoomShareEntityURL(serialized);
         if (URL != nil) {
-            YTKACEPresentNativeShare(URL, fromView);
+            YTzoomPresentNativeShare(URL, fromView);
             return;
         }
     }
@@ -255,10 +255,10 @@ static void YTKACEShareEntityExecute(id receiver, SEL selector, id command,
     }
 }
 
-static void YTKACEShowShareSheet(id receiver, SEL selector,
+static void YTzoomShowShareSheet(id receiver, SEL selector,
                                  id context, id handler) {
-    BOOL enabled = YTKACEFeatureEnabled(@"YTKACE.Preference.Sharing.NativeSheet");
-    BOOL hasOnAppear = YTKACEShareBool(receiver, @"hasOnAppear");
+    BOOL enabled = YTzoomFeatureEnabled(@"YTzoom.Preference.Sharing.NativeSheet");
+    BOOL hasOnAppear = YTzoomShareBool(receiver, @"hasOnAppear");
 
     if (!enabled || !hasOnAppear) {
         if (OriginalShowShareSheet != NULL) {
@@ -267,7 +267,7 @@ static void YTKACEShowShareSheet(id receiver, SEL selector,
         }
         return;
     }
-    id onAppear = YTKACEShareValue(receiver, @"onAppear");
+    id onAppear = YTzoomShareValue(receiver, @"onAppear");
     Class rootClass = NSClassFromString(@"YTIInnertubeCommandExtensionRoot");
     Class updateClass = NSClassFromString(@"YTIUpdateShareSheetCommand");
     SEL rootSelector = NSSelectorFromString(@"innertubeCommand");
@@ -276,11 +276,11 @@ static void YTKACEShowShareSheet(id receiver, SEL selector,
         ? ((id (*)(id, SEL))objc_msgSend)(rootClass, rootSelector) : nil;
     id updateDescriptor = [updateClass respondsToSelector:updateSelector]
         ? ((id (*)(id, SEL))objc_msgSend)(updateClass, updateSelector) : nil;
-    id command = YTKACEShareExtension(onAppear, rootDescriptor);
-    id update = YTKACEShareExtension(command, updateDescriptor);
-    NSString *serialized = YTKACEShareValue(update, @"serializedShareEntity");
+    id command = YTzoomShareExtension(onAppear, rootDescriptor);
+    id update = YTzoomShareExtension(command, updateDescriptor);
+    NSString *serialized = YTzoomShareValue(update, @"serializedShareEntity");
     if (serialized.length == 0) {
-        serialized = YTKACESerializedShareEntity(receiver, onAppear, context);
+        serialized = YTzoomSerializedShareEntity(receiver, onAppear, context);
     }
     if (update == nil && serialized.length == 0) {
         if (OriginalShowShareSheet != NULL) {
@@ -289,7 +289,7 @@ static void YTKACEShowShareSheet(id receiver, SEL selector,
         }
         return;
     }
-    NSURL *URL = YTKACEShareEntityURL(serialized);
+    NSURL *URL = YTzoomShareEntityURL(serialized);
     if (URL == nil) {
         if (OriginalShowShareSheet != NULL) {
             ((void (*)(id, SEL, id, id))OriginalShowShareSheet)(
@@ -297,17 +297,17 @@ static void YTKACEShowShareSheet(id receiver, SEL selector,
         }
         return;
     }
-    YTKACEPresentNativeShare(URL, nil);
+    YTzoomPresentNativeShare(URL, nil);
 }
 
-void YTKACEInstallNativeShareHooks(void) {
-    YTKACEInstallInstanceHook(
+void YTzoomInstallNativeShareHooks(void) {
+    YTzoomInstallInstanceHook(
         @"ELMPBShowActionSheetCommand",
         @"executeWithCommandContext:handler:",
-        (IMP)YTKACEShowShareSheet,
+        (IMP)YTzoomShowShareSheet,
         &OriginalShowShareSheet);
-    YTKACEInstallInstanceHook(@"YTShareEntityEndpointCommandHandler",
+    YTzoomInstallInstanceHook(@"YTShareEntityEndpointCommandHandler",
                               @"executeWithCommand:entry:fromView:sender:",
-                              (IMP)YTKACEShareEntityExecute,
+                              (IMP)YTzoomShareEntityExecute,
                               &OriginalShareEntityExecute);
 }

@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 
@@ -8,9 +8,9 @@
 
 static IMP OriginalFrostedLayout;
 static IMP OriginalFrostedMoveToWindow;
-static const void *YTKACEPlayerGlassAssociation = &YTKACEPlayerGlassAssociation;
+static const void *YTzoomPlayerGlassAssociation = &YTzoomPlayerGlassAssociation;
 
-static BOOL YTKACEInPlayerControls(UIView *view) {
+static BOOL YTzoomInPlayerControls(UIView *view) {
     NSUInteger depth = 0;
     for (UIView *current = view.superview; current != nil && depth < 10; current = current.superview, depth++) {
         NSString *name = NSStringFromClass(current.class);
@@ -20,7 +20,7 @@ static BOOL YTKACEInPlayerControls(UIView *view) {
     return NO;
 }
 
-static NSArray<UIView *> *YTKACEFrostedLayers(UIView *frosted) {
+static NSArray<UIView *> *YTzoomFrostedLayers(UIView *frosted) {
     NSMutableArray<UIView *> *views = [NSMutableArray array];
     for (NSString *key in @[@"_blurEffectView", @"_overlayView"]) {
         id view = nil;
@@ -30,14 +30,14 @@ static NSArray<UIView *> *YTKACEFrostedLayers(UIView *frosted) {
     return views;
 }
 
-static void YTKACEApplyFrostedGlass(UIView *receiver) {
-    UIVisualEffectView *glass = objc_getAssociatedObject(receiver, YTKACEPlayerGlassAssociation);
-    BOOL enabled = YTKACELiquidGlassAvailable() && YTKACEFeatureEnabled(@"YTKACE.Preference.Glass.Player");
-    BOOL wanted = enabled && YTKACEInPlayerControls(receiver);
+static void YTzoomApplyFrostedGlass(UIView *receiver) {
+    UIVisualEffectView *glass = objc_getAssociatedObject(receiver, YTzoomPlayerGlassAssociation);
+    BOOL enabled = YTzoomLiquidGlassAvailable() && YTzoomFeatureEnabled(@"YTzoom.Preference.Glass.Player");
+    BOOL wanted = enabled && YTzoomInPlayerControls(receiver);
     if (!wanted) {
         if (glass != nil) {
             [glass removeFromSuperview];
-            for (UIView *layer in YTKACEFrostedLayers(receiver)) layer.alpha = 1.0;
+            for (UIView *layer in YTzoomFrostedLayers(receiver)) layer.alpha = 1.0;
         }
         return;
     }
@@ -52,9 +52,9 @@ static void YTKACEApplyFrostedGlass(UIView *receiver) {
         glass.userInteractionEnabled = NO;
         glass.layer.cornerCurve = kCACornerCurveContinuous;
         glass.clipsToBounds = YES;
-        objc_setAssociatedObject(receiver, YTKACEPlayerGlassAssociation, glass, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+        objc_setAssociatedObject(receiver, YTzoomPlayerGlassAssociation, glass, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    for (UIView *layer in YTKACEFrostedLayers(receiver)) layer.alpha = 0.0;
+    for (UIView *layer in YTzoomFrostedLayers(receiver)) layer.alpha = 0.0;
     if (glass.superview != receiver) [receiver insertSubview:glass atIndex:0];
     glass.frame = receiver.bounds;
     CGFloat radius = receiver.layer.cornerRadius;
@@ -63,20 +63,20 @@ static void YTKACEApplyFrostedGlass(UIView *receiver) {
     receiver.backgroundColor = UIColor.clearColor;
 }
 
-static void YTKACEFrostedLayout(UIView *receiver, SEL selector) {
+static void YTzoomFrostedLayout(UIView *receiver, SEL selector) {
     if (OriginalFrostedLayout != NULL) ((void (*)(id, SEL))OriginalFrostedLayout)(receiver, selector);
-    YTKACEApplyFrostedGlass(receiver);
+    YTzoomApplyFrostedGlass(receiver);
 }
 
-static void YTKACEFrostedMoveToWindow(UIView *receiver, SEL selector) {
+static void YTzoomFrostedMoveToWindow(UIView *receiver, SEL selector) {
     if (OriginalFrostedMoveToWindow != NULL) ((void (*)(id, SEL))OriginalFrostedMoveToWindow)(receiver, selector);
     if (receiver.window != nil) [receiver setNeedsLayout];
 }
 
-__attribute__((constructor)) static void YTKACEInstallPlayerGlass(void) {
-    if (!YTKACELiquidGlassAvailable()) return;
-    YTKACEInstallInstanceHook(@"YTFrostedGlassView", @"layoutSubviews",
-                              (IMP)YTKACEFrostedLayout, &OriginalFrostedLayout);
-    YTKACEInstallInstanceHook(@"YTFrostedGlassView", @"didMoveToWindow",
-                              (IMP)YTKACEFrostedMoveToWindow, &OriginalFrostedMoveToWindow);
+__attribute__((constructor)) static void YTzoomInstallPlayerGlass(void) {
+    if (!YTzoomLiquidGlassAvailable()) return;
+    YTzoomInstallInstanceHook(@"YTFrostedGlassView", @"layoutSubviews",
+                              (IMP)YTzoomFrostedLayout, &OriginalFrostedLayout);
+    YTzoomInstallInstanceHook(@"YTFrostedGlassView", @"didMoveToWindow",
+                              (IMP)YTzoomFrostedMoveToWindow, &OriginalFrostedMoveToWindow);
 }

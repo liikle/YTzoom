@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 
@@ -7,7 +7,7 @@
 static IMP OriginalImageNamedBundleTraits;
 static IMP OriginalImageNamedBundle;
 
-static NSBundle *YTKACEInnertubeBundle(void) {
+static NSBundle *YTzoomInnertubeBundle(void) {
     NSBundle *main = NSBundle.mainBundle;
     NSArray<NSString *> *paths = @[
         [main.resourcePath stringByAppendingPathComponent:@"Innertube_Resources.bundle"],
@@ -22,7 +22,7 @@ static NSBundle *YTKACEInnertubeBundle(void) {
     return nil;
 }
 
-static NSString *YTKACEPremiumName(NSString *name,
+static NSString *YTzoomPremiumName(NSString *name,
                                     UITraitCollection *traits) {
     BOOL darkName = [name.lowercaseString containsString:@"dark"];
     BOOL darkMode = NO;
@@ -34,8 +34,8 @@ static NSString *YTKACEPremiumName(NSString *name,
         : @"youtube_premium_logo";
 }
 
-static BOOL YTKACEShouldReplaceLogo(NSString *name) {
-    if (!YTKACEFeatureEnabled(@"YTKACE.Preference.Navigation.PremiumLogo") ||
+static BOOL YTzoomShouldReplaceLogo(NSString *name) {
+    if (!YTzoomFeatureEnabled(@"YTzoom.Preference.Navigation.PremiumLogo") ||
         ![name isKindOfClass:NSString.class]) {
         return NO;
     }
@@ -44,7 +44,7 @@ static BOOL YTKACEShouldReplaceLogo(NSString *name) {
         ![lower containsString:@"premium"];
 }
 
-static UIImage *YTKACEImageNamedBundleTraits(id receiver,
+static UIImage *YTzoomImageNamedBundleTraits(id receiver,
                                               SEL selector,
                                               NSString *name,
                                               NSBundle *bundle,
@@ -55,12 +55,12 @@ static UIImage *YTKACEImageNamedBundleTraits(id receiver,
     UIImage *(*original)(id, SEL, NSString *, NSBundle *, UITraitCollection *) =
         (UIImage *(*)(id, SEL, NSString *, NSBundle *, UITraitCollection *))
             OriginalImageNamedBundleTraits;
-    if (YTKACEShouldReplaceLogo(name)) {
-        NSBundle *resources = YTKACEInnertubeBundle() ?: bundle;
+    if (YTzoomShouldReplaceLogo(name)) {
+        NSBundle *resources = YTzoomInnertubeBundle() ?: bundle;
         UIImage *premium = original(
             receiver,
             selector,
-            YTKACEPremiumName(name, traits),
+            YTzoomPremiumName(name, traits),
             resources,
             traits
         );
@@ -71,7 +71,7 @@ static UIImage *YTKACEImageNamedBundleTraits(id receiver,
     return original(receiver, selector, name, bundle, traits);
 }
 
-static UIImage *YTKACEImageNamedBundle(id receiver,
+static UIImage *YTzoomImageNamedBundle(id receiver,
                                        SEL selector,
                                        NSString *name,
                                        NSBundle *bundle) {
@@ -80,12 +80,12 @@ static UIImage *YTKACEImageNamedBundle(id receiver,
     }
     UIImage *(*original)(id, SEL, NSString *, NSBundle *) =
         (UIImage *(*)(id, SEL, NSString *, NSBundle *))OriginalImageNamedBundle;
-    if (YTKACEShouldReplaceLogo(name)) {
-        NSBundle *resources = YTKACEInnertubeBundle() ?: bundle;
+    if (YTzoomShouldReplaceLogo(name)) {
+        NSBundle *resources = YTzoomInnertubeBundle() ?: bundle;
         UIImage *premium = original(
             receiver,
             selector,
-            YTKACEPremiumName(name, UIScreen.mainScreen.traitCollection),
+            YTzoomPremiumName(name, UIScreen.mainScreen.traitCollection),
             resources
         );
         if (premium != nil) {
@@ -95,13 +95,13 @@ static UIImage *YTKACEImageNamedBundle(id receiver,
     return original(receiver, selector, name, bundle);
 }
 
-void YTKACEInstallPremiumLogoHooks(void) {
-    YTKACEInstallClassHook(@"UIImage",
+void YTzoomInstallPremiumLogoHooks(void) {
+    YTzoomInstallClassHook(@"UIImage",
                            @"imageNamed:inBundle:compatibleWithTraitCollection:",
-                           (IMP)YTKACEImageNamedBundleTraits,
+                           (IMP)YTzoomImageNamedBundleTraits,
                            &OriginalImageNamedBundleTraits);
-    YTKACEInstallClassHook(@"UIImage",
+    YTzoomInstallClassHook(@"UIImage",
                            @"imageNamed:inBundle:",
-                           (IMP)YTKACEImageNamedBundle,
+                           (IMP)YTzoomImageNamedBundle,
                            &OriginalImageNamedBundle);
 }

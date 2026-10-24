@@ -5,7 +5,7 @@
 #import <string.h>
 #import "../Features/Downloads/DownloadLog.h"
 
-static NSObject *YTKACEHookLock(void) {
+static NSObject *YTzoomHookLock(void) {
     static NSObject *lock;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -14,7 +14,7 @@ static NSObject *YTKACEHookLock(void) {
     return lock;
 }
 
-static NSMutableSet<NSString *> *YTKACEHookKeys(void) {
+static NSMutableSet<NSString *> *YTzoomHookKeys(void) {
     static NSMutableSet<NSString *> *keys;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -23,7 +23,7 @@ static NSMutableSet<NSString *> *YTKACEHookKeys(void) {
     return keys;
 }
 
-static BOOL YTKACEInstallHook(NSString *className,
+static BOOL YTzoomInstallHook(NSString *className,
                               NSString *selectorName,
                               BOOL classMethod,
                               IMP replacement,
@@ -53,8 +53,8 @@ static BOOL YTKACEInstallHook(NSString *className,
                      classMethod ? @"+" : @"-",
                      selectorName];
 
-    @synchronized (YTKACEHookLock()) {
-        if ([YTKACEHookKeys() containsObject:key]) {
+    @synchronized (YTzoomHookLock()) {
+        if ([YTzoomHookKeys() containsObject:key]) {
             return YES;
         }
 
@@ -73,26 +73,26 @@ static BOOL YTKACEInstallHook(NSString *className,
         if (originalStorage != NULL) {
             *originalStorage = original;
         }
-        [YTKACEHookKeys() addObject:key];
+        [YTzoomHookKeys() addObject:key];
         return YES;
     }
 }
 
-BOOL YTKACEInstallInstanceHook(NSString *className,
+BOOL YTzoomInstallInstanceHook(NSString *className,
                                NSString *selectorName,
                                IMP replacement,
                                IMP *originalStorage) {
-    return YTKACEInstallHook(className, selectorName, NO, replacement, originalStorage);
+    return YTzoomInstallHook(className, selectorName, NO, replacement, originalStorage);
 }
 
-BOOL YTKACEInstallClassHook(NSString *className,
+BOOL YTzoomInstallClassHook(NSString *className,
                             NSString *selectorName,
                             IMP replacement,
                             IMP *originalStorage) {
-    return YTKACEInstallHook(className, selectorName, YES, replacement, originalStorage);
+    return YTzoomInstallHook(className, selectorName, YES, replacement, originalStorage);
 }
 
-BOOL YTKACEAddInstanceMethod(NSString *className,
+BOOL YTzoomAddInstanceMethod(NSString *className,
                              NSString *selectorName,
                              IMP implementation,
                              const char *typeEncoding) {
@@ -107,8 +107,8 @@ BOOL YTKACEAddInstanceMethod(NSString *className,
     }
 
     NSString *key = [NSString stringWithFormat:@"%@|add|%@", className, selectorName];
-    @synchronized (YTKACEHookLock()) {
-        if ([YTKACEHookKeys() containsObject:key]) {
+    @synchronized (YTzoomHookLock()) {
+        if ([YTzoomHookKeys() containsObject:key]) {
             return YES;
         }
 
@@ -117,17 +117,17 @@ BOOL YTKACEAddInstanceMethod(NSString *className,
                                      implementation,
                                      typeEncoding);
         if (added) {
-            [YTKACEHookKeys() addObject:key];
-            [YTKACEHookKeys() addObject:
+            [YTzoomHookKeys() addObject:key];
+            [YTzoomHookKeys() addObject:
                 [NSString stringWithFormat:@"%@|-|%@", className, selectorName]];
         }
         return added;
     }
 }
 
-NSUInteger YTKACEInstalledHookCount(void) {
-    @synchronized (YTKACEHookLock()) {
-        return YTKACEHookKeys().count;
+NSUInteger YTzoomInstalledHookCount(void) {
+    @synchronized (YTzoomHookLock()) {
+        return YTzoomHookKeys().count;
     }
 }
 
@@ -137,26 +137,26 @@ typedef struct {
     void *cacheBuckets;
     void *cacheMask;
     uintptr_t bits;
-} YTKACEClassLayout;
+} YTzoomClassLayout;
 
-static const uintptr_t YTKACESwiftFlags = 3;
-static const uintptr_t YTKACEDataMask = 0x00007ffffffffff8UL;
-static const uint32_t YTKACERealizedFlag = 1u << 31;
+static const uintptr_t YTzoomSwiftFlags = 3;
+static const uintptr_t YTzoomDataMask = 0x00007ffffffffff8UL;
+static const uint32_t YTzoomRealizedFlag = 1u << 31;
 
-static const char *YTKACESafeClassName(Class cls) {
+static const char *YTzoomSafeClassName(Class cls) {
     if (cls == Nil) return NULL;
     const uintptr_t bits =
-        ((const YTKACEClassLayout *)(__bridge const void *)cls)->bits;
-    if (bits & YTKACESwiftFlags) return NULL;
-    const uintptr_t data = bits & YTKACEDataMask;
+        ((const YTzoomClassLayout *)(__bridge const void *)cls)->bits;
+    if (bits & YTzoomSwiftFlags) return NULL;
+    const uintptr_t data = bits & YTzoomDataMask;
     if (data == 0) return NULL;
-    if (*(const uint32_t *)data & YTKACERealizedFlag) {
+    if (*(const uint32_t *)data & YTzoomRealizedFlag) {
         return class_getName(cls);
     }
     return *(const char *const *)(data + 24);
 }
 
-static void YTKACECollectSection(const struct mach_header *header,
+static void YTzoomCollectSection(const struct mach_header *header,
                                  const char *segment,
                                  NSMutableArray<NSString *> *names) {
     unsigned long size = 0;
@@ -166,7 +166,7 @@ static void YTKACECollectSection(const struct mach_header *header,
     uintptr_t *list = (uintptr_t *)section;
     for (unsigned long index = 0; index < size / sizeof(uintptr_t); index++) {
         const char *name =
-            YTKACESafeClassName((__bridge Class)(void *)list[index]);
+            YTzoomSafeClassName((__bridge Class)(void *)list[index]);
         if (name == NULL) continue;
         if (strncmp(name, "_Tt", 3) == 0) continue;
         if (strstr(name, "$s") != NULL) continue;
@@ -175,7 +175,7 @@ static void YTKACECollectSection(const struct mach_header *header,
     }
 }
 
-NSArray<NSString *> *YTKACEAppClassNames(void) {
+NSArray<NSString *> *YTzoomAppClassNames(void) {
     NSMutableArray<NSString *> *names = [NSMutableArray array];
     const uint32_t imageCount = _dyld_image_count();
     for (uint32_t imageIndex = 0; imageIndex < imageCount; imageIndex++) {
@@ -185,13 +185,13 @@ NSArray<NSString *> *YTKACEAppClassNames(void) {
         if (strstr(path, "/usr/lib/") != NULL) continue;
         const struct mach_header *header = _dyld_get_image_header(imageIndex);
         if (header == NULL) continue;
-        YTKACECollectSection(header, "__DATA_CONST", names);
-        YTKACECollectSection(header, "__AUTH_CONST", names);
-        YTKACECollectSection(header, "__DATA", names);
+        YTzoomCollectSection(header, "__DATA_CONST", names);
+        YTzoomCollectSection(header, "__AUTH_CONST", names);
+        YTzoomCollectSection(header, "__DATA", names);
     }
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        YTKACEDownloadLog(@"scan", @"%lu objc classes across %u images",
+        YTzoomDownloadLog(@"scan", @"%lu objc classes across %u images",
                           (unsigned long)names.count, imageCount);
     });
     return names;

@@ -1,22 +1,22 @@
-#import "YTKACESettingsPages.h"
-#import "YTKACESettingsSearch.h"
+#import "YTzoomSettingsPages.h"
+#import "YTzoomSettingsSearch.h"
 #import "../Runtime/Localization.h"
-#import "YTKACERootOptionsController.h"
-#import "YTKACEDownloadsController.h"
+#import "YTzoomRootOptionsController.h"
+#import "YTzoomDownloadsController.h"
 #import "../Runtime/Hooking.h"
 #import "../UI/Assets.h"
-#import "../YTKACE.h"
+#import "../YTzoom.h"
 
 #import <UIKit/UIKit.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static const NSUInteger YTKACENativeSettingsCategory = 0x796b6361;
-static const NSUInteger YTKACENativeSettingsGroup = 0x796b6163;
-static NSString *const YTKACEInertIdentifier = @"YTKACEInertItem";
-static const NSInteger YTKACESearchFieldTag = 0x5954534B;
-static const void *YTKACEDeveloperHoldKey = &YTKACEDeveloperHoldKey;
-static const void *YTKACESettingIconImageKey = &YTKACESettingIconImageKey;
+static const NSUInteger YTzoomNativeSettingsCategory = 0x796b6361;
+static const NSUInteger YTzoomNativeSettingsGroup = 0x796b6163;
+static NSString *const YTzoomInertIdentifier = @"YTzoomInertItem";
+static const NSInteger YTzoomSearchFieldTag = 0x5954534B;
+static const void *YTzoomDeveloperHoldKey = &YTzoomDeveloperHoldKey;
+static const void *YTzoomSettingIconImageKey = &YTzoomSettingIconImageKey;
 static IMP OriginalSettingsCategoryOrder;
 static IMP OriginalUpdateSettingsSection;
 static IMP OriginalOrderedSettingsGroups;
@@ -24,14 +24,14 @@ static IMP OriginalSettingsGroupTitle;
 static IMP OriginalOrderedGroupCategories;
 static IMP OriginalSettingsCellLayout;
 
-typedef UIViewController * _Nonnull (^YTKACENativeBuilder)(void);
+typedef UIViewController * _Nonnull (^YTzoomNativeBuilder)(void);
 
-static NSArray<NSDictionary *> *YTKACENativeLayout(void) {
+static NSArray<NSDictionary *> *YTzoomNativeLayout(void) {
     NSMutableArray *layout = [NSMutableArray arrayWithArray:@[
         @{@"kind": @"search"},
         @{@"kind": @"row", @"title": @"Downloads & Library"}
     ]];
-    for (NSDictionary *section in YTKACESettingsMenu()) {
+    for (NSDictionary *section in YTzoomSettingsMenu()) {
         [layout addObject:@{@"kind": @"header", @"title": section[@"header"]}];
         for (NSDictionary *row in section[@"rows"]) {
             [layout addObject:@{@"kind": @"row", @"title": row[@"title"], @"id": row[@"id"]}];
@@ -45,8 +45,8 @@ static NSArray<NSDictionary *> *YTKACENativeLayout(void) {
     return layout;
 }
 
-static NSDictionary *YTKACENativeMenuRow(NSString *title) {
-    for (NSDictionary *section in YTKACESettingsMenu()) {
+static NSDictionary *YTzoomNativeMenuRow(NSString *title) {
+    for (NSDictionary *section in YTzoomSettingsMenu()) {
         for (NSDictionary *row in section[@"rows"]) {
             if ([row[@"title"] isEqualToString:title]) return row;
         }
@@ -54,55 +54,55 @@ static NSDictionary *YTKACENativeMenuRow(NSString *title) {
     return nil;
 }
 
-static NSArray *YTKACESettingsCategoryOrder(id receiver, SEL selector) {
+static NSArray *YTzoomSettingsCategoryOrder(id receiver, SEL selector) {
     NSArray *order = OriginalSettingsCategoryOrder == NULL ? @[] :
         ((id (*)(id, SEL))OriginalSettingsCategoryOrder)(receiver, selector);
-    if ([order containsObject:@(YTKACENativeSettingsCategory)]) return order;
+    if ([order containsObject:@(YTzoomNativeSettingsCategory)]) return order;
     NSMutableArray *updated = [order mutableCopy] ?: [NSMutableArray array];
     NSUInteger index = [updated indexOfObject:@1];
-    [updated insertObject:@(YTKACENativeSettingsCategory)
+    [updated insertObject:@(YTzoomNativeSettingsCategory)
                   atIndex:index == NSNotFound ? updated.count : index + 1];
     return updated;
 }
 
-static NSArray *YTKACEOrderedSettingsGroups(id receiver, SEL selector) {
+static NSArray *YTzoomOrderedSettingsGroups(id receiver, SEL selector) {
     NSArray *groups = OriginalOrderedSettingsGroups == NULL ? @[] :
         ((id (*)(id, SEL))OriginalOrderedSettingsGroups)(receiver, selector);
     Class groupClass = NSClassFromString(@"YTSettingsGroupData");
     SEL initializer = NSSelectorFromString(@"initWithGroupType:");
     if (groupClass == Nil || ![groupClass instancesRespondToSelector:initializer]) return groups;
     id group = ((id (*)(id, SEL, NSUInteger))objc_msgSend)(
-        [groupClass alloc], initializer, YTKACENativeSettingsGroup);
+        [groupClass alloc], initializer, YTzoomNativeSettingsGroup);
     if (group == nil) return groups;
     NSMutableArray *updated = [groups mutableCopy] ?: [NSMutableArray array];
     [updated insertObject:group atIndex:0];
     return updated;
 }
 
-static NSString *YTKACESettingsGroupTitle(id receiver, SEL selector, NSUInteger type) {
-    if (type == YTKACENativeSettingsGroup) return @"YTKACE";
+static NSString *YTzoomSettingsGroupTitle(id receiver, SEL selector, NSUInteger type) {
+    if (type == YTzoomNativeSettingsGroup) return @"YTzoom";
     return OriginalSettingsGroupTitle == NULL ? nil :
         ((id (*)(id, SEL, NSUInteger))OriginalSettingsGroupTitle)(receiver, selector, type);
 }
 
-static NSArray *YTKACEOrderedGroupCategories(id receiver, SEL selector, NSUInteger type) {
-    if (type == YTKACENativeSettingsGroup) return @[@(YTKACENativeSettingsCategory)];
+static NSArray *YTzoomOrderedGroupCategories(id receiver, SEL selector, NSUInteger type) {
+    if (type == YTzoomNativeSettingsGroup) return @[@(YTzoomNativeSettingsCategory)];
     return OriginalOrderedGroupCategories == NULL ? @[] :
         ((id (*)(id, SEL, NSUInteger))OriginalOrderedGroupCategories)(receiver, selector, type);
 }
 
-static NSString *YTKACENativeSettingsSubtitle(NSString *title) {
-    NSString *value = YTKACENativeMenuRow(title)[@"detail"];
+static NSString *YTzoomNativeSettingsSubtitle(NSString *title) {
+    NSString *value = YTzoomNativeMenuRow(title)[@"detail"];
     if ([title isEqualToString:@"Downloads & Library"]) value = @"Saved video, audio, Shorts, imports and backups";
     if ([title isEqualToString:@"itzzace"]) value = @"Developer";
-    return value != nil ? YTKACELocalized(value) : nil;
+    return value != nil ? YTzoomLocalized(value) : nil;
 }
 
-static UIImage *YTKACESettingIconStoredImage(id receiver) {
-    return objc_getAssociatedObject(receiver, YTKACESettingIconImageKey);
+static UIImage *YTzoomSettingIconStoredImage(id receiver) {
+    return objc_getAssociatedObject(receiver, YTzoomSettingIconImageKey);
 }
 
-static UIImage *YTKACETintedIcon(UIImage *image, UIColor *color) {
+static UIImage *YTzoomTintedIcon(UIImage *image, UIColor *color) {
     if (image == nil) return nil;
     UIColor *fill = color ?: UIColor.labelColor;
     UIGraphicsImageRendererFormat *format =
@@ -121,68 +121,68 @@ static UIImage *YTKACETintedIcon(UIImage *image, UIColor *color) {
     return [tinted imageWithRenderingMode:UIImageRenderingModeAlwaysOriginal];
 }
 
-static id YTKACEIconImageForStyle(id receiver, SEL selector, long long style) {
+static id YTzoomIconImageForStyle(id receiver, SEL selector, long long style) {
     (void)selector;
     (void)style;
-    return YTKACETintedIcon(YTKACESettingIconStoredImage(receiver), nil);
+    return YTzoomTintedIcon(YTzoomSettingIconStoredImage(receiver), nil);
 }
 
-static id YTKACEIconImageForColor(id receiver, SEL selector, UIColor *color) {
+static id YTzoomIconImageForColor(id receiver, SEL selector, UIColor *color) {
     (void)selector;
-    return YTKACETintedIcon(YTKACESettingIconStoredImage(receiver), color);
+    return YTzoomTintedIcon(YTzoomSettingIconStoredImage(receiver), color);
 }
 
-static id YTKACEIconImageForSelected(id receiver, SEL selector, BOOL selected) {
+static id YTzoomIconImageForSelected(id receiver, SEL selector, BOOL selected) {
     (void)selector;
     (void)selected;
-    return YTKACETintedIcon(YTKACESettingIconStoredImage(receiver), nil);
+    return YTzoomTintedIcon(YTzoomSettingIconStoredImage(receiver), nil);
 }
 
-static id YTKACEIconImagePlain(id receiver, SEL selector) {
+static id YTzoomIconImagePlain(id receiver, SEL selector) {
     (void)selector;
-    return YTKACETintedIcon(YTKACESettingIconStoredImage(receiver), nil);
+    return YTzoomTintedIcon(YTzoomSettingIconStoredImage(receiver), nil);
 }
 
-static Class YTKACESettingIconClass(void) {
+static Class YTzoomSettingIconClass(void) {
     static Class iconClass;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         Class superclass = NSClassFromString(@"YTIIcon");
         if (superclass == Nil) return;
-        iconClass = objc_allocateClassPair(superclass, "YTKACESettingIcon", 0);
+        iconClass = objc_allocateClassPair(superclass, "YTzoomSettingIcon", 0);
         if (iconClass == Nil) return;
         class_addMethod(iconClass, NSSelectorFromString(@"iconImageWithPageStyle:"),
-                        (IMP)YTKACEIconImageForStyle, "@24@0:8q16");
+                        (IMP)YTzoomIconImageForStyle, "@24@0:8q16");
         class_addMethod(iconClass, NSSelectorFromString(@"delhiIconImageWithPageStyle:"),
-                        (IMP)YTKACEIconImageForStyle, "@24@0:8q16");
+                        (IMP)YTzoomIconImageForStyle, "@24@0:8q16");
         class_addMethod(iconClass, NSSelectorFromString(@"iconImageWithColor:"),
-                        (IMP)YTKACEIconImageForColor, "@24@0:8@16");
+                        (IMP)YTzoomIconImageForColor, "@24@0:8@16");
         class_addMethod(iconClass, NSSelectorFromString(@"newIconImageWithColor:"),
-                        (IMP)YTKACEIconImageForColor, "@24@0:8@16");
+                        (IMP)YTzoomIconImageForColor, "@24@0:8@16");
         class_addMethod(iconClass, NSSelectorFromString(@"iconImageWithSelected:"),
-                        (IMP)YTKACEIconImageForSelected, "@20@0:8B16");
+                        (IMP)YTzoomIconImageForSelected, "@20@0:8B16");
         class_addMethod(iconClass, NSSelectorFromString(@"delhiIconImageWithSelected:"),
-                        (IMP)YTKACEIconImageForSelected, "@20@0:8B16");
+                        (IMP)YTzoomIconImageForSelected, "@20@0:8B16");
         class_addMethod(iconClass, NSSelectorFromString(@"iconImageForContextMenu"),
-                        (IMP)YTKACEIconImagePlain, "@16@0:8");
+                        (IMP)YTzoomIconImagePlain, "@16@0:8");
         objc_registerClassPair(iconClass);
     });
     return iconClass;
 }
 
-static UIImage *YTKACENativeSettingsIconImage(NSString *title) {
+static UIImage *YTzoomNativeSettingsIconImage(NSString *title) {
     if ([title isEqualToString:@"SponsorBlock"]) {
-        return YTKACEAssetImage(@"sponsorblock_shield_template", @"play.shield");
+        return YTzoomAssetImage(@"sponsorblock_shield_template", @"play.shield");
     }
-    if ([title isEqualToString:@"Shorts"]) return YTKACEShortsImage(NO);
+    if ([title isEqualToString:@"Shorts"]) return YTzoomShortsImage(NO);
     if ([title isEqualToString:@"Downloads & Library"]) {
-        return YTKACEDownloadTabImage(NO);
+        return YTzoomDownloadTabImage(NO);
     }
-    NSString *symbol = [title isEqualToString:@"itzzace"] ? @"person.crop.circle" : YTKACENativeMenuRow(title)[@"symbol"];
+    NSString *symbol = [title isEqualToString:@"itzzace"] ? @"person.crop.circle" : YTzoomNativeMenuRow(title)[@"symbol"];
     return symbol.length != 0 ? [UIImage systemImageNamed:symbol] : nil;
 }
 
-static UIImage *YTKACESquaredIcon(UIImage *image) {
+static UIImage *YTzoomSquaredIcon(UIImage *image) {
     if (image == nil) return nil;
     CGFloat side = MAX(image.size.width, image.size.height);
     if (side <= 0.0) return image;
@@ -202,19 +202,19 @@ static UIImage *YTKACESquaredIcon(UIImage *image) {
     return [padded imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
 }
 
-static void YTKACEApplyNativeSettingsIcon(id item, NSString *title) {
+static void YTzoomApplyNativeSettingsIcon(id item, NSString *title) {
     SEL setSettingIcon = NSSelectorFromString(@"setSettingIcon:");
     if (item == nil || ![item respondsToSelector:setSettingIcon]) return;
-    Class iconClass = YTKACESettingIconClass();
-    UIImage *image = YTKACESquaredIcon(YTKACENativeSettingsIconImage(title));
+    Class iconClass = YTzoomSettingIconClass();
+    UIImage *image = YTzoomSquaredIcon(YTzoomNativeSettingsIconImage(title));
     if (iconClass == Nil || image == nil) return;
     id icon = [iconClass new];
-    objc_setAssociatedObject(icon, YTKACESettingIconImageKey, image,
+    objc_setAssociatedObject(icon, YTzoomSettingIconImageKey, image,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     ((void (*)(id, SEL, id))objc_msgSend)(item, setSettingIcon, icon);
 }
 
-static id YTKACENativePlainItem(NSString *title, NSString *description) {
+static id YTzoomNativePlainItem(NSString *title, NSString *description) {
     Class itemClass = NSClassFromString(@"YTSettingsSectionItem");
     if (itemClass == Nil) return nil;
     SEL described = NSSelectorFromString(
@@ -223,16 +223,16 @@ static id YTKACENativePlainItem(NSString *title, NSString *description) {
     if (description != nil && [itemClass respondsToSelector:described]) {
         return ((id (*)(id, SEL, id, id, id, id, id))objc_msgSend)(
             itemClass, described, title, description,
-            YTKACEInertIdentifier, nil, nil);
+            YTzoomInertIdentifier, nil, nil);
     }
     SEL plain = NSSelectorFromString(
         @"itemWithTitle:accessibilityIdentifier:detailTextBlock:selectBlock:");
     if (![itemClass respondsToSelector:plain]) return nil;
     return ((id (*)(id, SEL, id, id, id, id))objc_msgSend)(
-        itemClass, plain, title, YTKACEInertIdentifier, nil, nil);
+        itemClass, plain, title, YTzoomInertIdentifier, nil, nil);
 }
 
-static void YTKACEMakeItemInert(id item) {
+static void YTzoomMakeItemInert(id item) {
     if (item == nil) return;
     for (NSString *name in @[@"setInkEnabled:", @"setEnabled:", @"setSettingEnabled:"]) {
         SEL selector = NSSelectorFromString(name);
@@ -242,11 +242,11 @@ static void YTKACEMakeItemInert(id item) {
     }
 }
 
-@interface YTKACEDeveloperHoldTarget : NSObject
+@interface YTzoomDeveloperHoldTarget : NSObject
 @property(nonatomic, weak) UIView *cell;
 @end
 
-@implementation YTKACEDeveloperHoldTarget
+@implementation YTzoomDeveloperHoldTarget
 
 - (void)handleHold:(UILongPressGestureRecognizer *)recognizer {
     if (recognizer.state != UIGestureRecognizerStateBegan) return;
@@ -257,12 +257,12 @@ static void YTKACEMakeItemInert(id item) {
     UINavigationController *navigation =
         ((UIViewController *)responder).navigationController;
     if (navigation == nil) return;
-    [navigation pushViewController:YTKACEMakeDownloadLogController() animated:YES];
+    [navigation pushViewController:YTzoomMakeDownloadLogController() animated:YES];
 }
 
 @end
 
-static void YTKACESettingsCellLayout(id receiver, SEL selector) {
+static void YTzoomSettingsCellLayout(id receiver, SEL selector) {
     if (OriginalSettingsCellLayout != NULL) {
         ((void (*)(id, SEL))OriginalSettingsCellLayout)(receiver, selector);
     }
@@ -275,12 +275,12 @@ static void YTKACESettingsCellLayout(id receiver, SEL selector) {
             cell, @selector(contentView));
         if (content != nil) host = content;
     }
-    UISearchBar *field = (UISearchBar *)[host viewWithTag:YTKACESearchFieldTag];
-    if ([identifier isEqualToString:@"YTKACESearchItem"]) {
+    UISearchBar *field = (UISearchBar *)[host viewWithTag:YTzoomSearchFieldTag];
+    if ([identifier isEqualToString:@"YTzoomSearchItem"]) {
         if (field == nil) {
             field = [UISearchBar new];
-            field.tag = YTKACESearchFieldTag;
-            field.placeholder = YTKACELocalized(@"Search");
+            field.tag = YTzoomSearchFieldTag;
+            field.placeholder = YTzoomLocalized(@"Search");
             field.searchBarStyle = UISearchBarStyleMinimal;
             field.userInteractionEnabled = NO;
             [host addSubview:field];
@@ -291,22 +291,22 @@ static void YTKACESettingsCellLayout(id receiver, SEL selector) {
         return;
     }
     if (field != nil) [field removeFromSuperview];
-    if ([identifier isEqualToString:@"YTKACEDeveloperItem"] &&
-        objc_getAssociatedObject(cell, YTKACEDeveloperHoldKey) == nil) {
-        YTKACEDeveloperHoldTarget *target = [YTKACEDeveloperHoldTarget new];
+    if ([identifier isEqualToString:@"YTzoomDeveloperItem"] &&
+        objc_getAssociatedObject(cell, YTzoomDeveloperHoldKey) == nil) {
+        YTzoomDeveloperHoldTarget *target = [YTzoomDeveloperHoldTarget new];
         target.cell = cell;
         UILongPressGestureRecognizer *hold =
             [[UILongPressGestureRecognizer alloc] initWithTarget:target
                                                           action:@selector(handleHold:)];
         hold.minimumPressDuration = 4.0;
         [cell addGestureRecognizer:hold];
-        objc_setAssociatedObject(cell, YTKACEDeveloperHoldKey, target,
+        objc_setAssociatedObject(cell, YTzoomDeveloperHoldKey, target,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    cell.userInteractionEnabled = ![identifier isEqualToString:YTKACEInertIdentifier];
+    cell.userInteractionEnabled = ![identifier isEqualToString:YTzoomInertIdentifier];
 }
 
-static id YTKACENativeSearchRow(id settingsController) {
+static id YTzoomNativeSearchRow(id settingsController) {
     Class itemClass = NSClassFromString(@"YTSettingsSectionItem");
     SEL plain = NSSelectorFromString(
         @"itemWithTitle:accessibilityIdentifier:detailTextBlock:selectBlock:");
@@ -315,16 +315,16 @@ static id YTKACENativeSearchRow(id settingsController) {
     BOOL (^select)(id, NSUInteger) = ^BOOL(__unused id cell, __unused NSUInteger index) {
         id controller = weakController;
         if (![controller isKindOfClass:UIViewController.class]) return NO;
-        YTKACEPresentSettingsSearchOverlay(controller);
+        YTzoomPresentSettingsSearchOverlay(controller);
         return YES;
     };
     return ((id (*)(id, SEL, id, id, id, id))objc_msgSend)(
-        itemClass, plain, @" ", @"YTKACESearchItem", nil, [select copy]);
+        itemClass, plain, @" ", @"YTzoomSearchItem", nil, [select copy]);
 }
 
-static id YTKACENativeSettingsItem(NSString *title,
+static id YTzoomNativeSettingsItem(NSString *title,
                                    id settingsController,
-                                   YTKACENativeBuilder builder) {
+                                   YTzoomNativeBuilder builder) {
     Class itemClass = NSClassFromString(@"YTSettingsSectionItem");
     SEL selector = NSSelectorFromString(
         @"itemWithTitle:accessibilityIdentifier:detailTextBlock:selectBlock:");
@@ -351,25 +351,25 @@ static id YTKACENativeSettingsItem(NSString *title,
     SEL described = NSSelectorFromString(
         @"itemWithTitle:titleDescription:accessibilityIdentifier:detailTextBlock:"
          "selectBlock:");
-    NSString *subtitle = YTKACENativeSettingsSubtitle(title);
-    NSString *localizedTitle = YTKACELocalized(title);
+    NSString *subtitle = YTzoomNativeSettingsSubtitle(title);
+    NSString *localizedTitle = YTzoomLocalized(title);
     id item = nil;
     if (subtitle.length != 0 && [itemClass respondsToSelector:described]) {
         item = ((id (*)(id, SEL, id, id, id, id, id))objc_msgSend)(
             itemClass, described, localizedTitle, subtitle,
-            @"YTKACENativeSettingsItem", detail, select);
+            @"YTzoomNativeSettingsItem", detail, select);
     } else {
         item = ((id (*)(id, SEL, id, id, id, id))objc_msgSend)(
-            itemClass, selector, localizedTitle, @"YTKACENativeSettingsItem",
+            itemClass, selector, localizedTitle, @"YTzoomNativeSettingsItem",
             detail, select);
     }
-    YTKACEApplyNativeSettingsIcon(item, title);
+    YTzoomApplyNativeSettingsIcon(item, title);
     return item;
 }
 
-static void YTKACEUpdateNativeSettingsSection(id receiver, SEL selector,
+static void YTzoomUpdateNativeSettingsSection(id receiver, SEL selector,
                                               NSUInteger category, id entry) {
-    if (category != YTKACENativeSettingsCategory) {
+    if (category != YTzoomNativeSettingsCategory) {
         if (OriginalUpdateSettingsSection != NULL) {
             ((void (*)(id, SEL, NSUInteger, id))OriginalUpdateSettingsSection)(
                 receiver, selector, category, entry);
@@ -383,48 +383,48 @@ static void YTKACEUpdateNativeSettingsSection(id receiver, SEL selector,
     } @catch (__unused NSException *exception) {
         return;
     }
-    NSMutableDictionary<NSString *, YTKACENativeBuilder> *builders = [@{
+    NSMutableDictionary<NSString *, YTzoomNativeBuilder> *builders = [@{
         @"Downloads & Library": [^UIViewController *{
-            YTKACEDownloadsController *controller = [YTKACEDownloadsController new];
+            YTzoomDownloadsController *controller = [YTzoomDownloadsController new];
             controller.hidesSettingsButton = YES;
             return controller;
         } copy],
         @"itzzace": [^UIViewController *{
-            NSURL *URL = [NSURL URLWithString:@"https://github.com/itzzace/ytkace"];
+            NSURL *URL = [NSURL URLWithString:@"https://github.com/liikle/ytzoom"];
             [UIApplication.sharedApplication openURL:URL options:@{}
                                    completionHandler:nil];
             return nil;
         } copy]
     } mutableCopy];
-    for (NSDictionary *section in YTKACESettingsMenu()) {
+    for (NSDictionary *section in YTzoomSettingsMenu()) {
         for (NSDictionary *row in section[@"rows"]) {
             NSString *pageID = row[@"id"];
-            builders[row[@"title"]] = [^UIViewController *{ return YTKACEMakeSettingsPage(pageID); } copy];
+            builders[row[@"title"]] = [^UIViewController *{ return YTzoomMakeSettingsPage(pageID); } copy];
         }
     }
 
     NSMutableArray *items = [NSMutableArray array];
-    for (NSDictionary *definition in YTKACENativeLayout()) {
+    for (NSDictionary *definition in YTzoomNativeLayout()) {
         NSString *kind = definition[@"kind"];
         NSString *title = definition[@"title"];
         id item = nil;
         if ([kind isEqualToString:@"search"]) {
-            item = YTKACENativeSearchRow(settingsController);
+            item = YTzoomNativeSearchRow(settingsController);
         } else if ([kind isEqualToString:@"header"]) {
-            item = YTKACENativePlainItem(nil, YTKACELocalized(title));
-            YTKACEMakeItemInert(item);
+            item = YTzoomNativePlainItem(nil, YTzoomLocalized(title));
+            YTzoomMakeItemInert(item);
         } else if ([kind isEqualToString:@"footer"]) {
-            NSString *info = [YTKACEDeviceInformationText()
+            NSString *info = [YTzoomDeviceInformationText()
                 stringByReplacingOccurrencesOfString:@"\n" withString:@"  •  "];
-            item = YTKACENativePlainItem(nil, info);
-            YTKACEMakeItemInert(item);
+            item = YTzoomNativePlainItem(nil, info);
+            YTzoomMakeItemInert(item);
         } else {
-            item = YTKACENativeSettingsItem(title, settingsController, builders[title]);
+            item = YTzoomNativeSettingsItem(title, settingsController, builders[title]);
             if ([definition[@"developer"] boolValue] && item != nil) {
                 SEL setIdentifier = NSSelectorFromString(@"setAccessibilityIdentifier:");
                 if ([item respondsToSelector:setIdentifier]) {
                     ((void (*)(id, SEL, id))objc_msgSend)(
-                        item, setIdentifier, @"YTKACEDeveloperItem");
+                        item, setIdentifier, @"YTzoomDeveloperItem");
                 }
             }
         }
@@ -442,39 +442,39 @@ static void YTKACEUpdateNativeSettingsSection(id receiver, SEL selector,
             ((void (*)(id, SEL, NSInteger))objc_msgSend)(icon, setIconType, 44);
         }
         ((void (*)(id, SEL, id, NSUInteger, id, id, id, BOOL))objc_msgSend)(
-            settingsController, modern, items, category, @"YTKACE", icon, nil, NO);
+            settingsController, modern, items, category, @"YTzoom", icon, nil, NO);
     } else if ([settingsController respondsToSelector:legacy]) {
         ((void (*)(id, SEL, id, NSUInteger, id, id, BOOL))objc_msgSend)(
-            settingsController, legacy, items, category, @"YTKACE", nil, NO);
+            settingsController, legacy, items, category, @"YTzoom", nil, NO);
     }
 }
 
-void YTKACEInstallNativeSettingsHooks(void) {
-    YTKACEInstallClassHook(@"YTAppSettingsPresentationData", @"settingsCategoryOrder",
-                           (IMP)YTKACESettingsCategoryOrder,
+void YTzoomInstallNativeSettingsHooks(void) {
+    YTzoomInstallClassHook(@"YTAppSettingsPresentationData", @"settingsCategoryOrder",
+                           (IMP)YTzoomSettingsCategoryOrder,
                            &OriginalSettingsCategoryOrder);
-    YTKACEInstallInstanceHook(@"YTSettingsSectionItemManager",
+    YTzoomInstallInstanceHook(@"YTSettingsSectionItemManager",
                               @"updateSectionForCategory:withEntry:",
-                              (IMP)YTKACEUpdateNativeSettingsSection,
+                              (IMP)YTzoomUpdateNativeSettingsSection,
                               &OriginalUpdateSettingsSection);
-    YTKACEInstallInstanceHook(@"YTSettingsCell", @"layoutSubviews",
-                              (IMP)YTKACESettingsCellLayout,
+    YTzoomInstallInstanceHook(@"YTSettingsCell", @"layoutSubviews",
+                              (IMP)YTzoomSettingsCellLayout,
                               &OriginalSettingsCellLayout);
-    YTKACEInstallClassHook(@"YTAppSettingsGroupPresentationData", @"orderedGroups",
-                           (IMP)YTKACEOrderedSettingsGroups,
+    YTzoomInstallClassHook(@"YTAppSettingsGroupPresentationData", @"orderedGroups",
+                           (IMP)YTzoomOrderedSettingsGroups,
                            &OriginalOrderedSettingsGroups);
-    YTKACEInstallInstanceHook(@"YTSettingsGroupData", @"titleForSettingGroupType:",
-                              (IMP)YTKACESettingsGroupTitle,
+    YTzoomInstallInstanceHook(@"YTSettingsGroupData", @"titleForSettingGroupType:",
+                              (IMP)YTzoomSettingsGroupTitle,
                               &OriginalSettingsGroupTitle);
-    YTKACEInstallInstanceHook(@"YTSettingsGroupData", @"orderedCategoriesForGroupType:",
-                              (IMP)YTKACEOrderedGroupCategories,
+    YTzoomInstallInstanceHook(@"YTSettingsGroupData", @"orderedCategoriesForGroupType:",
+                              (IMP)YTzoomOrderedGroupCategories,
                               &OriginalOrderedGroupCategories);
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         for (NSUInteger attempt = 1; attempt <= 60; attempt++) {
             dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                 (int64_t)(attempt * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
-                YTKACEInstallNativeSettingsHooks();
+                YTzoomInstallNativeSettingsHooks();
             });
         }
     });

@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../../UI/OverlayButtonHost.h"
@@ -8,13 +8,13 @@
 #import <objc/runtime.h>
 #import <math.h>
 
-static const void *YTKACEOverlayHiddenAssociation = &YTKACEOverlayHiddenAssociation;
-static const void *YTKACEOverlayForcedAssociation = &YTKACEOverlayForcedAssociation;
-static const void *YTKACEOverlayEnabledAssociation = &YTKACEOverlayEnabledAssociation;
-static const void *YTKACEOverlayTransformAssociation = &YTKACEOverlayTransformAssociation;
-static const void *YTKACEDoubleTapAssociation = &YTKACEDoubleTapAssociation;
-static const void *YTKACEPrevNextParentAssociation = &YTKACEPrevNextParentAssociation;
-static const void *YTKACEProductHiddenAssociation = &YTKACEProductHiddenAssociation;
+static const void *YTzoomOverlayHiddenAssociation = &YTzoomOverlayHiddenAssociation;
+static const void *YTzoomOverlayForcedAssociation = &YTzoomOverlayForcedAssociation;
+static const void *YTzoomOverlayEnabledAssociation = &YTzoomOverlayEnabledAssociation;
+static const void *YTzoomOverlayTransformAssociation = &YTzoomOverlayTransformAssociation;
+static const void *YTzoomDoubleTapAssociation = &YTzoomDoubleTapAssociation;
+static const void *YTzoomPrevNextParentAssociation = &YTzoomPrevNextParentAssociation;
+static const void *YTzoomProductHiddenAssociation = &YTzoomProductHiddenAssociation;
 static IMP OriginalVideoOverlayLayout;
 static IMP OriginalForceHidePreviousNext;
 static IMP OriginalPreviousButtonShouldHide;
@@ -36,23 +36,23 @@ static IMP OriginalTimelyShelfHeightVC;
 static IMP OriginalTimelyShelfHeightBar;
 static IMP OriginalTimelyShelfHeightInput;
 
-static NSUInteger YTKACEProductHiddenCount = 0;
+static NSUInteger YTzoomProductHiddenCount = 0;
 
-static void YTKACESweepProductViews(UIView *root, BOOL hide);
-static void YTKACEApplyProductVisibility(UIView *root);
+static void YTzoomSweepProductViews(UIView *root, BOOL hide);
+static void YTzoomApplyProductVisibility(UIView *root);
 
-static BOOL YTKACEOverlayPreference(NSString *key) {
-    return YTKACEFeatureEnabled(key);
+static BOOL YTzoomOverlayPreference(NSString *key) {
+    return YTzoomFeatureEnabled(key);
 }
 
-static NSString *YTKACEOverlayToken(UIView *view) {
+static NSString *YTzoomOverlayToken(UIView *view) {
     return [[NSString stringWithFormat:@"%@ %@ %@",
              NSStringFromClass(view.class),
              view.accessibilityIdentifier ?: @"",
              view.accessibilityLabel ?: @""] lowercaseString];
 }
 
-static BOOL YTKACEOverlayTokenMatches(NSString *token,
+static BOOL YTzoomOverlayTokenMatches(NSString *token,
                                       NSArray<NSString *> *needles) {
     for (NSString *needle in needles) {
         if ([token containsString:needle]) {
@@ -62,7 +62,7 @@ static BOOL YTKACEOverlayTokenMatches(NSString *token,
     return NO;
 }
 
-static NSArray<NSString *> *YTKACEPreviousNextTokens(void) {
+static NSArray<NSString *> *YTzoomPreviousNextTokens(void) {
     return @[
         @"id.player.previous.button", @"id.player.next.button",
         @"previous.button", @"next.button",
@@ -72,15 +72,15 @@ static NSArray<NSString *> *YTKACEPreviousNextTokens(void) {
     ];
 }
 
-static void YTKACESetPreviousNextContainerEnabled(UIView *view, BOOL enabled) {
+static void YTzoomSetPreviousNextContainerEnabled(UIView *view, BOOL enabled) {
     if (view == nil) return;
     NSDictionary *baseline = objc_getAssociatedObject(view,
-                                                       YTKACEPrevNextParentAssociation);
+                                                       YTzoomPrevNextParentAssociation);
     if (!enabled) {
         if (baseline == nil) {
             baseline = @{@"interaction": @(view.userInteractionEnabled),
                          @"alpha": @(view.alpha)};
-            objc_setAssociatedObject(view, YTKACEPrevNextParentAssociation,
+            objc_setAssociatedObject(view, YTzoomPrevNextParentAssociation,
                                      baseline, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
         view.userInteractionEnabled = NO;
@@ -88,12 +88,12 @@ static void YTKACESetPreviousNextContainerEnabled(UIView *view, BOOL enabled) {
     } else if (baseline != nil) {
         view.userInteractionEnabled = [baseline[@"interaction"] boolValue];
         view.alpha = [baseline[@"alpha"] doubleValue];
-        objc_setAssociatedObject(view, YTKACEPrevNextParentAssociation, nil,
+        objc_setAssociatedObject(view, YTzoomPrevNextParentAssociation, nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
-static void YTKACESetControlTreeEnabled(UIView *view, BOOL enabled) {
+static void YTzoomSetControlTreeEnabled(UIView *view, BOOL enabled) {
     if ([view isKindOfClass:UIControl.class]) {
         UIControl *control = (UIControl *)view;
         control.enabled = enabled;
@@ -101,24 +101,24 @@ static void YTKACESetControlTreeEnabled(UIView *view, BOOL enabled) {
         control.alpha = enabled ? 1.0 : 0.35;
     }
     for (UIView *subview in view.subviews) {
-        YTKACESetControlTreeEnabled(subview, enabled);
+        YTzoomSetControlTreeEnabled(subview, enabled);
     }
 }
 
-static void YTKACESetOverlayHidden(UIView *view, BOOL hidden) {
+static void YTzoomSetOverlayHidden(UIView *view, BOOL hidden) {
     if (view == nil ||
-        [view.accessibilityIdentifier hasPrefix:@"YTKACE"]) {
+        [view.accessibilityIdentifier hasPrefix:@"YTzoom"]) {
         return;
     }
 
     NSNumber *baseline = objc_getAssociatedObject(
         view,
-        YTKACEOverlayHiddenAssociation
+        YTzoomOverlayHiddenAssociation
     );
     if (hidden) {
         if (baseline == nil) {
             objc_setAssociatedObject(view,
-                                     YTKACEOverlayHiddenAssociation,
+                                     YTzoomOverlayHiddenAssociation,
                                      @(view.hidden),
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
@@ -128,13 +128,13 @@ static void YTKACESetOverlayHidden(UIView *view, BOOL hidden) {
         view.hidden = baseline.boolValue;
         view.userInteractionEnabled = YES;
         objc_setAssociatedObject(view,
-                                 YTKACEOverlayHiddenAssociation,
+                                 YTzoomOverlayHiddenAssociation,
                                  nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
-static BOOL YTKACEIsDarkOverlayView(UIView *view) {
+static BOOL YTzoomIsDarkOverlayView(UIView *view) {
     UIView *root = view.superview;
     if (view.class != UIView.class ||
         ![NSStringFromClass(root.class)
@@ -149,7 +149,7 @@ static BOOL YTKACEIsDarkOverlayView(UIView *view) {
         isEqualToString:@"YTMainAppVideoOverlayAccessibilityGlassContainerView"];
 }
 
-static BOOL YTKACEMatchesAncestorButton(UIView *view, NSString *accessor) {
+static BOOL YTzoomMatchesAncestorButton(UIView *view, NSString *accessor) {
     SEL selector = NSSelectorFromString(accessor);
     for (UIView *ancestor = view.superview; ancestor != nil;
          ancestor = ancestor.superview) {
@@ -161,71 +161,71 @@ static BOOL YTKACEMatchesAncestorButton(UIView *view, NSString *accessor) {
     return NO;
 }
 
-static BOOL YTKACEOverlayShouldHide(UIView *view) {
-    NSString *token = YTKACEOverlayToken(view);
-    if (YTKACEOverlayPreference(@"YTKACE.Preference.Overlay.DimmingRemoved") &&
-        YTKACEIsDarkOverlayView(view)) {
+static BOOL YTzoomOverlayShouldHide(UIView *view) {
+    NSString *token = YTzoomOverlayToken(view);
+    if (YTzoomOverlayPreference(@"YTzoom.Preference.Overlay.DimmingRemoved") &&
+        YTzoomIsDarkOverlayView(view)) {
         return YES;
     }
-    if (YTKACEOverlayPreference(@"YTKACE.Preference.Overlay.QuickActionsHidden") &&
-        YTKACEOverlayTokenMatches(token, @[
+    if (YTzoomOverlayPreference(@"YTzoom.Preference.Overlay.QuickActionsHidden") &&
+        YTzoomOverlayTokenMatches(token, @[
             @"quickaction", @"quick_action", @"actionbar", @"action_bar"
         ])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ContinueWatchingDisabled") &&
-        YTKACEOverlayTokenMatches(token, @[
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.ContinueWatchingDisabled") &&
+        YTzoomOverlayTokenMatches(token, @[
             @"continuewatching", @"continue_watching"
         ])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.RelatedVideosHidden") &&
-        YTKACEOverlayTokenMatches(token, @[
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.RelatedVideosHidden") &&
+        YTzoomOverlayTokenMatches(token, @[
             @"relatedvideo", @"related_video", @"morevideos", @"more_videos"
         ])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.AutoplayHidden") &&
-        YTKACEOverlayTokenMatches(token, @[@"autoplay", @"autonav"])) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.AutoplayHidden") &&
+        YTzoomOverlayTokenMatches(token, @[@"autoplay", @"autonav"])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.CaptionsButtonHidden") &&
-        YTKACEOverlayTokenMatches(token, @[@"caption", @"subtitle", @"closedcaption"])) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.CaptionsButtonHidden") &&
+        YTzoomOverlayTokenMatches(token, @[@"caption", @"subtitle", @"closedcaption"])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.CastHidden") &&
-        (YTKACEOverlayTokenMatches(token, @[@"cast", @"airplay", @"routebutton"]) ||
-         YTKACEMatchesAncestorButton(view, @"playbackRouteButton"))) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.CastHidden") &&
+        (YTzoomOverlayTokenMatches(token, @[@"cast", @"airplay", @"routebutton"]) ||
+         YTzoomMatchesAncestorButton(view, @"playbackRouteButton"))) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.WatermarkHidden") &&
-        YTKACEOverlayTokenMatches(token, @[@"watermark", @"branding"])) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.WatermarkHidden") &&
+        YTzoomOverlayTokenMatches(token, @[@"watermark", @"branding"])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.InfoCardsHidden") &&
-        YTKACEOverlayTokenMatches(token, @[@"infocard", @"info_card", @"cardsbutton"])) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.InfoCardsHidden") &&
+        YTzoomOverlayTokenMatches(token, @[@"infocard", @"info_card", @"cardsbutton"])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.EndScreenHidden") &&
-        YTKACEOverlayTokenMatches(token, @[@"endscreen", @"end_screen"])) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.EndScreenHidden") &&
+        YTzoomOverlayTokenMatches(token, @[@"endscreen", @"end_screen"])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.PlayPauseHidden") &&
-        YTKACEOverlayTokenMatches(token, @[@"playpause", @"play_pause"])) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.PlayPauseHidden") &&
+        YTzoomOverlayTokenMatches(token, @[@"playpause", @"play_pause"])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.MoreButtonHidden") &&
-        YTKACEOverlayTokenMatches(token, @[@"overflowbutton", @"settingsbutton", @"morebutton"])) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.MoreButtonHidden") &&
+        YTzoomOverlayTokenMatches(token, @[@"overflowbutton", @"settingsbutton", @"morebutton"])) {
         return YES;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.PreviousNextHidden") &&
-        YTKACEOverlayTokenMatches(token, YTKACEPreviousNextTokens())) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.PreviousNextHidden") &&
+        YTzoomOverlayTokenMatches(token, YTzoomPreviousNextTokens())) {
         return YES;
     }
     return NO;
 }
 
-static id YTKACEProductOverlayModelValue(id object, NSString *key) {
+static id YTzoomProductOverlayModelValue(id object, NSString *key) {
     if (object == nil || key.length == 0) return nil;
     @try {
         SEL selector = NSSelectorFromString(key);
@@ -238,7 +238,7 @@ static id YTKACEProductOverlayModelValue(id object, NSString *key) {
     }
 }
 
-static BOOL YTKACEProductOverlayBoolValue(id object, NSString *key) {
+static BOOL YTzoomProductOverlayBoolValue(id object, NSString *key) {
     if (object == nil || key.length == 0) return NO;
     @try {
         return [[object valueForKey:key] boolValue];
@@ -247,7 +247,7 @@ static BOOL YTKACEProductOverlayBoolValue(id object, NSString *key) {
     }
 }
 
-static BOOL YTKACEIsProductOverlayIdentifier(NSString *identifier) {
+static BOOL YTzoomIsProductOverlayIdentifier(NSString *identifier) {
     if (identifier.length == 0) return NO;
     NSString *token = [identifier lowercaseString];
     if ([token isEqualToString:@"player_overlay_product_in_video"]) return YES;
@@ -258,7 +258,7 @@ static BOOL YTKACEIsProductOverlayIdentifier(NSString *identifier) {
     return NO;
 }
 
-static BOOL YTKACEIsTimelyShelfOverlayIdentifier(NSString *identifier) {
+static BOOL YTzoomIsTimelyShelfOverlayIdentifier(NSString *identifier) {
     if (identifier.length == 0) return NO;
     NSString *token = [identifier lowercaseString];
     if ([token isEqualToString:@"player_overlay_timely_shelf"]) return YES;
@@ -269,7 +269,7 @@ static BOOL YTKACEIsTimelyShelfOverlayIdentifier(NSString *identifier) {
     return NO;
 }
 
-static BOOL YTKACEProductPayloadMatches(id object) {
+static BOOL YTzoomProductPayloadMatches(id object) {
     if (object == nil || [object isKindOfClass:UIView.class]) return NO;
     for (NSString *key in @[@"productsInVideoOverlayRenderer",
                             @"productsInVideoEntity",
@@ -277,12 +277,12 @@ static BOOL YTKACEProductPayloadMatches(id object) {
                             @"productCard",
                             @"shoppingAdInfoCardContentRenderer",
                             @"infoCardProduct"]) {
-        if (YTKACEProductOverlayModelValue(object, key) != nil) return YES;
+        if (YTzoomProductOverlayModelValue(object, key) != nil) return YES;
     }
-    if (YTKACEProductOverlayBoolValue(object, @"hasProductCard")) {
+    if (YTzoomProductOverlayBoolValue(object, @"hasProductCard")) {
         return YES;
     }
-    if (YTKACEProductOverlayBoolValue(
+    if (YTzoomProductOverlayBoolValue(
             object, @"hasShoppingAdInfoCardContentRenderer")) {
         return YES;
     }
@@ -297,15 +297,15 @@ static BOOL YTKACEProductPayloadMatches(id object) {
     return NO;
 }
 
-static BOOL YTKACETimelyShelfShoppingPayloadMatches(id object) {
+static BOOL YTzoomTimelyShelfShoppingPayloadMatches(id object) {
     if (object == nil || [object isKindOfClass:UIView.class]) return NO;
-    if (YTKACEProductPayloadMatches(object)) return YES;
+    if (YTzoomProductPayloadMatches(object)) return YES;
     for (NSString *key in @[@"taggedProducts",
                             @"creatorProduct",
                             @"shoppingData"]) {
-        if (YTKACEProductOverlayModelValue(object, key) != nil) return YES;
+        if (YTzoomProductOverlayModelValue(object, key) != nil) return YES;
     }
-    if (YTKACEProductOverlayBoolValue(object, @"hasTaggedProducts")) {
+    if (YTzoomProductOverlayBoolValue(object, @"hasTaggedProducts")) {
         return YES;
     }
     NSString *classToken = [NSStringFromClass([object class]) lowercaseString];
@@ -317,7 +317,7 @@ static BOOL YTKACETimelyShelfShoppingPayloadMatches(id object) {
         return YES;
     }
     for (NSString *key in @[@"overlayIdentifier", @"elementIdentifier"]) {
-        id raw = YTKACEProductOverlayModelValue(object, key);
+        id raw = YTzoomProductOverlayModelValue(object, key);
         if ([raw isKindOfClass:NSString.class] &&
             [[raw lowercaseString] containsString:@"shopping"]) {
             return YES;
@@ -326,56 +326,56 @@ static BOOL YTKACETimelyShelfShoppingPayloadMatches(id object) {
     return NO;
 }
 
-BOOL YTKACEProductOverlayMatches(id overlay) {
+BOOL YTzoomProductOverlayMatches(id overlay) {
     if (overlay == nil) return NO;
     NSString *identifier =
-        YTKACEProductOverlayModelValue(overlay, @"overlayIdentifier");
+        YTzoomProductOverlayModelValue(overlay, @"overlayIdentifier");
     if ([identifier isKindOfClass:NSString.class] &&
-        YTKACEIsProductOverlayIdentifier(identifier)) {
+        YTzoomIsProductOverlayIdentifier(identifier)) {
         return YES;
     }
-    if (YTKACEProductPayloadMatches(overlay)) return YES;
-    id renderer = YTKACEProductOverlayModelValue(overlay, @"renderer");
+    if (YTzoomProductPayloadMatches(overlay)) return YES;
+    id renderer = YTzoomProductOverlayModelValue(overlay, @"renderer");
     if (renderer == overlay) renderer = nil;
     NSString *rendererIdentifier = nil;
     if (renderer != nil) {
         rendererIdentifier =
-            YTKACEProductOverlayModelValue(renderer, @"overlayIdentifier");
+            YTzoomProductOverlayModelValue(renderer, @"overlayIdentifier");
         if ([rendererIdentifier isKindOfClass:NSString.class] &&
-            YTKACEIsProductOverlayIdentifier(rendererIdentifier)) {
+            YTzoomIsProductOverlayIdentifier(rendererIdentifier)) {
             return YES;
         }
-        if (YTKACEProductPayloadMatches(renderer)) return YES;
+        if (YTzoomProductPayloadMatches(renderer)) return YES;
     }
     BOOL timely =
         ([identifier isKindOfClass:NSString.class] &&
-         YTKACEIsTimelyShelfOverlayIdentifier(identifier)) ||
+         YTzoomIsTimelyShelfOverlayIdentifier(identifier)) ||
         ([rendererIdentifier isKindOfClass:NSString.class] &&
-         YTKACEIsTimelyShelfOverlayIdentifier(rendererIdentifier));
+         YTzoomIsTimelyShelfOverlayIdentifier(rendererIdentifier));
     if (timely &&
-        (YTKACETimelyShelfShoppingPayloadMatches(overlay) ||
-         (renderer != nil && YTKACETimelyShelfShoppingPayloadMatches(renderer)))) {
+        (YTzoomTimelyShelfShoppingPayloadMatches(overlay) ||
+         (renderer != nil && YTzoomTimelyShelfShoppingPayloadMatches(renderer)))) {
         return YES;
     }
     return NO;
 }
 
-static BOOL YTKACEShouldDropProductOverlay(id overlay) {
-    return YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ProductsHidden") &&
-        YTKACEProductOverlayMatches(overlay);
+static BOOL YTzoomShouldDropProductOverlay(id overlay) {
+    return YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.ProductsHidden") &&
+        YTzoomProductOverlayMatches(overlay);
 }
 
-static void YTKACEForwardProductOverlay(id receiver, SEL selector,
+static void YTzoomForwardProductOverlay(id receiver, SEL selector,
                                          id provider, id overlay,
                                          IMP original) {
-    if (YTKACEShouldDropProductOverlay(overlay)) return;
+    if (YTzoomShouldDropProductOverlay(overlay)) return;
     if (original != NULL) {
         ((void (*)(id, SEL, id, id))original)(
             receiver, selector, provider, overlay);
     }
 }
 
-static void YTKACEProductPillDidAddSubviewHook(UIView *receiver, SEL selector,
+static void YTzoomProductPillDidAddSubviewHook(UIView *receiver, SEL selector,
                                                 UIView *subview) {
     static Class controlsClass;
     static dispatch_once_t onceToken;
@@ -389,10 +389,10 @@ static void YTKACEProductPillDidAddSubviewHook(UIView *receiver, SEL selector,
     if (original != NULL) {
         ((void (*)(id, SEL, id))original)(receiver, selector, subview);
     }
-    YTKACEApplyProductVisibility(subview);
+    YTzoomApplyProductVisibility(subview);
 }
 
-static NSArray<NSString *> *YTKACEProductPillTokens(void) {
+static NSArray<NSString *> *YTzoomProductPillTokens(void) {
     static NSArray<NSString *> *tokens;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -406,7 +406,7 @@ static NSArray<NSString *> *YTKACEProductPillTokens(void) {
     return tokens;
 }
 
-static BOOL YTKACEProductTokenHasBareProduct(NSString *token) {
+static BOOL YTzoomProductTokenHasBareProduct(NSString *token) {
     if ([token containsString:@"product"] == NO) return NO;
     for (NSString *exclusion in @[@"production", @"producer",
                                   @"productivity"]) {
@@ -415,44 +415,44 @@ static BOOL YTKACEProductTokenHasBareProduct(NSString *token) {
     return YES;
 }
 
-static BOOL YTKACEViewLooksLikeProductPill(UIView *view) {
+static BOOL YTzoomViewLooksLikeProductPill(UIView *view) {
     if (view == nil) return NO;
-    NSString *token = YTKACEOverlayToken(view);
-    return YTKACEOverlayTokenMatches(token, YTKACEProductPillTokens()) ||
-        YTKACEProductTokenHasBareProduct(token);
+    NSString *token = YTzoomOverlayToken(view);
+    return YTzoomOverlayTokenMatches(token, YTzoomProductPillTokens()) ||
+        YTzoomProductTokenHasBareProduct(token);
 }
 
-static void YTKACEProductHiddenCounted(UIView *view, BOOL willHide) {
+static void YTzoomProductHiddenCounted(UIView *view, BOOL willHide) {
     NSNumber *baseline = objc_getAssociatedObject(
-        view, YTKACEProductHiddenAssociation);
+        view, YTzoomProductHiddenAssociation);
     if (willHide) {
-        if (baseline == nil && !view.hidden) YTKACEProductHiddenCount++;
+        if (baseline == nil && !view.hidden) YTzoomProductHiddenCount++;
     } else if (baseline != nil) {
-        if (YTKACEProductHiddenCount > 0) YTKACEProductHiddenCount--;
+        if (YTzoomProductHiddenCount > 0) YTzoomProductHiddenCount--;
     }
 }
 
-static BOOL YTKACEProductTokenInString(NSString *string) {
+static BOOL YTzoomProductTokenInString(NSString *string) {
     if (string.length == 0) return NO;
     NSString *token = [string lowercaseString];
-    return YTKACEOverlayTokenMatches(token, YTKACEProductPillTokens()) ||
-        YTKACEProductTokenHasBareProduct(token);
+    return YTzoomOverlayTokenMatches(token, YTzoomProductPillTokens()) ||
+        YTzoomProductTokenHasBareProduct(token);
 }
 
-static void YTKACEProductSetHidden(UIView *view, BOOL hidden) {
+static void YTzoomProductSetHidden(UIView *view, BOOL hidden) {
     if (view == nil ||
-        [view.accessibilityIdentifier hasPrefix:@"YTKACE"]) {
+        [view.accessibilityIdentifier hasPrefix:@"YTzoom"]) {
         return;
     }
 
     NSNumber *baseline = objc_getAssociatedObject(
         view,
-        YTKACEProductHiddenAssociation
+        YTzoomProductHiddenAssociation
     );
     if (hidden) {
         if (baseline == nil) {
             objc_setAssociatedObject(view,
-                                     YTKACEProductHiddenAssociation,
+                                     YTzoomProductHiddenAssociation,
                                      @(view.hidden),
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
@@ -462,60 +462,60 @@ static void YTKACEProductSetHidden(UIView *view, BOOL hidden) {
         view.hidden = baseline.boolValue;
         view.userInteractionEnabled = YES;
         objc_setAssociatedObject(view,
-                                 YTKACEProductHiddenAssociation,
+                                 YTzoomProductHiddenAssociation,
                                  nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
-static UIView *YTKACEFindForeignTextExcept(UIView *view, UIView *skip,
+static UIView *YTzoomFindForeignTextExcept(UIView *view, UIView *skip,
                                                NSUInteger depth) {
     if (view == nil || view == skip || depth > 4) return nil;
     if (view.hidden) return nil;
     if (depth == 0) {
-        if (!YTKACEProductTokenInString(view.accessibilityLabel) &&
+        if (!YTzoomProductTokenInString(view.accessibilityLabel) &&
             view.accessibilityLabel.length > 1) {
             return view;
         }
     } else {
-        if (YTKACEProductTokenInString(view.accessibilityLabel)) {
+        if (YTzoomProductTokenInString(view.accessibilityLabel)) {
             return nil;
         }
         if (view.accessibilityLabel.length > 1) return view;
     }
     if (depth > 0) {
         if ([view isKindOfClass:UILabel.class]) {
-            if (!YTKACEProductTokenInString(((UILabel *)view).text) &&
+            if (!YTzoomProductTokenInString(((UILabel *)view).text) &&
                 ((UILabel *)view).text.length > 1) {
                 return view;
             }
         } else if ([view isKindOfClass:UIButton.class]) {
             UIButton *button = (UIButton *)view;
-            if (!YTKACEProductTokenInString(button.currentTitle) &&
+            if (!YTzoomProductTokenInString(button.currentTitle) &&
                 button.currentTitle.length > 1) {
                 return view;
             }
-            if (!YTKACEProductTokenInString(button.accessibilityIdentifier) &&
+            if (!YTzoomProductTokenInString(button.accessibilityIdentifier) &&
                 button.accessibilityIdentifier.length > 1) {
                 return view;
             }
         } else if ([view isKindOfClass:UIControl.class]) {
-            if (!YTKACEProductTokenInString(view.accessibilityIdentifier) &&
+            if (!YTzoomProductTokenInString(view.accessibilityIdentifier) &&
                 view.accessibilityIdentifier.length > 1) {
                 return view;
             }
         }
     }
     for (UIView *subview in view.subviews) {
-        UIView *found = YTKACEFindForeignTextExcept(subview, skip, depth + 1);
+        UIView *found = YTzoomFindForeignTextExcept(subview, skip, depth + 1);
         if (found != nil) return found;
     }
     return nil;
 }
 
-static void YTKACEHideProductPill(UIView *pill, BOOL hide) {
-    YTKACEProductHiddenCounted(pill, hide);
-    YTKACEProductSetHidden(pill, hide);
+static void YTzoomHideProductPill(UIView *pill, BOOL hide) {
+    YTzoomProductHiddenCounted(pill, hide);
+    YTzoomProductSetHidden(pill, hide);
     if (!hide) return;
     UIView *child = pill;
     for (NSUInteger level = 0; level < 4; level++) {
@@ -528,11 +528,11 @@ static void YTKACEHideProductPill(UIView *pill, BOOL hide) {
         }
         CGFloat h = CGRectGetHeight(parent.bounds);
         if (h <= 0.5 || h > 320.0) {
-            if (!YTKACEViewLooksLikeProductPill(parent)) break;
+            if (!YTzoomViewLooksLikeProductPill(parent)) break;
         }
-        if (YTKACEFindForeignTextExcept(parent, child, 0) != nil) break;
-        YTKACEProductHiddenCounted(parent, YES);
-        YTKACEProductSetHidden(parent, YES);
+        if (YTzoomFindForeignTextExcept(parent, child, 0) != nil) break;
+        YTzoomProductHiddenCounted(parent, YES);
+        YTzoomProductSetHidden(parent, YES);
         child = parent;
     }
     if (child.superview != nil) {
@@ -540,16 +540,16 @@ static void YTKACEHideProductPill(UIView *pill, BOOL hide) {
     }
 }
 
-static void YTKACESetOverlayForcedVisible(UIView *view, BOOL forced) {
+static void YTzoomSetOverlayForcedVisible(UIView *view, BOOL forced) {
     NSDictionary *baseline = objc_getAssociatedObject(
         view,
-        YTKACEOverlayForcedAssociation
+        YTzoomOverlayForcedAssociation
     );
     if (forced) {
         if (baseline == nil) {
             baseline = @{@"hidden": @(view.hidden), @"alpha": @(view.alpha)};
             objc_setAssociatedObject(view,
-                                     YTKACEOverlayForcedAssociation,
+                                     YTzoomOverlayForcedAssociation,
                                      baseline,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
@@ -559,41 +559,41 @@ static void YTKACESetOverlayForcedVisible(UIView *view, BOOL forced) {
         view.hidden = [baseline[@"hidden"] boolValue];
         view.alpha = [baseline[@"alpha"] doubleValue];
         objc_setAssociatedObject(view,
-                                 YTKACEOverlayForcedAssociation,
+                                 YTzoomOverlayForcedAssociation,
                                  nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
-static void YTKACEApplyOverlayBehavior(UIView *view) {
-    NSString *token = YTKACEOverlayToken(view);
-    BOOL playPause = YTKACEOverlayTokenMatches(token, @[
+static void YTzoomApplyOverlayBehavior(UIView *view) {
+    NSString *token = YTzoomOverlayToken(view);
+    BOOL playPause = YTzoomOverlayTokenMatches(token, @[
         @"playpause", @"play_pause", @"playbackbutton"
     ]);
-    BOOL progress = YTKACEOverlayTokenMatches(token, @[
+    BOOL progress = YTzoomOverlayTokenMatches(token, @[
         @"progress", @"scrubber", @"playerbar", @"player_bar"
     ]);
     BOOL control = [view isKindOfClass:UIControl.class] ||
-        YTKACEOverlayTokenMatches(token, @[@"control", @"button"]);
-    BOOL force = (YTKACEOverlayPreference(@"YTKACE.Preference.Overlay.AlwaysShowPlayPause") && playPause) ||
-        (YTKACEOverlayPreference(@"YTKACE.Preference.Overlay.AlwaysShowControls") && control) ||
-        (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ProgressAlwaysVisible") && progress);
-    YTKACESetOverlayForcedVisible(view, force);
+        YTzoomOverlayTokenMatches(token, @[@"control", @"button"]);
+    BOOL force = (YTzoomOverlayPreference(@"YTzoom.Preference.Overlay.AlwaysShowPlayPause") && playPause) ||
+        (YTzoomOverlayPreference(@"YTzoom.Preference.Overlay.AlwaysShowControls") && control) ||
+        (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.ProgressAlwaysVisible") && progress);
+    YTzoomSetOverlayForcedVisible(view, force);
 
-    BOOL previousNext = YTKACEOverlayTokenMatches(
-        token, YTKACEPreviousNextTokens());
-    BOOL disablePreviousNext = YTKACEOverlayPreference(
-        @"YTKACE.Preference.Overlay.PreviousNextDisabled");
+    BOOL previousNext = YTzoomOverlayTokenMatches(
+        token, YTzoomPreviousNextTokens());
+    BOOL disablePreviousNext = YTzoomOverlayPreference(
+        @"YTzoom.Preference.Overlay.PreviousNextDisabled");
     if ([view isKindOfClass:UIControl.class]) {
         UIControl *controlView = (UIControl *)view;
         NSNumber *baseline = objc_getAssociatedObject(
             view,
-            YTKACEOverlayEnabledAssociation
+            YTzoomOverlayEnabledAssociation
         );
         if (disablePreviousNext && previousNext) {
             if (baseline == nil) {
                 objc_setAssociatedObject(view,
-                                         YTKACEOverlayEnabledAssociation,
+                                         YTzoomOverlayEnabledAssociation,
                                          @(controlView.enabled),
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
@@ -603,7 +603,7 @@ static void YTKACEApplyOverlayBehavior(UIView *view) {
             controlView.enabled = baseline.boolValue;
             controlView.alpha = 1.0;
             objc_setAssociatedObject(view,
-                                     YTKACEOverlayEnabledAssociation,
+                                     YTzoomOverlayEnabledAssociation,
                                      nil,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
@@ -612,19 +612,19 @@ static void YTKACEApplyOverlayBehavior(UIView *view) {
         UIView *container = view.superview;
         if ([NSStringFromClass(container.class)
                 containsString:@"TransportControlsButtonView"]) {
-            YTKACESetPreviousNextContainerEnabled(container,
+            YTzoomSetPreviousNextContainerEnabled(container,
                                                    !disablePreviousNext);
         }
     }
 
     NSValue *transform = objc_getAssociatedObject(
         view,
-        YTKACEOverlayTransformAssociation
+        YTzoomOverlayTransformAssociation
     );
-    if (YTKACEOverlayPreference(@"YTKACE.Preference.Overlay.CompactPreviousNext") && previousNext) {
+    if (YTzoomOverlayPreference(@"YTzoom.Preference.Overlay.CompactPreviousNext") && previousNext) {
         if (transform == nil) {
             objc_setAssociatedObject(view,
-                                     YTKACEOverlayTransformAssociation,
+                                     YTzoomOverlayTransformAssociation,
                                      [NSValue valueWithCGAffineTransform:view.transform],
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
@@ -636,7 +636,7 @@ static void YTKACEApplyOverlayBehavior(UIView *view) {
     } else if (transform != nil) {
         view.transform = transform.CGAffineTransformValue;
         objc_setAssociatedObject(view,
-                                 YTKACEOverlayTransformAssociation,
+                                 YTzoomOverlayTransformAssociation,
                                  nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
@@ -648,12 +648,12 @@ static void YTKACEApplyOverlayBehavior(UIView *view) {
         }
         NSNumber *baseline = objc_getAssociatedObject(
             recognizer,
-            YTKACEDoubleTapAssociation
+            YTzoomDoubleTapAssociation
         );
-        if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.DoubleTapDisabled")) {
+        if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.DoubleTapDisabled")) {
             if (baseline == nil) {
                 objc_setAssociatedObject(recognizer,
-                                         YTKACEDoubleTapAssociation,
+                                         YTzoomDoubleTapAssociation,
                                          @(recognizer.enabled),
                                          OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             }
@@ -661,43 +661,43 @@ static void YTKACEApplyOverlayBehavior(UIView *view) {
         } else if (baseline != nil) {
             recognizer.enabled = baseline.boolValue;
             objc_setAssociatedObject(recognizer,
-                                     YTKACEDoubleTapAssociation,
+                                     YTzoomDoubleTapAssociation,
                                      nil,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
     }
 }
 
-static void YTKACEApplyOverlayTree(UIView *view) {
-    YTKACEApplyOverlayBehavior(view);
-    YTKACESetOverlayHidden(view, YTKACEOverlayShouldHide(view));
+static void YTzoomApplyOverlayTree(UIView *view) {
+    YTzoomApplyOverlayBehavior(view);
+    YTzoomSetOverlayHidden(view, YTzoomOverlayShouldHide(view));
     for (UIView *subview in view.subviews) {
-        YTKACEApplyOverlayTree(subview);
+        YTzoomApplyOverlayTree(subview);
     }
 }
 
-static void YTKACEApplyOverlaySelectors(id overlay) {
+static void YTzoomApplyOverlaySelectors(id overlay) {
     NSDictionary<NSString *, NSString *> *selectors = @{
-        @"autoplaySwitch": @"YTKACE.Preference.Overlay.AutoplayHidden",
-        @"autoplayButton": @"YTKACE.Preference.Overlay.AutoplayHidden",
-        @"captionsButton": @"YTKACE.Preference.Overlay.CaptionsButtonHidden",
-        @"closedCaptionsButton": @"YTKACE.Preference.Overlay.CaptionsButtonHidden",
-        @"castButton": @"YTKACE.Preference.Overlay.CastHidden",
-        @"playbackRouteButton": @"YTKACE.Preference.Overlay.CastHidden",
-        @"closedCaptionsOrSubtitlesButton": @"YTKACE.Preference.Overlay.CaptionsButtonHidden",
-        @"infoCardButton": @"YTKACE.Preference.Overlay.InfoCardsHidden",
-        @"watermarkView": @"YTKACE.Preference.Overlay.WatermarkHidden",
-        @"endscreenView": @"YTKACE.Preference.Overlay.EndScreenHidden",
-        @"playPauseButton": @"YTKACE.Preference.Overlay.PlayPauseHidden",
-        @"previousButton": @"YTKACE.Preference.Overlay.PreviousNextHidden",
-        @"nextButton": @"YTKACE.Preference.Overlay.PreviousNextHidden",
-        @"previousButtonView": @"YTKACE.Preference.Overlay.PreviousNextHidden",
-        @"nextButtonView": @"YTKACE.Preference.Overlay.PreviousNextHidden",
-        @"minimizedPanelPreviousButton": @"YTKACE.Preference.Overlay.PreviousNextHidden",
-        @"minimizedPanelNextButton": @"YTKACE.Preference.Overlay.PreviousNextHidden",
-        @"replayNextButton": @"YTKACE.Preference.Overlay.PreviousNextHidden",
-        @"overflowButton": @"YTKACE.Preference.Overlay.MoreButtonHidden",
-        @"settingsButton": @"YTKACE.Preference.Overlay.MoreButtonHidden"
+        @"autoplaySwitch": @"YTzoom.Preference.Overlay.AutoplayHidden",
+        @"autoplayButton": @"YTzoom.Preference.Overlay.AutoplayHidden",
+        @"captionsButton": @"YTzoom.Preference.Overlay.CaptionsButtonHidden",
+        @"closedCaptionsButton": @"YTzoom.Preference.Overlay.CaptionsButtonHidden",
+        @"castButton": @"YTzoom.Preference.Overlay.CastHidden",
+        @"playbackRouteButton": @"YTzoom.Preference.Overlay.CastHidden",
+        @"closedCaptionsOrSubtitlesButton": @"YTzoom.Preference.Overlay.CaptionsButtonHidden",
+        @"infoCardButton": @"YTzoom.Preference.Overlay.InfoCardsHidden",
+        @"watermarkView": @"YTzoom.Preference.Overlay.WatermarkHidden",
+        @"endscreenView": @"YTzoom.Preference.Overlay.EndScreenHidden",
+        @"playPauseButton": @"YTzoom.Preference.Overlay.PlayPauseHidden",
+        @"previousButton": @"YTzoom.Preference.Overlay.PreviousNextHidden",
+        @"nextButton": @"YTzoom.Preference.Overlay.PreviousNextHidden",
+        @"previousButtonView": @"YTzoom.Preference.Overlay.PreviousNextHidden",
+        @"nextButtonView": @"YTzoom.Preference.Overlay.PreviousNextHidden",
+        @"minimizedPanelPreviousButton": @"YTzoom.Preference.Overlay.PreviousNextHidden",
+        @"minimizedPanelNextButton": @"YTzoom.Preference.Overlay.PreviousNextHidden",
+        @"replayNextButton": @"YTzoom.Preference.Overlay.PreviousNextHidden",
+        @"overflowButton": @"YTzoom.Preference.Overlay.MoreButtonHidden",
+        @"settingsButton": @"YTzoom.Preference.Overlay.MoreButtonHidden"
     };
     for (NSString *name in selectors) {
         SEL selector = NSSelectorFromString(name);
@@ -706,19 +706,19 @@ static void YTKACEApplyOverlaySelectors(id overlay) {
         }
         id value = ((id (*)(id, SEL))objc_msgSend)(overlay, selector);
         if ([value isKindOfClass:UIView.class]) {
-            YTKACESetOverlayHidden(value,
-                                   YTKACEFeatureEnabled(selectors[name]));
+            YTzoomSetOverlayHidden(value,
+                                   YTzoomFeatureEnabled(selectors[name]));
             if ([name.lowercaseString containsString:@"previous"] ||
                 [name.lowercaseString containsString:@"next"]) {
-                BOOL disabled = YTKACEOverlayPreference(
-                    @"YTKACE.Preference.Overlay.PreviousNextDisabled");
-                YTKACESetControlTreeEnabled(value, !disabled);
+                BOOL disabled = YTzoomOverlayPreference(
+                    @"YTzoom.Preference.Overlay.PreviousNextDisabled");
+                YTzoomSetControlTreeEnabled(value, !disabled);
             }
         }
     }
 }
 
-static void YTKACESweepProductViews(UIView *root, BOOL hide) {
+static void YTzoomSweepProductViews(UIView *root, BOOL hide) {
     if (root == nil) return;
     NSMutableArray<UIView *> *stack = [NSMutableArray arrayWithObject:root];
     while (stack.count != 0) {
@@ -726,46 +726,46 @@ static void YTKACESweepProductViews(UIView *root, BOOL hide) {
         [stack removeLastObject];
         if (view.hidden &&
             objc_getAssociatedObject(view,
-                                     YTKACEProductHiddenAssociation) != nil) {
+                                     YTzoomProductHiddenAssociation) != nil) {
             if (!hide) {
-                YTKACEProductHiddenCounted(view, NO);
-                YTKACEProductSetHidden(view, NO);
+                YTzoomProductHiddenCounted(view, NO);
+                YTzoomProductSetHidden(view, NO);
             } else {
                 continue;
             }
         }
-        if (hide && YTKACEViewLooksLikeProductPill(view)) {
-            YTKACEHideProductPill(view, YES);
+        if (hide && YTzoomViewLooksLikeProductPill(view)) {
+            YTzoomHideProductPill(view, YES);
             continue;
         }
         if (!hide &&
             objc_getAssociatedObject(view,
-                                     YTKACEProductHiddenAssociation) != nil) {
-            YTKACEProductHiddenCounted(view, NO);
-            YTKACEProductSetHidden(view, NO);
+                                     YTzoomProductHiddenAssociation) != nil) {
+            YTzoomProductHiddenCounted(view, NO);
+            YTzoomProductSetHidden(view, NO);
         }
         [stack addObjectsFromArray:view.subviews];
     }
 }
 
-static void YTKACEApplyProductVisibility(UIView *root) {
+static void YTzoomApplyProductVisibility(UIView *root) {
     if (root == nil) return;
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ProductsHidden")) {
-        YTKACESweepProductViews(root, YES);
-    } else if (YTKACEProductHiddenCount > 0) {
-        YTKACESweepProductViews(root, NO);
-        if (YTKACEProductHiddenCount > 0) {
-            YTKACEProductHiddenCount = 0;
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.ProductsHidden")) {
+        YTzoomSweepProductViews(root, YES);
+    } else if (YTzoomProductHiddenCount > 0) {
+        YTzoomSweepProductViews(root, NO);
+        if (YTzoomProductHiddenCount > 0) {
+            YTzoomProductHiddenCount = 0;
         }
     }
 }
 
-BOOL YTKACEProductIdentifierMatches(NSString *identifier) {
+BOOL YTzoomProductIdentifierMatches(NSString *identifier) {
     if (identifier.length == 0) return NO;
-    return YTKACEProductTokenInString(identifier);
+    return YTzoomProductTokenInString(identifier);
 }
 
-BOOL YTKACEViewIsInsidePlayerOverlay(UIView *view) {
+BOOL YTzoomViewIsInsidePlayerOverlay(UIView *view) {
     NSUInteger depth = 0;
     for (UIView *node = view; node != nil && depth < 12;
          node = node.superview, depth++) {
@@ -778,59 +778,59 @@ BOOL YTKACEViewIsInsidePlayerOverlay(UIView *view) {
     return NO;
 }
 
-void YTKACEHideProductSubtree(UIView *root) {
-    if (root == nil || !YTKACEViewIsInsidePlayerOverlay(root)) return;
-    YTKACESweepProductViews(root, YES);
+void YTzoomHideProductSubtree(UIView *root) {
+    if (root == nil || !YTzoomViewIsInsidePlayerOverlay(root)) return;
+    YTzoomSweepProductViews(root, YES);
 }
 
-static void YTKACEVideoOverlayLayout(UIView *receiver, SEL selector) {
+static void YTzoomVideoOverlayLayout(UIView *receiver, SEL selector) {
     if (OriginalVideoOverlayLayout != NULL) {
         ((void (*)(id, SEL))OriginalVideoOverlayLayout)(receiver, selector);
     }
-    YTKACEApplyOverlaySelectors(receiver);
-    YTKACEApplyProductVisibility(receiver);
-    if (YTKACEOverlayPreference(@"YTKACE.Preference.Overlay.DimmingRemoved")) {
+    YTzoomApplyOverlaySelectors(receiver);
+    YTzoomApplyProductVisibility(receiver);
+    if (YTzoomOverlayPreference(@"YTzoom.Preference.Overlay.DimmingRemoved")) {
         for (UIView *subview in receiver.subviews) {
-            if (YTKACEIsDarkOverlayView(subview)) {
-                YTKACESetOverlayHidden(subview, YES);
+            if (YTzoomIsDarkOverlayView(subview)) {
+                YTzoomSetOverlayHidden(subview, YES);
             }
         }
     }
 }
 
-static void YTKACEDidUpdatePlayerOverlayContent(id receiver, SEL selector,
+static void YTzoomDidUpdatePlayerOverlayContent(id receiver, SEL selector,
                                                  id provider, id overlay) {
-    YTKACEForwardProductOverlay(receiver, selector, provider, overlay,
+    YTzoomForwardProductOverlay(receiver, selector, provider, overlay,
                                  OriginalDidUpdatePlayerOverlayContent);
 }
 
-static BOOL YTKACEHasProductsInVideoOverlay(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ProductsHidden")) return NO;
+static BOOL YTzoomHasProductsInVideoOverlay(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.ProductsHidden")) return NO;
     return OriginalHasProductsInVideoOverlay != NULL &&
         ((BOOL (*)(id, SEL))OriginalHasProductsInVideoOverlay)(receiver, selector);
 }
 
-static id YTKACEProductsInVideoOverlay(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ProductsHidden")) return nil;
+static id YTzoomProductsInVideoOverlay(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.ProductsHidden")) return nil;
     return OriginalProductsInVideoOverlay == NULL ? nil :
         ((id (*)(id, SEL))OriginalProductsInVideoOverlay)(receiver, selector);
 }
 
-static void YTKACETimelyShelfDidInsert(id receiver, SEL selector,
+static void YTzoomTimelyShelfDidInsert(id receiver, SEL selector,
                                          id provider, id overlay) {
-    YTKACEForwardProductOverlay(receiver, selector, provider, overlay,
+    YTzoomForwardProductOverlay(receiver, selector, provider, overlay,
                                  OriginalTimelyShelfDidInsert);
 }
 
-static void YTKACETimelyShelfDidUpdate(id receiver, SEL selector,
+static void YTzoomTimelyShelfDidUpdate(id receiver, SEL selector,
                                         id provider, id overlay) {
-    YTKACEForwardProductOverlay(receiver, selector, provider, overlay,
+    YTzoomForwardProductOverlay(receiver, selector, provider, overlay,
                                  OriginalTimelyShelfDidUpdate);
 }
 
-static void YTKACEUpdateTimelyShelfOverlay(id receiver, SEL selector,
+static void YTzoomUpdateTimelyShelfOverlay(id receiver, SEL selector,
                                             id overlay) {
-    if (YTKACEShouldDropProductOverlay(overlay)) {
+    if (YTzoomShouldDropProductOverlay(overlay)) {
         return;
     }
     if (OriginalUpdateTimelyShelfOverlay != NULL) {
@@ -839,8 +839,8 @@ static void YTKACEUpdateTimelyShelfOverlay(id receiver, SEL selector,
     }
 }
 
-static void YTKACEUpdateTimelyShelfState(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ProductsHidden")) {
+static void YTzoomUpdateTimelyShelfState(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.ProductsHidden")) {
         return;
     }
     if (OriginalUpdateTimelyShelfState != NULL) {
@@ -849,9 +849,9 @@ static void YTKACEUpdateTimelyShelfState(id receiver, SEL selector) {
     }
 }
 
-static void YTKACEUpdateTimelyShelfStateWith(id receiver, SEL selector,
+static void YTzoomUpdateTimelyShelfStateWith(id receiver, SEL selector,
                                               NSInteger state) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ProductsHidden")) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.ProductsHidden")) {
         return;
     }
     if (OriginalUpdateTimelyShelfStateWith != NULL) {
@@ -860,13 +860,13 @@ static void YTKACEUpdateTimelyShelfStateWith(id receiver, SEL selector,
     }
 }
 
-static void YTKACETimelyShelfFrame(id receiver, SEL selector,
+static void YTzoomTimelyShelfFrame(id receiver, SEL selector,
                                     id shelf, CGRect overlayBounds) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ProductsHidden")) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.ProductsHidden")) {
         if ([shelf isKindOfClass:UIView.class]) {
             UIView *shelfView = (UIView *)shelf;
-            YTKACEProductHiddenCounted(shelfView, YES);
-            YTKACEProductSetHidden(shelfView, YES);
+            YTzoomProductHiddenCounted(shelfView, YES);
+            YTzoomProductSetHidden(shelfView, YES);
             shelfView.frame = CGRectZero;
             [shelfView.superview setNeedsLayout];
         }
@@ -878,8 +878,8 @@ static void YTKACETimelyShelfFrame(id receiver, SEL selector,
     }
 }
 
-static CGFloat YTKACETimelyShelfHeightHook(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.ProductsHidden")) {
+static CGFloat YTzoomTimelyShelfHeightHook(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.ProductsHidden")) {
         return 0.0;
     }
     static Class barClass;
@@ -899,162 +899,162 @@ static CGFloat YTKACETimelyShelfHeightHook(id receiver, SEL selector) {
         ((CGFloat (*)(id, SEL))original)(receiver, selector);
 }
 
-static BOOL YTKACEForceHidePreviousNext(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.PreviousNextHidden")) return YES;
+static BOOL YTzoomForceHidePreviousNext(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.PreviousNextHidden")) return YES;
     return OriginalForceHidePreviousNext == NULL
         ? NO
         : ((BOOL (*)(id, SEL))OriginalForceHidePreviousNext)(
             receiver, selector);
 }
 
-static BOOL YTKACEPreviousButtonShouldHide(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.PreviousNextHidden")) return YES;
+static BOOL YTzoomPreviousButtonShouldHide(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.PreviousNextHidden")) return YES;
     return OriginalPreviousButtonShouldHide == NULL
         ? NO
         : ((BOOL (*)(id, SEL))OriginalPreviousButtonShouldHide)(
             receiver, selector);
 }
 
-static BOOL YTKACENextButtonShouldHide(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.PreviousNextHidden")) return YES;
+static BOOL YTzoomNextButtonShouldHide(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.PreviousNextHidden")) return YES;
     return OriginalNextButtonShouldHide == NULL
         ? NO
         : ((BOOL (*)(id, SEL))OriginalNextButtonShouldHide)(
             receiver, selector);
 }
 
-static BOOL YTKACERemoveNextPaddle(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.PreviousNextHidden")) return YES;
+static BOOL YTzoomRemoveNextPaddle(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.PreviousNextHidden")) return YES;
     return OriginalRemoveNextPaddle != NULL &&
         ((BOOL (*)(id, SEL))OriginalRemoveNextPaddle)(receiver, selector);
 }
 
-static BOOL YTKACERemovePreviousPaddle(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.PreviousNextHidden")) return YES;
+static BOOL YTzoomRemovePreviousPaddle(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.PreviousNextHidden")) return YES;
     return OriginalRemovePreviousPaddle != NULL &&
         ((BOOL (*)(id, SEL))OriginalRemovePreviousPaddle)(receiver, selector);
 }
 
-static NSString *const YTKACEFullscreenActionsKey =
-    @"YTKACE.Preference.Overlay.FullscreenActionsHidden";
+static NSString *const YTzoomFullscreenActionsKey =
+    @"YTzoom.Preference.Overlay.FullscreenActionsHidden";
 
 static IMP OriginalFullscreenActionsLayout;
 static IMP OriginalFullscreenEngagementLayout;
-static void YTKACEApplyHidden(UIView *view, NSString *key) {
-    const BOOL hidden = YTKACEFeatureEnabled(key);
+static void YTzoomApplyHidden(UIView *view, NSString *key) {
+    const BOOL hidden = YTzoomFeatureEnabled(key);
     if (view.hidden != hidden) view.hidden = hidden;
 }
 
-static void YTKACEFullscreenActionsLayout(UIView *receiver, SEL selector) {
+static void YTzoomFullscreenActionsLayout(UIView *receiver, SEL selector) {
     if (OriginalFullscreenActionsLayout != NULL) {
         ((void (*)(id, SEL))OriginalFullscreenActionsLayout)(receiver, selector);
     }
-    YTKACEApplyHidden(receiver, YTKACEFullscreenActionsKey);
+    YTzoomApplyHidden(receiver, YTzoomFullscreenActionsKey);
 }
 
-static void YTKACEFullscreenEngagementLayout(UIView *receiver, SEL selector) {
+static void YTzoomFullscreenEngagementLayout(UIView *receiver, SEL selector) {
     if (OriginalFullscreenEngagementLayout != NULL) {
         ((void (*)(id, SEL))OriginalFullscreenEngagementLayout)(receiver, selector);
     }
-    YTKACEApplyHidden(receiver, YTKACEFullscreenActionsKey);
+    YTzoomApplyHidden(receiver, YTzoomFullscreenActionsKey);
 }
 
-void YTKACEInstallOverlayVisibilityHooks(void) {
-    YTKACEInstallInstanceHook(@"YTFullscreenActionsView", @"layoutSubviews",
-                              (IMP)YTKACEFullscreenActionsLayout,
+void YTzoomInstallOverlayVisibilityHooks(void) {
+    YTzoomInstallInstanceHook(@"YTFullscreenActionsView", @"layoutSubviews",
+                              (IMP)YTzoomFullscreenActionsLayout,
                               &OriginalFullscreenActionsLayout);
-    YTKACEInstallInstanceHook(@"YTFullscreenEngagementActionBarView",
+    YTzoomInstallInstanceHook(@"YTFullscreenEngagementActionBarView",
                               @"layoutSubviews",
-                              (IMP)YTKACEFullscreenEngagementLayout,
+                              (IMP)YTzoomFullscreenEngagementLayout,
                               &OriginalFullscreenEngagementLayout);
-    YTKACERegisterOverlayConfigurator(@"visibility", ^(UIView *overlay,
+    YTzoomRegisterOverlayConfigurator(@"visibility", ^(UIView *overlay,
                                                         UIStackView *stack) {
         for (UIView *subview in overlay.subviews) {
             if (subview != stack) {
-                YTKACEApplyOverlayTree(subview);
+                YTzoomApplyOverlayTree(subview);
             }
         }
-        YTKACEApplyOverlaySelectors(overlay);
-        YTKACEApplyProductVisibility(overlay);
+        YTzoomApplyOverlaySelectors(overlay);
+        YTzoomApplyProductVisibility(overlay);
     });
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayView",
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayView",
                               @"layoutSubviews",
-                              (IMP)YTKACEVideoOverlayLayout,
+                              (IMP)YTzoomVideoOverlayLayout,
                               &OriginalVideoOverlayLayout);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
                               @"playerOverlayProvider:didUpdateContentForPlayerOverlay:",
-                              (IMP)YTKACEDidUpdatePlayerOverlayContent,
+                              (IMP)YTzoomDidUpdatePlayerOverlayContent,
                               &OriginalDidUpdatePlayerOverlayContent);
-    YTKACEInstallInstanceHook(@"YTIPlayerOverlayRenderer",
+    YTzoomInstallInstanceHook(@"YTIPlayerOverlayRenderer",
                               @"hasProductsInVideoOverlayRenderer",
-                              (IMP)YTKACEHasProductsInVideoOverlay,
+                              (IMP)YTzoomHasProductsInVideoOverlay,
                               &OriginalHasProductsInVideoOverlay);
-    YTKACEInstallInstanceHook(@"YTIPlayerOverlayRenderer",
+    YTzoomInstallInstanceHook(@"YTIPlayerOverlayRenderer",
                               @"productsInVideoOverlayRenderer",
-                              (IMP)YTKACEProductsInVideoOverlay,
+                              (IMP)YTzoomProductsInVideoOverlay,
                               &OriginalProductsInVideoOverlay);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayView",
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayView",
                               @"didAddSubview:",
-                              (IMP)YTKACEProductPillDidAddSubviewHook,
+                              (IMP)YTzoomProductPillDidAddSubviewHook,
                               &OriginalProductPillOverlayDidAddSubview);
-    YTKACEInstallInstanceHook(@"YTMainAppControlsOverlayView",
+    YTzoomInstallInstanceHook(@"YTMainAppControlsOverlayView",
                               @"didAddSubview:",
-                              (IMP)YTKACEProductPillDidAddSubviewHook,
+                              (IMP)YTzoomProductPillDidAddSubviewHook,
                               &OriginalProductPillControlsDidAddSubview);
-    YTKACEInstallInstanceHook(@"YTTimelyShelfStateManager",
+    YTzoomInstallInstanceHook(@"YTTimelyShelfStateManager",
                               @"playerOverlayProvider:didInsertPlayerOverlay:",
-                              (IMP)YTKACETimelyShelfDidInsert,
+                              (IMP)YTzoomTimelyShelfDidInsert,
                               &OriginalTimelyShelfDidInsert);
-    YTKACEInstallInstanceHook(@"YTTimelyShelfStateManager",
+    YTzoomInstallInstanceHook(@"YTTimelyShelfStateManager",
                               @"playerOverlayProvider:didUpdateContentForPlayerOverlay:",
-                              (IMP)YTKACETimelyShelfDidUpdate,
+                              (IMP)YTzoomTimelyShelfDidUpdate,
                               &OriginalTimelyShelfDidUpdate);
-    YTKACEInstallInstanceHook(@"YTTimelyShelfStateManager",
+    YTzoomInstallInstanceHook(@"YTTimelyShelfStateManager",
                               @"updateTimelyShelfOverlay:",
-                              (IMP)YTKACEUpdateTimelyShelfOverlay,
+                              (IMP)YTzoomUpdateTimelyShelfOverlay,
                               &OriginalUpdateTimelyShelfOverlay);
-    YTKACEInstallInstanceHook(@"YTTimelyShelfStateManager",
+    YTzoomInstallInstanceHook(@"YTTimelyShelfStateManager",
                               @"updateTimelyShelfState",
-                              (IMP)YTKACEUpdateTimelyShelfState,
+                              (IMP)YTzoomUpdateTimelyShelfState,
                               &OriginalUpdateTimelyShelfState);
-    YTKACEInstallInstanceHook(@"YTTimelyShelfStateManager",
+    YTzoomInstallInstanceHook(@"YTTimelyShelfStateManager",
                               @"updateTimelyShelfState:",
-                              (IMP)YTKACEUpdateTimelyShelfStateWith,
+                              (IMP)YTzoomUpdateTimelyShelfStateWith,
                               &OriginalUpdateTimelyShelfStateWith);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayView",
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayView",
                               @"setTimelyShelfFrame:fromOverlayBounds:",
-                              (IMP)YTKACETimelyShelfFrame,
+                              (IMP)YTzoomTimelyShelfFrame,
                               &OriginalTimelyShelfFrame);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
                               @"timelyShelfHeight",
-                              (IMP)YTKACETimelyShelfHeightHook,
+                              (IMP)YTzoomTimelyShelfHeightHook,
                               &OriginalTimelyShelfHeightVC);
-    YTKACEInstallInstanceHook(@"YTPlayerBarController",
+    YTzoomInstallInstanceHook(@"YTPlayerBarController",
                               @"timelyShelfHeight",
-                              (IMP)YTKACETimelyShelfHeightHook,
+                              (IMP)YTzoomTimelyShelfHeightHook,
                               &OriginalTimelyShelfHeightBar);
-    YTKACEInstallInstanceHook(@"YTPlayerBarLayoutInput",
+    YTzoomInstallInstanceHook(@"YTPlayerBarLayoutInput",
                               @"timelyShelfHeight",
-                              (IMP)YTKACETimelyShelfHeightHook,
+                              (IMP)YTzoomTimelyShelfHeightHook,
                               &OriginalTimelyShelfHeightInput);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
                               @"forceHidePreviousAndNextButtons",
-                              (IMP)YTKACEForceHidePreviousNext,
+                              (IMP)YTzoomForceHidePreviousNext,
                               &OriginalForceHidePreviousNext);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
                               @"previousButtonShouldHide",
-                              (IMP)YTKACEPreviousButtonShouldHide,
+                              (IMP)YTzoomPreviousButtonShouldHide,
                               &OriginalPreviousButtonShouldHide);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
                               @"nextButtonShouldHide",
-                              (IMP)YTKACENextButtonShouldHide,
+                              (IMP)YTzoomNextButtonShouldHide,
                               &OriginalNextButtonShouldHide);
-    YTKACEInstallInstanceHook(@"YTColdConfig",
+    YTzoomInstallInstanceHook(@"YTColdConfig",
                               @"removeNextPaddleForSingletonVideos",
-                              (IMP)YTKACERemoveNextPaddle,
+                              (IMP)YTzoomRemoveNextPaddle,
                               &OriginalRemoveNextPaddle);
-    YTKACEInstallInstanceHook(@"YTColdConfig",
+    YTzoomInstallInstanceHook(@"YTColdConfig",
                               @"removePreviousPaddleForSingletonVideos",
-                              (IMP)YTKACERemovePreviousPaddle,
+                              (IMP)YTzoomRemovePreviousPaddle,
                               &OriginalRemovePreviousPaddle);
 }

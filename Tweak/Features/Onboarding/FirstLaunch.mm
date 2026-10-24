@@ -1,19 +1,19 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../UI/Notice.h"
 #import "../../Runtime/Localization.h"
 
 #import <UIKit/UIKit.h>
 
-static NSString * const YTKACEOnboardingKey = @"YTKACE.Preference.Onboarding.Shown";
+static NSString * const YTzoomOnboardingKey = @"YTzoom.Preference.Onboarding.Shown";
 
-@interface YTKACEFirstLaunchFlow : NSObject <NSNetServiceBrowserDelegate>
+@interface YTzoomFirstLaunchFlow : NSObject <NSNetServiceBrowserDelegate>
 @property(nonatomic, strong) NSNetServiceBrowser *browser;
 @property(nonatomic, assign) NSInteger attempts;
 @end
 
-static YTKACEFirstLaunchFlow *YTKACEFirstLaunchInstance;
+static YTzoomFirstLaunchFlow *YTzoomFirstLaunchInstance;
 
-static UIViewController *YTKACEFirstLaunchPresenter(void) {
+static UIViewController *YTzoomFirstLaunchPresenter(void) {
     UIWindow *window = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class] ||
@@ -32,13 +32,13 @@ static UIViewController *YTKACEFirstLaunchPresenter(void) {
     return controller;
 }
 
-@implementation YTKACEFirstLaunchFlow
+@implementation YTzoomFirstLaunchFlow
 
 - (void)startCastRequest {
     self.browser = [NSNetServiceBrowser new];
     self.browser.delegate = self;
     [self.browser searchForServicesOfType:@"_googlecast._tcp." inDomain:@"local."];
-    YTKACEStartCastDiscovery();
+    YTzoomStartCastDiscovery();
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 15 * NSEC_PER_SEC),
         dispatch_get_main_queue(), ^{
             [self.browser stop];
@@ -48,20 +48,20 @@ static UIViewController *YTKACEFirstLaunchPresenter(void) {
 
 - (void)showSponsorBlockFrom:(UIViewController *)presenter {
     (void)presenter;
-    if (YTKACEShowYouTubeDialog(
-        YTKACELocalized(@"SponsorBlock"),
-        YTKACELocalized(@"YTKACE uses SponsorBlock data.\nLicensed under CC BY-NC-SA 4.0."))) {
+    if (YTzoomShowYouTubeDialog(
+        YTzoomLocalized(@"SponsorBlock"),
+        YTzoomLocalized(@"YTzoom uses SponsorBlock data.\nLicensed under CC BY-NC-SA 4.0."))) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC),
             dispatch_get_main_queue(), ^{ [self startCastRequest]; });
         return;
     }
-    YTKACEShowNotice(YTKACELocalized(@"SponsorBlock data: CC BY-NC-SA 4.0"));
+    YTzoomShowNotice(YTzoomLocalized(@"SponsorBlock data: CC BY-NC-SA 4.0"));
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 400 * NSEC_PER_MSEC),
         dispatch_get_main_queue(), ^{ [self startCastRequest]; });
 }
 
 - (void)show {
-    UIViewController *presenter = YTKACEFirstLaunchPresenter();
+    UIViewController *presenter = YTzoomFirstLaunchPresenter();
     if (presenter == nil || presenter.view.window == nil) {
         self.attempts += 1;
         if (self.attempts < 20) {
@@ -70,33 +70,33 @@ static UIViewController *YTKACEFirstLaunchPresenter(void) {
         }
         return;
     }
-    [NSUserDefaults.standardUserDefaults setBool:YES forKey:YTKACEOnboardingKey];
-    if (YTKACEShowYouTubeDialog(
-        @"YTKACE",
-        YTKACELocalized(@"To change these, open the YTKACE tab and use the gear icon above."))) {
+    [NSUserDefaults.standardUserDefaults setBool:YES forKey:YTzoomOnboardingKey];
+    if (YTzoomShowYouTubeDialog(
+        @"YTzoom",
+        YTzoomLocalized(@"To change these, open the YTzoom tab and use the gear icon above."))) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC),
             dispatch_get_main_queue(), ^{
-                UIViewController *nextPresenter = YTKACEFirstLaunchPresenter();
+                UIViewController *nextPresenter = YTzoomFirstLaunchPresenter();
                 if (nextPresenter != nil) [self showSponsorBlockFrom:nextPresenter];
             });
         return;
     }
-    YTKACEShowNotice(YTKACELocalized(@"Settings live in the YTKACE tab, behind the gear icon."));
+    YTzoomShowNotice(YTzoomLocalized(@"Settings live in the YTzoom tab, behind the gear icon."));
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 300 * NSEC_PER_MSEC),
         dispatch_get_main_queue(), ^{
-            UIViewController *nextPresenter = YTKACEFirstLaunchPresenter();
+            UIViewController *nextPresenter = YTzoomFirstLaunchPresenter();
             if (nextPresenter != nil) [self showSponsorBlockFrom:nextPresenter];
         });
 }
 
 @end
 
-void YTKACEScheduleFirstLaunch(void) {
+void YTzoomScheduleFirstLaunch(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        if ([NSUserDefaults.standardUserDefaults boolForKey:YTKACEOnboardingKey]) return;
-        YTKACEFirstLaunchInstance = [YTKACEFirstLaunchFlow new];
+        if ([NSUserDefaults.standardUserDefaults boolForKey:YTzoomOnboardingKey]) return;
+        YTzoomFirstLaunchInstance = [YTzoomFirstLaunchFlow new];
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW, 3 * NSEC_PER_SEC),
-            dispatch_get_main_queue(), ^{ [YTKACEFirstLaunchInstance show]; });
+            dispatch_get_main_queue(), ^{ [YTzoomFirstLaunchInstance show]; });
     });
 }

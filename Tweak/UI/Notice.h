@@ -4,11 +4,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 @class UIView;
 
-FOUNDATION_EXPORT void YTKACEShowNotice(NSString *message);
-FOUNDATION_EXPORT BOOL YTKACEApplyGlassBackground(UIView *view, BOOL dark);
-FOUNDATION_EXPORT BOOL YTKACEShowYouTubeDialog(NSString *title,
+FOUNDATION_EXPORT void YTzoomShowNotice(NSString *message);
+FOUNDATION_EXPORT BOOL YTzoomApplyGlassBackground(UIView *view, BOOL dark);
+FOUNDATION_EXPORT BOOL YTzoomShowYouTubeDialog(NSString *title,
                                                 NSString *message);
-FOUNDATION_EXPORT BOOL YTKACEShowYouTubeConfirmation(
+FOUNDATION_EXPORT BOOL YTzoomShowYouTubeConfirmation(
     NSString *title,
     NSString *message,
     NSString *actionTitle,

@@ -2,14 +2,14 @@
 set -euo pipefail
 
 if [[ $# -lt 2 || $# -gt 3 ]]; then
-  echo "usage: sideload-repack.sh input.ipa YTKACE.dylib [output.ipa]" >&2
+  echo "usage: sideload-repack.sh input.ipa YTzoom.dylib [output.ipa]" >&2
   exit 2
 fi
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 INPUT="$(cd "$(dirname "$1")" && pwd)/$(basename "$1")"
 DYLIB="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"
-OUTPUT="${3:-$PWD/YTKACE_YouTube.ipa}"
+OUTPUT="${3:-$PWD/YTzoom_YouTube.ipa}"
 OUTPUT="$(python3 -c 'import os,sys; print(os.path.abspath(sys.argv[1]))' "$OUTPUT")"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
@@ -39,23 +39,23 @@ PY
 )"
 MAIN="$APP/$EXECUTABLE"
 
-rm -rf "$APP/YTKACE.bundle"
+rm -rf "$APP/YTzoom.bundle"
 rm -rf "$APP/Extensions/AppMigrationExtension.appex"
 rm -rf "$APP/_CodeSignature"
 find "$APP" -maxdepth 1 -type f \( -name 'YTK@*' -o -name 'YTK-*' \) -delete
 python3 "$ROOT/Tools/sanitize_plist.py" "$APP/Info.plist"
 
 python3 "$ROOT/Tools/macho_inject.py" "$MAIN" \
-  --add-load '@rpath/YTKACE.dylib'
+  --add-load '@rpath/YTzoom.dylib'
 
 mkdir -p "$APP/Frameworks"
-cp "$DYLIB" "$APP/Frameworks/YTKACE.dylib"
-cp -R "$ROOT/Resources/YTKACE.bundle" "$APP/YTKACE.bundle"
+cp "$DYLIB" "$APP/Frameworks/YTzoom.dylib"
+cp -R "$ROOT/Resources/YTzoom.bundle" "$APP/YTzoom.bundle"
 
 bash "$ROOT/Scripts/sign-bundle.sh" "$APP"
 
 mkdir -p "$(dirname "$OUTPUT")"
-ARCHIVE="$WORK/YTKACE_YouTube.ipa"
+ARCHIVE="$WORK/YTzoom_YouTube.ipa"
 (
   cd "$WORK"
   zip -qry "$ARCHIVE" Payload

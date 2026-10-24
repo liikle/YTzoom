@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../Downloads/DownloadLog.h"
@@ -9,55 +9,55 @@
 #import <objc/runtime.h>
 
 // visionOS client identifiers from yt-dlp (Unlicense, public domain)
-static NSString *const YTKACEVisionClientName    = @"VISIONOS";
-static NSString *const YTKACEVisionClientVersion = @"1.02";
-static NSString *const YTKACEVisionDeviceMake    = @"Apple";
-static NSString *const YTKACEVisionDeviceModel   = @"RealityDevice17,1";
-static NSString *const YTKACEVisionOSName        = @"visionOS";
-static NSString *const YTKACEVisionOSVersion     = @"26.5.23O471";
-static NSString *const YTKACEVisionUserAgent     =
+static NSString *const YTzoomVisionClientName    = @"VISIONOS";
+static NSString *const YTzoomVisionClientVersion = @"1.02";
+static NSString *const YTzoomVisionDeviceMake    = @"Apple";
+static NSString *const YTzoomVisionDeviceModel   = @"RealityDevice17,1";
+static NSString *const YTzoomVisionOSName        = @"visionOS";
+static NSString *const YTzoomVisionOSVersion     = @"26.5.23O471";
+static NSString *const YTzoomVisionUserAgent     =
     @"Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 "
      "(KHTML, like Gecko) Version/26.0 Safari/605.1.15";
 
-static const NSTimeInterval YTKACEHLSCacheLifetime = 4.0 * 60.0 * 60.0;
+static const NSTimeInterval YTzoomHLSCacheLifetime = 4.0 * 60.0 * 60.0;
 
-static IMP YTKACEHLSOrigInitFull;
-static IMP YTKACEHLSOrigInitShort;
-static IMP YTKACEHLSOrigInitRental;
-static IMP YTKACEHLSOrigParseString;
-static IMP YTKACEHLSOrigSetConstraint;
-static IMP YTKACEHLSOrigPlay;
-static IMP YTKACEHLSOrigPause;
-static IMP YTKACEHLSOrigScrubStart;
-static IMP YTKACEHLSOrigScrubEnd;
+static IMP YTzoomHLSOrigInitFull;
+static IMP YTzoomHLSOrigInitShort;
+static IMP YTzoomHLSOrigInitRental;
+static IMP YTzoomHLSOrigParseString;
+static IMP YTzoomHLSOrigSetConstraint;
+static IMP YTzoomHLSOrigPlay;
+static IMP YTzoomHLSOrigPause;
+static IMP YTzoomHLSOrigScrubStart;
+static IMP YTzoomHLSOrigScrubEnd;
 
-static NSMutableDictionary<NSString *, NSDictionary *> *YTKACEHLSCache;
-static NSMutableSet<NSString *> *YTKACEHLSPending;
-static NSMutableDictionary<NSString *, id> *YTKACEHLSOriginals;
+static NSMutableDictionary<NSString *, NSDictionary *> *YTzoomHLSCache;
+static NSMutableSet<NSString *> *YTzoomHLSPending;
+static NSMutableDictionary<NSString *, id> *YTzoomHLSOriginals;
 
-static NSMutableDictionary<NSString *, NSString *> *YTKACEHLSSources;
-static NSMutableSet<NSString *> *YTKACEHLSFallbacks;
-static BOOL YTKACEHLSInScrubStart;
-static BOOL YTKACEHLSScrubPaused;
-static NSUInteger YTKACEHLSScrubGeneration;
+static NSMutableDictionary<NSString *, NSString *> *YTzoomHLSSources;
+static NSMutableSet<NSString *> *YTzoomHLSFallbacks;
+static BOOL YTzoomHLSInScrubStart;
+static BOOL YTzoomHLSScrubPaused;
+static NSUInteger YTzoomHLSScrubGeneration;
 
-static BOOL YTKACEHLSEnabled(void) {
-    return YTKACEPlaybackFixMode() == 2;
+static BOOL YTzoomHLSEnabled(void) {
+    return YTzoomPlaybackFixMode() == 2;
 }
 
-static id YTKACEHLSGet(id object, NSString *name) {
+static id YTzoomHLSGet(id object, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     if (object == nil || ![object respondsToSelector:selector]) return nil;
     return ((id (*)(id, SEL))objc_msgSend)(object, selector);
 }
 
-static BOOL YTKACEHLSBool(id object, NSString *name) {
+static BOOL YTzoomHLSBool(id object, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     if (object == nil || ![object respondsToSelector:selector]) return NO;
     return ((BOOL (*)(id, SEL))objc_msgSend)(object, selector);
 }
 
-static long long YTKACEHLSInteger(id object, NSString *name) {
+static long long YTzoomHLSInteger(id object, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     if (object == nil || ![object respondsToSelector:selector]) return LLONG_MIN;
     const char *type = [object methodSignatureForSelector:selector].methodReturnType;
@@ -67,15 +67,15 @@ static long long YTKACEHLSInteger(id object, NSString *name) {
     return LLONG_MIN;
 }
 
-static NSDictionary *YTKACEVisionContext(NSString *visitor) {
+static NSDictionary *YTzoomVisionContext(NSString *visitor) {
     NSMutableDictionary *client = [@{
-        @"clientName": YTKACEVisionClientName,
-        @"clientVersion": YTKACEVisionClientVersion,
-        @"deviceMake": YTKACEVisionDeviceMake,
-        @"deviceModel": YTKACEVisionDeviceModel,
-        @"osName": YTKACEVisionOSName,
-        @"osVersion": YTKACEVisionOSVersion,
-        @"userAgent": YTKACEVisionUserAgent,
+        @"clientName": YTzoomVisionClientName,
+        @"clientVersion": YTzoomVisionClientVersion,
+        @"deviceMake": YTzoomVisionDeviceMake,
+        @"deviceModel": YTzoomVisionDeviceModel,
+        @"osName": YTzoomVisionOSName,
+        @"osVersion": YTzoomVisionOSVersion,
+        @"userAgent": YTzoomVisionUserAgent,
         @"hl": @"en",
         @"gl": @"US"
     } mutableCopy];
@@ -83,29 +83,29 @@ static NSDictionary *YTKACEVisionContext(NSString *visitor) {
     return @{@"client": client};
 }
 
-static NSMutableURLRequest *YTKACEVisionRequest(NSString *path, NSDictionary *body, NSString *visitor) {
+static NSMutableURLRequest *YTzoomVisionRequest(NSString *path, NSDictionary *body, NSString *visitor) {
     NSURL *url = [NSURL URLWithString:[@"https://youtubei.googleapis.com/youtubei/v1/" stringByAppendingString:path]];
     NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:url];
     request.timeoutInterval = 12;
     request.HTTPMethod = @"POST";
     request.HTTPBody = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
     [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    [request setValue:YTKACEVisionUserAgent forHTTPHeaderField:@"User-Agent"];
+    [request setValue:YTzoomVisionUserAgent forHTTPHeaderField:@"User-Agent"];
     if (visitor.length != 0) [request setValue:visitor forHTTPHeaderField:@"X-Goog-Visitor-Id"];
     return request;
 }
 
-static NSString *YTKACEVisionVisitor(void) {
-    NSDictionary *cached = YTKACEPreferenceObject(@"YTKACE.Cache.DirectVisitor");
+static NSString *YTzoomVisionVisitor(void) {
+    NSDictionary *cached = YTzoomPreferenceObject(@"YTzoom.Cache.DirectVisitor");
     NSString *value = [cached isKindOfClass:NSDictionary.class] ? cached[@"id"] : nil;
     if ([value isKindOfClass:NSString.class] && value.length != 0) return value;
     static NSString *fetched;
     if (fetched.length != 0) return fetched;
     __block NSString *visitor = nil;
     dispatch_semaphore_t done = dispatch_semaphore_create(0);
-    [[NSURLSession.sharedSession dataTaskWithRequest:YTKACEVisionRequest(
+    [[NSURLSession.sharedSession dataTaskWithRequest:YTzoomVisionRequest(
         @"guide?prettyPrint=false&fields=responseContext.visitorData",
-        @{@"context": YTKACEVisionContext(nil)}, nil)
+        @{@"context": YTzoomVisionContext(nil)}, nil)
         completionHandler:^(NSData *data, __unused NSURLResponse *response, __unused NSError *error) {
         id json = data.length ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
         id found = [json isKindOfClass:NSDictionary.class] ? json[@"responseContext"][@"visitorData"] : nil;
@@ -117,51 +117,51 @@ static NSString *YTKACEVisionVisitor(void) {
     return visitor;
 }
 
-static NSString *YTKACEHLSCachedURL(NSString *videoID) {
-    @synchronized (YTKACEHLSCache) {
-        NSDictionary *entry = YTKACEHLSCache[videoID];
+static NSString *YTzoomHLSCachedURL(NSString *videoID) {
+    @synchronized (YTzoomHLSCache) {
+        NSDictionary *entry = YTzoomHLSCache[videoID];
         if (entry == nil) return nil;
-        if (NSDate.date.timeIntervalSince1970 - [entry[@"time"] doubleValue] > YTKACEHLSCacheLifetime) {
-            [YTKACEHLSCache removeObjectForKey:videoID];
+        if (NSDate.date.timeIntervalSince1970 - [entry[@"time"] doubleValue] > YTzoomHLSCacheLifetime) {
+            [YTzoomHLSCache removeObjectForKey:videoID];
             return nil;
         }
         return entry[@"url"];
     }
 }
 
-static void YTKACEHLSFetchVisionThen(NSString *videoID, void (^done)(BOOL ready));
+static void YTzoomHLSFetchVisionThen(NSString *videoID, void (^done)(BOOL ready));
 
-static void YTKACEHLSFetchVision(NSString *videoID) {
-    YTKACEHLSFetchVisionThen(videoID, nil);
+static void YTzoomHLSFetchVision(NSString *videoID) {
+    YTzoomHLSFetchVisionThen(videoID, nil);
 }
 
-static void YTKACEHLSFetchVisionThen(NSString *videoID, void (^done)(BOOL ready)) {
-    @synchronized (YTKACEHLSCache) {
-        const BOOL cached = YTKACEHLSCache[videoID] != nil;
+static void YTzoomHLSFetchVisionThen(NSString *videoID, void (^done)(BOOL ready)) {
+    @synchronized (YTzoomHLSCache) {
+        const BOOL cached = YTzoomHLSCache[videoID] != nil;
         if (cached) {
             if (done != nil) done(YES);
             return;
         }
-        if ([YTKACEHLSPending containsObject:videoID]) {
+        if ([YTzoomHLSPending containsObject:videoID]) {
             if (done != nil) {
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(2.0 * NSEC_PER_SEC)),
                                dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-                    done(YTKACEHLSCachedURL(videoID) != nil);
+                    done(YTzoomHLSCachedURL(videoID) != nil);
                 });
             }
             return;
         }
-        [YTKACEHLSPending addObject:videoID];
+        [YTzoomHLSPending addObject:videoID];
     }
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
-        NSString *visitor = YTKACEVisionVisitor();
+        NSString *visitor = YTzoomVisionVisitor();
         NSDictionary *body = @{
-            @"context": YTKACEVisionContext(visitor),
+            @"context": YTzoomVisionContext(visitor),
             @"videoId": videoID,
             @"contentCheckOk": @YES,
             @"racyCheckOk": @YES
         };
-        [[NSURLSession.sharedSession dataTaskWithRequest:YTKACEVisionRequest(@"player?prettyPrint=false", body, visitor)
+        [[NSURLSession.sharedSession dataTaskWithRequest:YTzoomVisionRequest(@"player?prettyPrint=false", body, visitor)
             completionHandler:^(NSData *data, __unused NSURLResponse *response, __unused NSError *error) {
             id json = data.length ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
             NSDictionary *root = [json isKindOfClass:NSDictionary.class] ? json : @{};
@@ -170,14 +170,14 @@ static void YTKACEHLSFetchVisionThen(NSString *videoID, void (^done)(BOOL ready)
             NSDictionary *streaming = [root[@"streamingData"] isKindOfClass:NSDictionary.class]
                 ? root[@"streamingData"] : @{};
             NSString *hls = [streaming[@"hlsManifestUrl"] isKindOfClass:NSString.class] ? streaming[@"hlsManifestUrl"] : nil;
-            @synchronized (YTKACEHLSCache) {
-                [YTKACEHLSPending removeObject:videoID];
+            @synchronized (YTzoomHLSCache) {
+                [YTzoomHLSPending removeObject:videoID];
                 if (hls.length != 0) {
-                    YTKACEHLSCache[videoID] = @{@"url": hls, @"time": @(NSDate.date.timeIntervalSince1970)};
+                    YTzoomHLSCache[videoID] = @{@"url": hls, @"time": @(NSDate.date.timeIntervalSince1970)};
                 }
             }
             if (hls.length == 0) {
-                YTKACEDownloadLog(@"hls", @"vision video=%@ playability=%@ no manifest", videoID,
+                YTzoomDownloadLog(@"hls", @"vision video=%@ playability=%@ no manifest", videoID,
                                   playability[@"status"] ?: @"-");
             }
             if (done != nil) done(hls.length != 0);
@@ -185,98 +185,98 @@ static void YTKACEHLSFetchVisionThen(NSString *videoID, void (^done)(BOOL ready)
     });
 }
 
-BOOL YTKACEHLSBeginFallback(NSString *videoID, void (^ready)(BOOL available)) {
-    if (!YTKACEHLSEnabled() || videoID.length == 0 || YTKACEHLSSources == nil) return NO;
-    @synchronized (YTKACEHLSSources) {
-        if (![YTKACEHLSSources[videoID] isEqualToString:@"ios"] || [YTKACEHLSFallbacks containsObject:videoID]) {
+BOOL YTzoomHLSBeginFallback(NSString *videoID, void (^ready)(BOOL available)) {
+    if (!YTzoomHLSEnabled() || videoID.length == 0 || YTzoomHLSSources == nil) return NO;
+    @synchronized (YTzoomHLSSources) {
+        if (![YTzoomHLSSources[videoID] isEqualToString:@"ios"] || [YTzoomHLSFallbacks containsObject:videoID]) {
             return NO;
         }
-        [YTKACEHLSFallbacks addObject:videoID];
+        [YTzoomHLSFallbacks addObject:videoID];
     }
-    YTKACEHLSFetchVisionThen(videoID, ^(BOOL available) {
+    YTzoomHLSFetchVisionThen(videoID, ^(BOOL available) {
         dispatch_async(dispatch_get_main_queue(), ^{ ready(available); });
     });
     return YES;
 }
 
-id YTKACEHLSOriginalResponse(NSString *videoID) {
-    if (videoID.length == 0 || YTKACEHLSOriginals == nil) return nil;
-    @synchronized (YTKACEHLSOriginals) {
-        return YTKACEHLSOriginals[videoID];
+id YTzoomHLSOriginalResponse(NSString *videoID) {
+    if (videoID.length == 0 || YTzoomHLSOriginals == nil) return nil;
+    @synchronized (YTzoomHLSOriginals) {
+        return YTzoomHLSOriginals[videoID];
     }
 }
 
-static void YTKACEHLSKeepOriginal(NSString *videoID, id data) {
+static void YTzoomHLSKeepOriginal(NSString *videoID, id data) {
     if (![data respondsToSelector:@selector(copyWithZone:)]) return;
     id copy = [data copy];
     if (copy == nil) return;
-    @synchronized (YTKACEHLSOriginals) {
-        if (YTKACEHLSOriginals.count > 20) [YTKACEHLSOriginals removeAllObjects];
-        YTKACEHLSOriginals[videoID] = copy;
+    @synchronized (YTzoomHLSOriginals) {
+        if (YTzoomHLSOriginals.count > 20) [YTzoomHLSOriginals removeAllObjects];
+        YTzoomHLSOriginals[videoID] = copy;
     }
 }
 
-static void YTKACEHLSSwap(id data) {
-    if (!YTKACEHLSEnabled() || data == nil) return;
-    NSString *videoID = YTKACEHLSGet(YTKACEHLSGet(data, @"videoDetails"), @"videoId");
+static void YTzoomHLSSwap(id data) {
+    if (!YTzoomHLSEnabled() || data == nil) return;
+    NSString *videoID = YTzoomHLSGet(YTzoomHLSGet(data, @"videoDetails"), @"videoId");
     if (![videoID isKindOfClass:NSString.class] || videoID.length == 0) return;
-    id streaming = YTKACEHLSGet(data, @"streamingData");
-    if (streaming == nil || YTKACEHLSBool(streaming, @"isLivePlayback")) return;
+    id streaming = YTzoomHLSGet(data, @"streamingData");
+    if (streaming == nil || YTzoomHLSBool(streaming, @"isLivePlayback")) return;
     SEL setHLS = NSSelectorFromString(@"setHlsManifestURL:");
     SEL setSABR = NSSelectorFromString(@"setHasServerAbrStreamingURL:");
     SEL setOnesie = NSSelectorFromString(@"setHasOnesieStreamingURL:");
     if (![streaming respondsToSelector:setHLS] || ![streaming respondsToSelector:setSABR] ||
         ![streaming respondsToSelector:setOnesie]) return;
-    NSString *ios = YTKACEHLSGet(streaming, @"hlsManifestURL");
-    NSString *vision = YTKACEHLSCachedURL(videoID);
+    NSString *ios = YTzoomHLSGet(streaming, @"hlsManifestURL");
+    NSString *vision = YTzoomHLSCachedURL(videoID);
     NSString *chosen = vision.length != 0 ? vision : ([ios isKindOfClass:NSString.class] ? ios : nil);
-    YTKACEHLSFetchVision(videoID);
+    YTzoomHLSFetchVision(videoID);
     if (chosen.length == 0) return;
-    YTKACEHLSKeepOriginal(videoID, data);
+    YTzoomHLSKeepOriginal(videoID, data);
     ((void (*)(id, SEL, id))objc_msgSend)(streaming, setHLS, chosen);
     ((void (*)(id, SEL, BOOL))objc_msgSend)(streaming, setSABR, NO);
     ((void (*)(id, SEL, BOOL))objc_msgSend)(streaming, setOnesie, NO);
-    NSMutableArray *formats = YTKACEHLSGet(streaming, @"adaptiveFormatsArray");
+    NSMutableArray *formats = YTzoomHLSGet(streaming, @"adaptiveFormatsArray");
     if ([formats respondsToSelector:@selector(removeAllObjects)]) [formats removeAllObjects];
-    @synchronized (YTKACEHLSSources) {
-        if (YTKACEHLSSources.count > 50) [YTKACEHLSSources removeAllObjects];
-        YTKACEHLSSources[videoID] = vision.length != 0 ? @"vision" : @"ios";
+    @synchronized (YTzoomHLSSources) {
+        if (YTzoomHLSSources.count > 50) [YTzoomHLSSources removeAllObjects];
+        YTzoomHLSSources[videoID] = vision.length != 0 ? @"vision" : @"ios";
     }
-    YTKACEDownloadLog(@"hls", @"swap video=%@ source=%@", videoID, vision.length != 0 ? @"vision" : @"ios");
+    YTzoomDownloadLog(@"hls", @"swap video=%@ source=%@", videoID, vision.length != 0 ? @"vision" : @"ios");
 }
 
-static id YTKACEHLSInitFull(id self, SEL _cmd, id data, id date, id offline, id state, BOOL trailer,
+static id YTzoomHLSInitFull(id self, SEL _cmd, id data, id date, id offline, id state, BOOL trailer,
                             id qoe, id key, id context, id latency, BOOL rental) {
-    YTKACEHLSSwap(data);
-    return ((id (*)(id, SEL, id, id, id, id, BOOL, id, id, id, id, BOOL))YTKACEHLSOrigInitFull)(
+    YTzoomHLSSwap(data);
+    return ((id (*)(id, SEL, id, id, id, id, BOOL, id, id, id, id, BOOL))YTzoomHLSOrigInitFull)(
         self, _cmd, data, date, offline, state, trailer, qoe, key, context, latency, rental);
 }
 
-static id YTKACEHLSInitShort(id self, SEL _cmd, id data, id date, id offline, id state, BOOL trailer) {
-    YTKACEHLSSwap(data);
-    return ((id (*)(id, SEL, id, id, id, id, BOOL))YTKACEHLSOrigInitShort)(
+static id YTzoomHLSInitShort(id self, SEL _cmd, id data, id date, id offline, id state, BOOL trailer) {
+    YTzoomHLSSwap(data);
+    return ((id (*)(id, SEL, id, id, id, id, BOOL))YTzoomHLSOrigInitShort)(
         self, _cmd, data, date, offline, state, trailer);
 }
 
-static id YTKACEHLSInitRental(id self, SEL _cmd, id data, id date, id offline, id state, BOOL trailer,
+static id YTzoomHLSInitRental(id self, SEL _cmd, id data, id date, id offline, id state, BOOL trailer,
                               BOOL rental) {
-    YTKACEHLSSwap(data);
-    return ((id (*)(id, SEL, id, id, id, id, BOOL, BOOL))YTKACEHLSOrigInitRental)(
+    YTzoomHLSSwap(data);
+    return ((id (*)(id, SEL, id, id, id, id, BOOL, BOOL))YTzoomHLSOrigInitRental)(
         self, _cmd, data, date, offline, state, trailer, rental);
 }
 
-static BOOL YTKACEHLSDeviceDecodesVP9(void) {
+static BOOL YTzoomHLSDeviceDecodesVP9(void) {
     static BOOL supported;
     static dispatch_once_t once;
     dispatch_once(&once, ^{
         supported = VTIsHardwareDecodeSupported('vp09');
-        YTKACEDownloadLog(@"hls", @"device vp9=%d", supported);
+        YTzoomDownloadLog(@"hls", @"device vp9=%d", supported);
     });
     return supported;
 }
 
-static NSString *YTKACEHLSFilterManifest(NSString *text) {
-    if (![text containsString:@"vp09"] || YTKACEHLSDeviceDecodesVP9()) return text;
+static NSString *YTzoomHLSFilterManifest(NSString *text) {
+    if (![text containsString:@"vp09"] || YTzoomHLSDeviceDecodesVP9()) return text;
     NSMutableArray<NSString *> *kept = [NSMutableArray array];
     NSUInteger dropped = 0, total = 0;
     BOOL skipNext = NO;
@@ -299,89 +299,89 @@ static NSString *YTKACEHLSFilterManifest(NSString *text) {
     return [kept componentsJoinedByString:@"\n"];
 }
 
-static id YTKACEHLSParseString(id self, SEL _cmd, NSString *string, NSError **error) {
-    if (YTKACEHLSEnabled() && [string isKindOfClass:NSString.class]) string = YTKACEHLSFilterManifest(string);
-    return ((id (*)(id, SEL, id, NSError **))YTKACEHLSOrigParseString)(self, _cmd, string, error);
+static id YTzoomHLSParseString(id self, SEL _cmd, NSString *string, NSError **error) {
+    if (YTzoomHLSEnabled() && [string isKindOfClass:NSString.class]) string = YTzoomHLSFilterManifest(string);
+    return ((id (*)(id, SEL, id, NSError **))YTzoomHLSOrigParseString)(self, _cmd, string, error);
 }
 
-static BOOL YTKACEHLSSameConstraint(id current, id incoming) {
+static BOOL YTzoomHLSSameConstraint(id current, id incoming) {
     if (current == incoming) return YES;
     if (current == nil || incoming == nil) return NO;
     if ([current isEqual:incoming]) return YES;
     if ([current class] != [incoming class]) return NO;
     for (NSString *key in @[@"videoQualitySetting", @"stickyResolutionCap", @"disableTrack"]) {
-        if (YTKACEHLSInteger(current, key) != YTKACEHLSInteger(incoming, key)) return NO;
+        if (YTzoomHLSInteger(current, key) != YTzoomHLSInteger(incoming, key)) return NO;
     }
-    id currentLabel = YTKACEHLSGet(current, @"qualityLabel");
-    id incomingLabel = YTKACEHLSGet(incoming, @"qualityLabel");
+    id currentLabel = YTzoomHLSGet(current, @"qualityLabel");
+    id incomingLabel = YTzoomHLSGet(incoming, @"qualityLabel");
     return currentLabel == incomingLabel || [currentLabel isEqual:incomingLabel];
 }
 
-static void YTKACEHLSSetConstraint(id self, SEL _cmd, id constraint) {
-    if (YTKACEHLSSameConstraint(YTKACEHLSGet(self, @"videoFormatConstraint"), constraint)) return;
-    ((void (*)(id, SEL, id))YTKACEHLSOrigSetConstraint)(self, _cmd, constraint);
+static void YTzoomHLSSetConstraint(id self, SEL _cmd, id constraint) {
+    if (YTzoomHLSSameConstraint(YTzoomHLSGet(self, @"videoFormatConstraint"), constraint)) return;
+    ((void (*)(id, SEL, id))YTzoomHLSOrigSetConstraint)(self, _cmd, constraint);
 }
 
-static void YTKACEHLSScrubStart(id self, SEL _cmd, BOOL bar) {
-    YTKACEHLSScrubPaused = NO;
-    YTKACEHLSScrubGeneration++;
-    YTKACEHLSInScrubStart = YES;
-    ((void (*)(id, SEL, BOOL))YTKACEHLSOrigScrubStart)(self, _cmd, bar);
-    YTKACEHLSInScrubStart = NO;
+static void YTzoomHLSScrubStart(id self, SEL _cmd, BOOL bar) {
+    YTzoomHLSScrubPaused = NO;
+    YTzoomHLSScrubGeneration++;
+    YTzoomHLSInScrubStart = YES;
+    ((void (*)(id, SEL, BOOL))YTzoomHLSOrigScrubStart)(self, _cmd, bar);
+    YTzoomHLSInScrubStart = NO;
 }
 
-static void YTKACEHLSScrubEnd(id self, SEL _cmd, BOOL bar, BOOL cancelled, int source) {
-    ((void (*)(id, SEL, BOOL, BOOL, int))YTKACEHLSOrigScrubEnd)(self, _cmd, bar, cancelled, source);
-    if (!YTKACEHLSScrubPaused) return;
-    const NSUInteger generation = YTKACEHLSScrubGeneration;
+static void YTzoomHLSScrubEnd(id self, SEL _cmd, BOOL bar, BOOL cancelled, int source) {
+    ((void (*)(id, SEL, BOOL, BOOL, int))YTzoomHLSOrigScrubEnd)(self, _cmd, bar, cancelled, source);
+    if (!YTzoomHLSScrubPaused) return;
+    const NSUInteger generation = YTzoomHLSScrubGeneration;
     __weak id weakOverlay = self;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.5 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         id overlay = weakOverlay;
-        if (overlay == nil || !YTKACEHLSScrubPaused || generation != YTKACEHLSScrubGeneration) return;
-        YTKACEHLSScrubPaused = NO;
+        if (overlay == nil || !YTzoomHLSScrubPaused || generation != YTzoomHLSScrubGeneration) return;
+        YTzoomHLSScrubPaused = NO;
         SEL play = NSSelectorFromString(@"didPressPlay:");
         if ([overlay respondsToSelector:play]) ((void (*)(id, SEL, id))objc_msgSend)(overlay, play, nil);
     });
 }
 
-static void YTKACEHLSPlay(id self, SEL _cmd) {
-    YTKACEHLSScrubPaused = NO;
-    ((void (*)(id, SEL))YTKACEHLSOrigPlay)(self, _cmd);
+static void YTzoomHLSPlay(id self, SEL _cmd) {
+    YTzoomHLSScrubPaused = NO;
+    ((void (*)(id, SEL))YTzoomHLSOrigPlay)(self, _cmd);
 }
 
-static void YTKACEHLSPause(id self, SEL _cmd, int reason) {
-    if (YTKACEHLSInScrubStart) YTKACEHLSScrubPaused = YES;
-    ((void (*)(id, SEL, int))YTKACEHLSOrigPause)(self, _cmd, reason);
+static void YTzoomHLSPause(id self, SEL _cmd, int reason) {
+    if (YTzoomHLSInScrubStart) YTzoomHLSScrubPaused = YES;
+    ((void (*)(id, SEL, int))YTzoomHLSOrigPause)(self, _cmd, reason);
 }
 
-void YTKACEInstallHLSPlaybackHooks(void) {
-    if (!YTKACEHLSEnabled()) return;
-    YTKACEHLSCache = [NSMutableDictionary dictionary];
-    YTKACEHLSPending = [NSMutableSet set];
-    YTKACEHLSOriginals = [NSMutableDictionary dictionary];
-    YTKACEHLSSources = [NSMutableDictionary dictionary];
-    YTKACEHLSFallbacks = [NSMutableSet set];
+void YTzoomInstallHLSPlaybackHooks(void) {
+    if (!YTzoomHLSEnabled()) return;
+    YTzoomHLSCache = [NSMutableDictionary dictionary];
+    YTzoomHLSPending = [NSMutableSet set];
+    YTzoomHLSOriginals = [NSMutableDictionary dictionary];
+    YTzoomHLSSources = [NSMutableDictionary dictionary];
+    YTzoomHLSFallbacks = [NSMutableSet set];
     NSString *response = @"YTPlayerResponse";
-    YTKACEInstallInstanceHook(response,
+    YTzoomInstallInstanceHook(response,
         @"initWithPlayerData:responseDate:offlineStateDate:mutableState:trailer:QOEController:cacheKey:cacheContext:latencyLogger:offlineRentalActivated:",
-        (IMP)YTKACEHLSInitFull, &YTKACEHLSOrigInitFull);
-    YTKACEInstallInstanceHook(response,
+        (IMP)YTzoomHLSInitFull, &YTzoomHLSOrigInitFull);
+    YTzoomInstallInstanceHook(response,
         @"initWithPlayerData:responseDate:offlineStateDate:mutableState:trailer:",
-        (IMP)YTKACEHLSInitShort, &YTKACEHLSOrigInitShort);
-    YTKACEInstallInstanceHook(response,
+        (IMP)YTzoomHLSInitShort, &YTzoomHLSOrigInitShort);
+    YTzoomInstallInstanceHook(response,
         @"initWithPlayerData:responseDate:offlineStateDate:mutableState:trailer:offlineRentalActivated:",
-        (IMP)YTKACEHLSInitRental, &YTKACEHLSOrigInitRental);
-    YTKACEInstallInstanceHook(@"MLHLSMasterPlaylistParser", @"parseFromString:error:",
-        (IMP)YTKACEHLSParseString, &YTKACEHLSOrigParseString);
-    YTKACEInstallInstanceHook(@"MLAVPlayer", @"setVideoFormatConstraint:",
-        (IMP)YTKACEHLSSetConstraint, &YTKACEHLSOrigSetConstraint);
-    YTKACEInstallInstanceHook(@"MLAVPlayer", @"play", (IMP)YTKACEHLSPlay, &YTKACEHLSOrigPlay);
-    YTKACEInstallInstanceHook(@"MLAVPlayer", @"pauseWithStoppageReason:",
-        (IMP)YTKACEHLSPause, &YTKACEHLSOrigPause);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
+        (IMP)YTzoomHLSInitRental, &YTzoomHLSOrigInitRental);
+    YTzoomInstallInstanceHook(@"MLHLSMasterPlaylistParser", @"parseFromString:error:",
+        (IMP)YTzoomHLSParseString, &YTzoomHLSOrigParseString);
+    YTzoomInstallInstanceHook(@"MLAVPlayer", @"setVideoFormatConstraint:",
+        (IMP)YTzoomHLSSetConstraint, &YTzoomHLSOrigSetConstraint);
+    YTzoomInstallInstanceHook(@"MLAVPlayer", @"play", (IMP)YTzoomHLSPlay, &YTzoomHLSOrigPlay);
+    YTzoomInstallInstanceHook(@"MLAVPlayer", @"pauseWithStoppageReason:",
+        (IMP)YTzoomHLSPause, &YTzoomHLSOrigPause);
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
         @"didStartPlayerBarScrubbingWithGestureOriginatingInPlayerBar:",
-        (IMP)YTKACEHLSScrubStart, &YTKACEHLSOrigScrubStart);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
+        (IMP)YTzoomHLSScrubStart, &YTzoomHLSOrigScrubStart);
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
         @"didEndPlayerBarScrubbingWithGestureOriginatingInPlayerBar:withSeekCancelled:seekSource:",
-        (IMP)YTKACEHLSScrubEnd, &YTKACEHLSOrigScrubEnd);
+        (IMP)YTzoomHLSScrubEnd, &YTzoomHLSOrigScrubEnd);
 }

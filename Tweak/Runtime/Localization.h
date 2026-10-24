@@ -2,11 +2,11 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-FOUNDATION_EXPORT NSString * const YTKACELanguageKey;
+FOUNDATION_EXPORT NSString * const YTzoomLanguageKey;
 
-FOUNDATION_EXPORT NSString *YTKACELocalized(NSString *key);
-FOUNDATION_EXPORT NSArray<NSString *> *YTKACEAvailableLanguages(void);
-FOUNDATION_EXPORT NSString *YTKACELanguageDisplayName(NSString *code);
-FOUNDATION_EXPORT void YTKACEResetLocalizationCache(void);
+FOUNDATION_EXPORT NSString *YTzoomLocalized(NSString *key);
+FOUNDATION_EXPORT NSArray<NSString *> *YTzoomAvailableLanguages(void);
+FOUNDATION_EXPORT NSString *YTzoomLanguageDisplayName(NSString *code);
+FOUNDATION_EXPORT void YTzoomResetLocalizationCache(void);
 
 NS_ASSUME_NONNULL_END

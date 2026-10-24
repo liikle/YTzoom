@@ -6,12 +6,12 @@ YouTube 21.26.4 has a minimum deployment version of iOS 16.0 and links
 AppIntents. This baseline is therefore supported on iOS 16 and newer. Changing
 Info.plist alone cannot make it an iOS 15 application.
 
-The YTKACE dylib itself targets iOS 15 and can be repacked into an older
+The YTzoom dylib itself targets iOS 15 and can be repacked into an older
 YouTube baseline that also targets iOS 15.
 
 ## Architectures
 
-YTKACE builds arm64. The supplied YouTube executable is arm64, including on
+YTzoom builds arm64. The supplied YouTube executable is arm64, including on
 devices that support arm64e.
 
 ## YouTube updates

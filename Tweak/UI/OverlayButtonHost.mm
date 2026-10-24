@@ -1,5 +1,5 @@
 #import "OverlayButtonHost.h"
-#import "../YTKACE.h"
+#import "../YTzoom.h"
 #import "../Runtime/Hooking.h"
 #import "../Runtime/Preferences.h"
 
@@ -13,13 +13,13 @@ static IMP OriginalControlsSetControlsVisible;
 static IMP OriginalVideoSetOverlayVisible;
 static IMP OriginalVideoSetControlsVisible;
 static IMP OriginalControlsSetHidden;
-static const void *YTKACEOverlayStackAssociation = &YTKACEOverlayStackAssociation;
-static const void *YTKACEOverlayTrailingAssociation = &YTKACEOverlayTrailingAssociation;
-static const void *YTKACEOverlayAlignmentAssociation = &YTKACEOverlayAlignmentAssociation;
-static NSMutableArray<NSDictionary *> *YTKACEOverlayConfigurators;
-static BOOL YTKACENativeControlsVisible = YES;
+static const void *YTzoomOverlayStackAssociation = &YTzoomOverlayStackAssociation;
+static const void *YTzoomOverlayTrailingAssociation = &YTzoomOverlayTrailingAssociation;
+static const void *YTzoomOverlayAlignmentAssociation = &YTzoomOverlayAlignmentAssociation;
+static NSMutableArray<NSDictionary *> *YTzoomOverlayConfigurators;
+static BOOL YTzoomNativeControlsVisible = YES;
 
-static void YTKACEFindSettingsControlInView(UIView *view,
+static void YTzoomFindSettingsControlInView(UIView *view,
                                             UIView *excluded,
                                             UIView *coordinateView,
                                             UIView **best,
@@ -51,12 +51,12 @@ static void YTKACEFindSettingsControlInView(UIView *view,
         }
     }
     for (UIView *subview in view.subviews) {
-        YTKACEFindSettingsControlInView(subview, excluded, coordinateView,
+        YTzoomFindSettingsControlInView(subview, excluded, coordinateView,
                                         best, bestScore);
     }
 }
 
-static BOOL YTKACEIsTopTrailingControl(UIView *view, UIView *overlay) {
+static BOOL YTzoomIsTopTrailingControl(UIView *view, UIView *overlay) {
     CGRect frame = [view convertRect:view.bounds toView:overlay];
     CGFloat width = CGRectGetWidth(overlay.bounds);
     CGFloat height = CGRectGetHeight(overlay.bounds);
@@ -67,7 +67,7 @@ static BOOL YTKACEIsTopTrailingControl(UIView *view, UIView *overlay) {
         CGRectIntersectsRect(frame, overlay.bounds);
 }
 
-static UIView *YTKACEOverflowControl(UIView *overlay) {
+static UIView *YTzoomOverflowControl(UIView *overlay) {
     SEL selector = NSSelectorFromString(@"overflowButton");
     if (![overlay respondsToSelector:selector]) return nil;
     UIView *button = ((id (*)(id, SEL))objc_msgSend)(overlay, selector);
@@ -75,38 +75,38 @@ static UIView *YTKACEOverflowControl(UIView *overlay) {
         button.alpha < 0.05 || CGRectIsEmpty(button.bounds)) {
         return nil;
     }
-    return YTKACEIsTopTrailingControl(button, overlay) ? button : nil;
+    return YTzoomIsTopTrailingControl(button, overlay) ? button : nil;
 }
 
-static UIView *YTKACEFindSettingsControl(UIView *overlay, UIView *excluded) {
+static UIView *YTzoomFindSettingsControl(UIView *overlay, UIView *excluded) {
     UIView *best = nil;
     CGFloat bestScore = -CGFLOAT_MAX;
-    YTKACEFindSettingsControlInView(overlay, excluded, overlay,
+    YTzoomFindSettingsControlInView(overlay, excluded, overlay,
                                     &best, &bestScore);
     if (best == nil && overlay.window != nil) {
-        YTKACEFindSettingsControlInView(overlay.window, excluded, overlay,
+        YTzoomFindSettingsControlInView(overlay.window, excluded, overlay,
                                         &best, &bestScore);
     }
     return best;
 }
 
-static NSMutableDictionary *YTKACEAlignmentState(UIView *overlay) {
+static NSMutableDictionary *YTzoomAlignmentState(UIView *overlay) {
     NSMutableDictionary *state = objc_getAssociatedObject(
-        overlay, YTKACEOverlayAlignmentAssociation);
+        overlay, YTzoomOverlayAlignmentAssociation);
     if (state == nil) {
         state = [NSMutableDictionary dictionary];
-        objc_setAssociatedObject(overlay, YTKACEOverlayAlignmentAssociation,
+        objc_setAssociatedObject(overlay, YTzoomOverlayAlignmentAssociation,
                                  state, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     return state;
 }
 
-static BOOL YTKACEAlignOverlayStack(UIView *overlay, UIStackView *stack) {
+static BOOL YTzoomAlignOverlayStack(UIView *overlay, UIStackView *stack) {
     NSLayoutConstraint *trailing = objc_getAssociatedObject(
-        overlay, YTKACEOverlayTrailingAssociation);
+        overlay, YTzoomOverlayTrailingAssociation);
     if (trailing == nil) return NO;
 
-    NSMutableDictionary *state = YTKACEAlignmentState(overlay);
+    NSMutableDictionary *state = YTzoomAlignmentState(overlay);
     CGSize size = overlay.bounds.size;
     CGSize oldSize = [state[@"size"] CGSizeValue];
     if (fabs(size.width - oldSize.width) > 1.0 ||
@@ -121,8 +121,8 @@ static BOOL YTKACEAlignOverlayStack(UIView *overlay, UIStackView *stack) {
     CGFloat constant = fillsLandscapeWindow ? -20.0 : -8.0;
     NSNumber *previous = state[@"constant"];
     BOOL hasGearAlignment = [state[@"hasGearAlignment"] boolValue];
-    UIView *gear = YTKACEOverflowControl(overlay) ?:
-        YTKACEFindSettingsControl(overlay, stack);
+    UIView *gear = YTzoomOverflowControl(overlay) ?:
+        YTzoomFindSettingsControl(overlay, stack);
     if (gear != nil) {
         CGRect frame = [gear.superview convertRect:gear.frame toView:overlay];
         CGFloat safeTrailing = CGRectGetMaxX(overlay.safeAreaLayoutGuide.layoutFrame);
@@ -159,13 +159,13 @@ static BOOL YTKACEAlignOverlayStack(UIView *overlay, UIStackView *stack) {
     return ready;
 }
 
-static BOOL YTKACEKeepControlsVisible(void) {
-    return YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.AlwaysShowControls") ||
-        YTKACEFeatureEnabled(@"YTKACE.Preference.Overlay.AlwaysShowControls");
+static BOOL YTzoomKeepControlsVisible(void) {
+    return YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.AlwaysShowControls") ||
+        YTzoomFeatureEnabled(@"YTzoom.Preference.Overlay.AlwaysShowControls");
 }
 
-static void YTKACESetHostedControlsHidden(UIView *view, BOOL hidden) {
-    if ([view.accessibilityIdentifier isEqualToString:@"YTKACEOverlayControls"]) {
+static void YTzoomSetHostedControlsHidden(UIView *view, BOOL hidden) {
+    if ([view.accessibilityIdentifier isEqualToString:@"YTzoomOverlayControls"]) {
         BOOL visible = !hidden;
         view.userInteractionEnabled = visible;
         if (visible) {
@@ -184,57 +184,57 @@ static void YTKACESetHostedControlsHidden(UIView *view, BOOL hidden) {
         return;
     }
     for (UIView *subview in view.subviews) {
-        YTKACESetHostedControlsHidden(subview, hidden);
+        YTzoomSetHostedControlsHidden(subview, hidden);
     }
 }
 
-static void YTKACEUpdateHostedVisibility(UIView *receiver, BOOL visible) {
-    YTKACENativeControlsVisible = visible;
-    YTKACESetHostedControlsHidden(receiver, !visible);
+static void YTzoomUpdateHostedVisibility(UIView *receiver, BOOL visible) {
+    YTzoomNativeControlsVisible = visible;
+    YTzoomSetHostedControlsHidden(receiver, !visible);
 }
 
-static void YTKACEControlsSetOverlayVisible(UIView *receiver, SEL selector, BOOL visible) {
-    visible = visible || YTKACEKeepControlsVisible();
+static void YTzoomControlsSetOverlayVisible(UIView *receiver, SEL selector, BOOL visible) {
+    visible = visible || YTzoomKeepControlsVisible();
     if (OriginalControlsSetOverlayVisible != NULL) {
         ((void (*)(id, SEL, BOOL))OriginalControlsSetOverlayVisible)(receiver, selector, visible);
     }
-    YTKACEUpdateHostedVisibility(receiver, visible);
+    YTzoomUpdateHostedVisibility(receiver, visible);
 }
 
-static void YTKACEControlsSetControlsVisible(UIView *receiver, SEL selector, BOOL visible) {
-    visible = visible || YTKACEKeepControlsVisible();
+static void YTzoomControlsSetControlsVisible(UIView *receiver, SEL selector, BOOL visible) {
+    visible = visible || YTzoomKeepControlsVisible();
     if (OriginalControlsSetControlsVisible != NULL) {
         ((void (*)(id, SEL, BOOL))OriginalControlsSetControlsVisible)(receiver, selector, visible);
     }
-    YTKACEUpdateHostedVisibility(receiver, visible);
+    YTzoomUpdateHostedVisibility(receiver, visible);
 }
 
-static void YTKACEVideoSetOverlayVisible(UIView *receiver, SEL selector, BOOL visible) {
-    visible = visible || YTKACEKeepControlsVisible();
+static void YTzoomVideoSetOverlayVisible(UIView *receiver, SEL selector, BOOL visible) {
+    visible = visible || YTzoomKeepControlsVisible();
     if (OriginalVideoSetOverlayVisible != NULL) {
         ((void (*)(id, SEL, BOOL))OriginalVideoSetOverlayVisible)(receiver, selector, visible);
     }
-    YTKACEUpdateHostedVisibility(receiver, visible);
+    YTzoomUpdateHostedVisibility(receiver, visible);
 }
 
-static void YTKACEVideoSetControlsVisible(UIView *receiver, SEL selector, BOOL visible) {
-    visible = visible || YTKACEKeepControlsVisible();
+static void YTzoomVideoSetControlsVisible(UIView *receiver, SEL selector, BOOL visible) {
+    visible = visible || YTzoomKeepControlsVisible();
     if (OriginalVideoSetControlsVisible != NULL) {
         ((void (*)(id, SEL, BOOL))OriginalVideoSetControlsVisible)(receiver, selector, visible);
     }
-    YTKACEUpdateHostedVisibility(receiver, visible);
+    YTzoomUpdateHostedVisibility(receiver, visible);
 }
 
-static void YTKACEControlsSetHidden(UIView *receiver, SEL selector, BOOL hidden) {
-    hidden = hidden && !YTKACEKeepControlsVisible();
+static void YTzoomControlsSetHidden(UIView *receiver, SEL selector, BOOL hidden) {
+    hidden = hidden && !YTzoomKeepControlsVisible();
     if (OriginalControlsSetHidden != NULL) {
         ((void (*)(id, SEL, BOOL))OriginalControlsSetHidden)(receiver, selector, hidden);
     }
-    YTKACEUpdateHostedVisibility(receiver, !hidden);
+    YTzoomUpdateHostedVisibility(receiver, !hidden);
 }
 
-static UIStackView *YTKACEStackForOverlay(UIView *overlay) {
-    UIStackView *stack = objc_getAssociatedObject(overlay, YTKACEOverlayStackAssociation);
+static UIStackView *YTzoomStackForOverlay(UIView *overlay) {
+    UIStackView *stack = objc_getAssociatedObject(overlay, YTzoomOverlayStackAssociation);
     if (stack != nil) {
         return stack;
     }
@@ -247,10 +247,10 @@ static UIStackView *YTKACEStackForOverlay(UIView *overlay) {
     stack.layoutMargins = UIEdgeInsetsZero;
     stack.layoutMarginsRelativeArrangement = YES;
     stack.backgroundColor = UIColor.clearColor;
-    stack.alpha = YTKACENativeControlsVisible ? 1.0 : 0.0;
-    stack.userInteractionEnabled = YTKACENativeControlsVisible;
+    stack.alpha = YTzoomNativeControlsVisible ? 1.0 : 0.0;
+    stack.userInteractionEnabled = YTzoomNativeControlsVisible;
     stack.translatesAutoresizingMaskIntoConstraints = NO;
-    stack.accessibilityIdentifier = @"YTKACEOverlayControls";
+    stack.accessibilityIdentifier = @"YTzoomOverlayControls";
 
     [overlay addSubview:stack];
     NSLayoutConstraint *trailing =
@@ -261,16 +261,16 @@ static UIStackView *YTKACEStackForOverlay(UIView *overlay) {
         [stack.topAnchor constraintEqualToAnchor:overlay.safeAreaLayoutGuide.topAnchor constant:50.0],
         [stack.heightAnchor constraintEqualToConstant:40.0]
     ]];
-    objc_setAssociatedObject(overlay, YTKACEOverlayTrailingAssociation,
+    objc_setAssociatedObject(overlay, YTzoomOverlayTrailingAssociation,
                              trailing, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(overlay,
-                             YTKACEOverlayStackAssociation,
+                             YTzoomOverlayStackAssociation,
                              stack,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return stack;
 }
 
-UIButton *YTKACEOverlayButton(UIStackView *stack,
+UIButton *YTzoomOverlayButton(UIStackView *stack,
                               NSString *identifier,
                               NSString *symbolName,
                               id target,
@@ -304,21 +304,21 @@ UIButton *YTKACEOverlayButton(UIStackView *stack,
     return button;
 }
 
-static void YTKACEControlsOverlayLayout(UIView *receiver, SEL selector) {
+static void YTzoomControlsOverlayLayout(UIView *receiver, SEL selector) {
     if (OriginalControlsOverlayLayout != NULL) {
         ((void (*)(id, SEL))OriginalControlsOverlayLayout)(receiver, selector);
     }
 
-    UIStackView *stack = YTKACEStackForOverlay(receiver);
+    UIStackView *stack = YTzoomStackForOverlay(receiver);
     NSArray<NSDictionary *> *configurators = nil;
-    @synchronized (YTKACEOverlayConfigurators) {
-        configurators = [YTKACEOverlayConfigurators copy];
+    @synchronized (YTzoomOverlayConfigurators) {
+        configurators = [YTzoomOverlayConfigurators copy];
     }
     for (NSDictionary *entry in configurators) {
-        YTKACEOverlayConfigurator configurator = entry[@"block"];
+        YTzoomOverlayConfigurator configurator = entry[@"block"];
         configurator(receiver, stack);
     }
-    BOOL aligned = YTKACEAlignOverlayStack(receiver, stack);
+    BOOL aligned = YTzoomAlignOverlayStack(receiver, stack);
 
     BOOL visible = NO;
     for (UIView *view in stack.arrangedSubviews) {
@@ -330,56 +330,56 @@ static void YTKACEControlsOverlayLayout(UIView *receiver, SEL selector) {
     stack.hidden = !visible || !aligned;
 }
 
-void YTKACERegisterOverlayConfigurator(NSString *identifier,
-                                       YTKACEOverlayConfigurator configurator) {
+void YTzoomRegisterOverlayConfigurator(NSString *identifier,
+                                       YTzoomOverlayConfigurator configurator) {
     if (identifier.length == 0 || configurator == nil) {
         return;
     }
 
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        YTKACEOverlayConfigurators = [NSMutableArray array];
+        YTzoomOverlayConfigurators = [NSMutableArray array];
     });
 
-    @synchronized (YTKACEOverlayConfigurators) {
-        for (NSDictionary *entry in YTKACEOverlayConfigurators) {
+    @synchronized (YTzoomOverlayConfigurators) {
+        for (NSDictionary *entry in YTzoomOverlayConfigurators) {
             if ([entry[@"identifier"] isEqualToString:identifier]) {
                 return;
             }
         }
-        [YTKACEOverlayConfigurators addObject:@{
+        [YTzoomOverlayConfigurators addObject:@{
             @"identifier": identifier,
             @"block": [configurator copy]
         }];
     }
 
-    YTKACEInstallInstanceHook(@"YTMainAppControlsOverlayView",
+    YTzoomInstallInstanceHook(@"YTMainAppControlsOverlayView",
                               @"layoutSubviews",
-                              (IMP)YTKACEControlsOverlayLayout,
+                              (IMP)YTzoomControlsOverlayLayout,
                               &OriginalControlsOverlayLayout);
-    YTKACEInstallInstanceHook(@"YTMainAppControlsOverlayView",
+    YTzoomInstallInstanceHook(@"YTMainAppControlsOverlayView",
                               @"setOverlayVisible:",
-                              (IMP)YTKACEControlsSetOverlayVisible,
+                              (IMP)YTzoomControlsSetOverlayVisible,
                               &OriginalControlsSetOverlayVisible);
-    YTKACEInstallInstanceHook(@"YTMainAppControlsOverlayView",
+    YTzoomInstallInstanceHook(@"YTMainAppControlsOverlayView",
                               @"setControlsOverlayVisible:",
-                              (IMP)YTKACEControlsSetControlsVisible,
+                              (IMP)YTzoomControlsSetControlsVisible,
                               &OriginalControlsSetControlsVisible);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayView",
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayView",
                               @"setOverlayVisible:",
-                              (IMP)YTKACEVideoSetOverlayVisible,
+                              (IMP)YTzoomVideoSetOverlayVisible,
                               &OriginalVideoSetOverlayVisible);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayView",
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayView",
                               @"setControlsOverlayVisible:",
-                              (IMP)YTKACEVideoSetControlsVisible,
+                              (IMP)YTzoomVideoSetControlsVisible,
                               &OriginalVideoSetControlsVisible);
-    YTKACEInstallInstanceHook(@"YTMainAppControlsOverlayView",
+    YTzoomInstallInstanceHook(@"YTMainAppControlsOverlayView",
                               @"setHidden:",
-                              (IMP)YTKACEControlsSetHidden,
+                              (IMP)YTzoomControlsSetHidden,
                               &OriginalControlsSetHidden);
 }
 
-static UIViewController *YTKACESheetPresenter(UIView *sourceView) {
+static UIViewController *YTzoomSheetPresenter(UIView *sourceView) {
     UIResponder *responder = sourceView;
     for (NSUInteger depth = 0; responder != nil && depth < 20; depth++) {
         SEL eventsSelector = NSSelectorFromString(@"eventsDelegate");
@@ -395,7 +395,7 @@ static UIViewController *YTKACESheetPresenter(UIView *sourceView) {
     return nil;
 }
 
-id YTKACEMakeSheet(NSString *title, NSString *subtitle) {
+id YTzoomMakeSheet(NSString *title, NSString *subtitle) {
     Class sheetClass = NSClassFromString(@"YTDefaultSheetController");
     if (sheetClass == Nil) return nil;
     SEL init = NSSelectorFromString(
@@ -409,14 +409,14 @@ id YTKACEMakeSheet(NSString *title, NSString *subtitle) {
     return ((id (*)(id, SEL, id, id, id, id))objc_msgSend)(sheetClass, makeSheet, title, subtitle, nil, nil);
 }
 
-BOOL YTKACEShowSheet(id sheet, UIViewController *presenter) {
+BOOL YTzoomShowSheet(id sheet, UIViewController *presenter) {
     SEL present = NSSelectorFromString(@"presentFromViewController:animated:completion:");
     if (sheet == nil || presenter == nil || ![sheet respondsToSelector:present]) return NO;
     ((void (*)(id, SEL, id, BOOL, id))objc_msgSend)(sheet, present, presenter, YES, nil);
     return YES;
 }
 
-void YTKACEPresentNativeSheet(NSString *title,
+void YTzoomPresentNativeSheet(NSString *title,
                               NSString *subtitle,
                               UIView *sourceView,
                               NSArray<NSDictionary *> *actions) {
@@ -436,7 +436,7 @@ void YTKACEPresentNativeSheet(NSString *title,
         ![actionClass respondsToSelector:makeSimple]) {
         return;
     }
-    id sheet = YTKACEMakeSheet(title.length != 0 ? title : nil, subtitle.length != 0 ? subtitle : nil);
+    id sheet = YTzoomMakeSheet(title.length != 0 ? title : nil, subtitle.length != 0 ? subtitle : nil);
     if (sheet == nil || ![sheet respondsToSelector:addAction]) return;
 
     for (NSDictionary *item in actions) {
@@ -476,5 +476,5 @@ void YTKACEPresentNativeSheet(NSString *title,
         }
     }
 
-    YTKACEShowSheet(sheet, YTKACESheetPresenter(sourceView));
+    YTzoomShowSheet(sheet, YTzoomSheetPresenter(sourceView));
 }

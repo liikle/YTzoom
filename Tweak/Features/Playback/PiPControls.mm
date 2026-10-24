@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Localization.h"
 #import "../../Runtime/Preferences.h"
 #import "../Downloads/DownloadCoordinator.h"
@@ -12,7 +12,7 @@
 #import <math.h>
 #import <objc/message.h>
 
-@interface YTKACEPiPCoordinator : NSObject <AVPictureInPictureControllerDelegate>
+@interface YTzoomPiPCoordinator : NSObject <AVPictureInPictureControllerDelegate>
 + (instancetype)sharedCoordinator;
 @property(nonatomic, weak) UIView *overlay;
 @property(nonatomic, strong) AVPictureInPictureController *controller;
@@ -27,13 +27,13 @@
 - (void)togglePiP;
 @end
 
-@implementation YTKACEPiPCoordinator
+@implementation YTzoomPiPCoordinator
 
 + (instancetype)sharedCoordinator {
-    static YTKACEPiPCoordinator *coordinator;
+    static YTzoomPiPCoordinator *coordinator;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        coordinator = [YTKACEPiPCoordinator new];
+        coordinator = [YTzoomPiPCoordinator new];
     });
     return coordinator;
 }
@@ -113,7 +113,7 @@
             }
         }
     }
-    return YTKACEDownloadCoordinator.sharedCoordinator.playerResponse;
+    return YTzoomDownloadCoordinator.sharedCoordinator.playerResponse;
 }
 
 - (id)activeYouTubePlayer {
@@ -189,7 +189,7 @@
     spinner.frame = CGRectMake(57.0, 12.0, 40.0, 40.0);
     [spinner startAnimating];
     UILabel *label = [[UILabel alloc] initWithFrame:CGRectMake(8.0, 56.0, 138.0, 24.0)];
-    label.text = YTKACELocalized(@"Loading PiP");
+    label.text = YTzoomLocalized(@"Loading PiP");
     label.textColor = UIColor.whiteColor;
     label.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightSemibold];
     label.textAlignment = NSTextAlignmentCenter;
@@ -222,7 +222,7 @@
             return;
         }
     }
-    YTKACEShowNotice([NSString stringWithFormat:@"Picture in Picture\n%@", message]);
+    YTzoomShowNotice([NSString stringWithFormat:@"Picture in Picture\n%@", message]);
 }
 
 - (void)stopObservingItem {
@@ -247,7 +247,7 @@
 }
 
 - (void)togglePiP {
-    if (!YTKACEFeatureEnabled(YTKACEPiPKey)) {
+    if (!YTzoomFeatureEnabled(YTzoomPiPKey)) {
         return;
     }
     if (self.controller.isPictureInPictureActive) {
@@ -263,7 +263,7 @@
     [self clearPlayer];
     self.youtubePlayer = [self activeYouTubePlayer];
     NSTimeInterval currentTime = [self currentVideoTime];
-    YTKACEStreamOption *option = [YTKACEStreamResolver
+    YTzoomStreamOption *option = [YTzoomStreamResolver
         bestPiPVideoFromPlayerResponse:[self currentPlayerResponse]];
     if (option != nil) {
         [self pauseYouTubePlayer];
@@ -383,23 +383,23 @@
 
 @end
 
-void YTKACEInstallPiPHooks(void) {
-    YTKACERegisterOverlayConfigurator(@"pip", ^(UIView *overlay, UIStackView *stack) {
-        YTKACEPiPCoordinator.sharedCoordinator.overlay = overlay;
-        UIButton *button = YTKACEOverlayButton(
+void YTzoomInstallPiPHooks(void) {
+    YTzoomRegisterOverlayConfigurator(@"pip", ^(UIView *overlay, UIStackView *stack) {
+        YTzoomPiPCoordinator.sharedCoordinator.overlay = overlay;
+        UIButton *button = YTzoomOverlayButton(
             stack,
-            @"YTKACE PiP",
+            @"YTzoom PiP",
             @"pip",
-            YTKACEPiPCoordinator.sharedCoordinator,
+            YTzoomPiPCoordinator.sharedCoordinator,
             @selector(togglePiP)
         );
         UIImageSymbolConfiguration *configuration =
             [UIImageSymbolConfiguration configurationWithPointSize:21.0
                                                             weight:UIImageSymbolWeightMedium];
-        [button setImage:[[YTKACEAssetImage(@"picture_in_picture_24pt_3x_Normal", @"pip")
+        [button setImage:[[YTzoomAssetImage(@"picture_in_picture_24pt_3x_Normal", @"pip")
             imageByApplyingSymbolConfiguration:configuration]
             imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
                   forState:UIControlStateNormal];
-        button.hidden = !YTKACEFeatureEnabled(YTKACEPiPKey);
+        button.hidden = !YTzoomFeatureEnabled(YTzoomPiPKey);
     });
 }

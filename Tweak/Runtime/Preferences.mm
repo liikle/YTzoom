@@ -4,31 +4,31 @@
 
 #import <UIKit/UIKit.h>
 
-NSString * const YTKACEMasterEnabledKey = @"YTKACE.Preference.Enabled";
-NSString * const YTKACEOLEDKey = @"YTKACE.Preference.Appearance.OLED";
-NSString * const YTKACENoAdsKey = @"YTKACE.Preference.Ads.Blocking";
-NSString * const YTKACESponsorBlockKey = @"YTKACE.Preference.SponsorBlock.Enabled";
-NSString * const YTKACEDownloadKey = @"YTKACE.Preference.Downloads.Enabled";
-NSString * const YTKACEBackgroundPlaybackKey = @"YTKACE.Preference.Playback.BackgroundAudio";
-NSString * const YTKACEPiPKey = @"YTKACE.Preference.Player.PiP";
-NSString * const YTKACESpeedKey = @"YTKACE.Preference.Player.SpeedControls";
-NSString * const YTKACELoopKey = @"YTKACE.Preference.Player.Loop";
-NSString * const YTKACESleepTimerKey = @"YTKACE.Preference.Player.SleepTimer";
-NSString * const YTKACEPreferencesDidChangeNotification =
-    @"YTKACEPreferencesDidChangeNotification";
+NSString * const YTzoomMasterEnabledKey = @"YTzoom.Preference.Enabled";
+NSString * const YTzoomOLEDKey = @"YTzoom.Preference.Appearance.OLED";
+NSString * const YTzoomNoAdsKey = @"YTzoom.Preference.Ads.Blocking";
+NSString * const YTzoomSponsorBlockKey = @"YTzoom.Preference.SponsorBlock.Enabled";
+NSString * const YTzoomDownloadKey = @"YTzoom.Preference.Downloads.Enabled";
+NSString * const YTzoomBackgroundPlaybackKey = @"YTzoom.Preference.Playback.BackgroundAudio";
+NSString * const YTzoomPiPKey = @"YTzoom.Preference.Player.PiP";
+NSString * const YTzoomSpeedKey = @"YTzoom.Preference.Player.SpeedControls";
+NSString * const YTzoomLoopKey = @"YTzoom.Preference.Player.Loop";
+NSString * const YTzoomSleepTimerKey = @"YTzoom.Preference.Player.SleepTimer";
+NSString * const YTzoomPreferencesDidChangeNotification =
+    @"YTzoomPreferencesDidChangeNotification";
 
-static NSUserDefaults *YTKACEDefaults(void) {
+static NSUserDefaults *YTzoomDefaults(void) {
     return NSUserDefaults.standardUserDefaults;
 }
 
-static void YTKACEAnnouncePreferenceChange(NSString *key) {
+static void YTzoomAnnouncePreferenceChange(NSString *key) {
     if (key.length == 0) return;
-    if ([key isEqualToString:@"YTKACE.Preference.Language"]) {
-        YTKACEResetLocalizationCache();
+    if ([key isEqualToString:@"YTzoom.Preference.Language"]) {
+        YTzoomResetLocalizationCache();
     }
     void (^post)(void) = ^{
         [NSNotificationCenter.defaultCenter
-            postNotificationName:YTKACEPreferencesDidChangeNotification
+            postNotificationName:YTzoomPreferencesDidChangeNotification
                           object:nil
                         userInfo:@{@"key": key}];
     };
@@ -39,120 +39,146 @@ static void YTKACEAnnouncePreferenceChange(NSString *key) {
     }
 }
 
-void YTKACERegisterDefaults(void) {
-    id legacyBrightnessSide = [YTKACEDefaults()
-        objectForKey:@"YTKACE.Preference.Gestures.BrightnessSide"];
-    id legacyVolumeSide = [YTKACEDefaults()
-        objectForKey:@"YTKACE.Preference.Gestures.VolumeSide"];
-    BOOL hasLeftAction = [YTKACEDefaults()
-        objectForKey:@"YTKACE.Preference.Gestures.LeftAction"] != nil;
-    BOOL hasRightAction = [YTKACEDefaults()
-        objectForKey:@"YTKACE.Preference.Gestures.RightAction"] != nil;
-    id legacyDownloadButton = [YTKACEDefaults()
-        objectForKey:@"YTKACE.Preference.Downloads.Enabled"];
-    BOOL hasPlacement = [YTKACEDefaults()
-        objectForKey:@"YTKACE.Preference.Downloads.Placement"] != nil;
-    [YTKACEDefaults() registerDefaults:@{
-        YTKACEMasterEnabledKey: @YES,
-        YTKACENoAdsKey: @YES,
-        YTKACEOLEDKey: @NO,
-        YTKACEDownloadKey: @NO,
-        YTKACEBackgroundPlaybackKey: @YES,
-        YTKACEPiPKey: @NO,
-        YTKACESpeedKey: @NO,
-        YTKACELoopKey: @NO,
-        @"YTKACE.Preference.Playback.CustomDoubleTap": @NO,
-        @"YTKACE.Preference.Playback.TapToSeek": @NO,
-        @"YTKACE.Preference.Sharing.NativeSheet": @NO,
-        @"YTKACE.Preference.Playback.OpenPaused": @NO,
-        @"YTKACE.Preference.Playback.Transcript": @NO,
-        @"YTKACE.Preference.Downloads.Subtitles": @NO,
-        @"YTKACE.Preference.Playback.CaptionLanguage": @"",
-        @"YTKACE.Preference.Shorts.PinchFullscreen": @NO,
-        @"YTKACE.Preference.Shorts.RemixHidden": @NO,
-        @"YTKACE.Preference.Shorts.ShareHidden": @NO,
-        @"YTKACE.Preference.Shorts.SaveHidden": @NO,
-        @"YTKACE.Preference.Downloads.PlaylistEnabled": @NO,
-        @"YTKACE.Preference.Downloads.Placement": @0,
-        @"YTKACE.Preference.Shorts.CommentsHidden": @NO,
-        @"YTKACE.Preference.Shorts.LikeHidden": @NO,
-        @"YTKACE.Preference.Shorts.SoundHidden": @NO,
-        @"YTKACE.Preference.Shorts.DownloadPosition": @0,
-        @"YTKACE.Preference.Overlay.ProductsHidden": @NO,
-        @"YTKACE.Preference.Feed.CommunityPostsHidden": @NO,
-        @"YTKACE.Preference.Feed.HorizontalShelvesHidden": @NO,
-        @"YTKACE.Preference.Feed.MixesHidden": @NO,
-        @"YTKACE.Preference.Feed.PlayablesHidden": @NO,
-        @"YTKACE.Preference.Navigation.MessagesHidden": @NO,
-        @"YTKACE.Preference.ActionBar.LikeHidden": @NO,
-        @"YTKACE.Preference.ActionBar.DislikeHidden": @NO,
-        @"YTKACE.Preference.ActionBar.ShareHidden": @NO,
-        @"YTKACE.Preference.ActionBar.DownloadHidden": @NO,
-        @"YTKACE.Preference.ActionBar.SaveHidden": @NO,
-        @"YTKACE.Preference.ActionBar.ClipHidden": @NO,
-        @"YTKACE.Preference.ActionBar.RemixHidden": @NO,
-        @"YTKACE.Preference.ActionBar.ThanksHidden": @NO,
-        @"YTKACE.Preference.ActionBar.HypeHidden": @NO,
-        @"YTKACE.Preference.ActionBar.ReportHidden": @NO,
-        @"YTKACE.Preference.ActionBar.AskHidden": @NO,
-        @"YTKACE.Preference.ActionBar.OverflowHidden": @NO,
-        @"YTKACE.Preference.Overlay.FullscreenActionsHidden": @NO,
-        @"YTKACE.Preference.Player.HoldSpeedEnabled": @NO,
-        @"YTKACE.Preference.Player.HoldSpeedRate": @2.0,
-        @"YTKACE.Preference.Gestures.LandscapeOnly": @NO,
-        @"YTKACE.Preference.Profiles.Preview": @YES,
-        @"YTKACE.Preference.Posts.SaveImage": @YES,
-        @"YTKACE.Preference.Downloads.SaveLocation": @0,
-        @"YTKACE.Preference.Appearance.LaunchAnimationDisabled": @NO,
-        @"YTKACE.Preference.Player.StartRate": @0,
-        @"YTKACE.Preference.Player.CustomRate": @1.5,
-        @"YTKACE.Preference.Playback.DoubleTapSeconds": @10.0,
-        @"YTKACE.Preference.Gestures.HoldSeekSeconds": @10.0,
-        @"YTKACE.Preference.Gestures.VolumeSide": @2,
-        @"YTKACE.Preference.Gestures.BrightnessSide": @2,
-        @"YTKACE.Preference.Gestures.Enabled": @NO,
-        @"YTKACE.Preference.Gestures.ActivationArea": @20.0,
-        @"YTKACE.Preference.Gestures.LeftAction": @0,
-        @"YTKACE.Preference.Gestures.RightAction": @0,
-        @"YTKACE.Preference.Gestures.HUDEnabled": @YES,
-        @"YTKACE.Preference.Gestures.HUDSize": @1,
-        @"YTKACE.Preference.Gestures.HUDPosition": @0,
-        @"YTKACE.Preference.Tabs.Startup": @"",
-        @"YTKACE.Preference.Feed.HomeTabsHidden": @NO,
-        @"YTKACE.Preference.Shorts.LimitEnabled": @NO,
-        @"YTKACE.Preference.Playback.HLSMode": @NO,
-        @"YTKACE.Preference.Playback.Fix": @NO,
-        @"YTKACE.Preference.Shorts.LimitCount": @20,
-        @"YTKACE.Preference.Tabs.FrostedHidden": @NO,
-        @"YTKACE.Preference.Tabs.GlassMinimize": @NO,
-        @"YTKACE.Preference.Tabs.SelectedTint": @0,
-        @"YTKACE.Preference.Glass.Menus": @NO,
-        @"YTKACE.Preference.Glass.Notices": @NO,
-        @"YTKACE.Preference.Glass.Player": @NO,
-        @"YTKACE.Preference.Playback.WiFiQuality": @0,
-        @"YTKACE.Preference.Playback.CellularQuality": @0,
-        @"YTKACE.Preference.SponsorBlock.Mode": @0,
-        @"YTKACE.Preference.SponsorBlock.SkipAlertSeconds": @4.0,
-        @"YTKACE.Preference.SponsorBlock.UnskipAlertSeconds": @4.0,
-        @"YTKACE.Preference.Downloads.ClearOnStartup": @NO,
-        @"YTKACE.Preference.Tabs.Hidden.Create": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.Music": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.Live": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.Gaming": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.News": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.Posts": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.Sports": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.Learning": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.Fashion": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.Playlists": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.History": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.Notifs": @YES,
-        @"YTKACE.Preference.Tabs.Hidden.WatchLater": @YES,
-        @"YTKACE.Preference.Tabs.Order": @[@"home", @"shorts", @"subscriptions", @"library", @"ytkace"]
+// Settings saved before the rename use the YTKACE prefix. Copy them over once.
+static void YTzoomMigrateLegacyPreferences(void) {
+    NSUserDefaults *defaults = YTzoomDefaults();
+    if ([defaults boolForKey:@"YTzoom.Migration.LegacyPreferences"]) return;
+    NSDictionary<NSString *, id> *stored = defaults.dictionaryRepresentation;
+    for (NSString *key in stored) {
+        if (![key hasPrefix:@"YTKACE."]) continue;
+        NSString *renamed = [@"YTzoom." stringByAppendingString:[key substringFromIndex:7]];
+        renamed = [renamed stringByReplacingOccurrencesOfString:@"YTKACE" withString:@"YTzoom"];
+        if ([defaults objectForKey:renamed] == nil) {
+            id value = stored[key];
+            if ([value isKindOfClass:NSArray.class]) {
+                NSMutableArray *values = [NSMutableArray array];
+                for (id entry in (NSArray *)value) {
+                    [values addObject:[entry isEqual:@"ytkace"] ? @"ytzoom" : entry];
+                }
+                value = values;
+            }
+            [defaults setObject:value forKey:renamed];
+        }
+        [defaults removeObjectForKey:key];
+    }
+    [defaults setBool:YES forKey:@"YTzoom.Migration.LegacyPreferences"];
+}
+
+void YTzoomRegisterDefaults(void) {
+    YTzoomMigrateLegacyPreferences();
+    id legacyBrightnessSide = [YTzoomDefaults()
+        objectForKey:@"YTzoom.Preference.Gestures.BrightnessSide"];
+    id legacyVolumeSide = [YTzoomDefaults()
+        objectForKey:@"YTzoom.Preference.Gestures.VolumeSide"];
+    BOOL hasLeftAction = [YTzoomDefaults()
+        objectForKey:@"YTzoom.Preference.Gestures.LeftAction"] != nil;
+    BOOL hasRightAction = [YTzoomDefaults()
+        objectForKey:@"YTzoom.Preference.Gestures.RightAction"] != nil;
+    id legacyDownloadButton = [YTzoomDefaults()
+        objectForKey:@"YTzoom.Preference.Downloads.Enabled"];
+    BOOL hasPlacement = [YTzoomDefaults()
+        objectForKey:@"YTzoom.Preference.Downloads.Placement"] != nil;
+    [YTzoomDefaults() registerDefaults:@{
+        YTzoomMasterEnabledKey: @YES,
+        YTzoomNoAdsKey: @YES,
+        YTzoomOLEDKey: @NO,
+        YTzoomDownloadKey: @NO,
+        YTzoomBackgroundPlaybackKey: @YES,
+        YTzoomPiPKey: @NO,
+        YTzoomSpeedKey: @NO,
+        YTzoomLoopKey: @NO,
+        @"YTzoom.Preference.Playback.CustomDoubleTap": @NO,
+        @"YTzoom.Preference.Playback.TapToSeek": @NO,
+        @"YTzoom.Preference.Sharing.NativeSheet": @NO,
+        @"YTzoom.Preference.Playback.OpenPaused": @NO,
+        @"YTzoom.Preference.Playback.Transcript": @NO,
+        @"YTzoom.Preference.Downloads.Subtitles": @NO,
+        @"YTzoom.Preference.Playback.CaptionLanguage": @"",
+        @"YTzoom.Preference.Shorts.PinchFullscreen": @NO,
+        @"YTzoom.Preference.Shorts.RemixHidden": @NO,
+        @"YTzoom.Preference.Shorts.ShareHidden": @NO,
+        @"YTzoom.Preference.Shorts.SaveHidden": @NO,
+        @"YTzoom.Preference.Downloads.PlaylistEnabled": @NO,
+        @"YTzoom.Preference.Downloads.Placement": @0,
+        @"YTzoom.Preference.Shorts.CommentsHidden": @NO,
+        @"YTzoom.Preference.Shorts.LikeHidden": @NO,
+        @"YTzoom.Preference.Shorts.SoundHidden": @NO,
+        @"YTzoom.Preference.Shorts.DownloadPosition": @0,
+        @"YTzoom.Preference.Overlay.ProductsHidden": @NO,
+        @"YTzoom.Preference.Feed.CommunityPostsHidden": @NO,
+        @"YTzoom.Preference.Feed.HorizontalShelvesHidden": @NO,
+        @"YTzoom.Preference.Feed.MixesHidden": @NO,
+        @"YTzoom.Preference.Feed.PlayablesHidden": @NO,
+        @"YTzoom.Preference.Navigation.MessagesHidden": @NO,
+        @"YTzoom.Preference.ActionBar.LikeHidden": @NO,
+        @"YTzoom.Preference.ActionBar.DislikeHidden": @NO,
+        @"YTzoom.Preference.ActionBar.ShareHidden": @NO,
+        @"YTzoom.Preference.ActionBar.DownloadHidden": @NO,
+        @"YTzoom.Preference.ActionBar.SaveHidden": @NO,
+        @"YTzoom.Preference.ActionBar.ClipHidden": @NO,
+        @"YTzoom.Preference.ActionBar.RemixHidden": @NO,
+        @"YTzoom.Preference.ActionBar.ThanksHidden": @NO,
+        @"YTzoom.Preference.ActionBar.HypeHidden": @NO,
+        @"YTzoom.Preference.ActionBar.ReportHidden": @NO,
+        @"YTzoom.Preference.ActionBar.AskHidden": @NO,
+        @"YTzoom.Preference.ActionBar.OverflowHidden": @NO,
+        @"YTzoom.Preference.Overlay.FullscreenActionsHidden": @NO,
+        @"YTzoom.Preference.Player.HoldSpeedEnabled": @NO,
+        @"YTzoom.Preference.Player.HoldSpeedRate": @2.0,
+        @"YTzoom.Preference.Gestures.LandscapeOnly": @NO,
+        @"YTzoom.Preference.Profiles.Preview": @YES,
+        @"YTzoom.Preference.Posts.SaveImage": @YES,
+        @"YTzoom.Preference.Downloads.SaveLocation": @0,
+        @"YTzoom.Preference.Appearance.LaunchAnimationDisabled": @NO,
+        @"YTzoom.Preference.Player.StartRate": @0,
+        @"YTzoom.Preference.Player.CustomRate": @1.5,
+        @"YTzoom.Preference.Playback.DoubleTapSeconds": @10.0,
+        @"YTzoom.Preference.Gestures.HoldSeekSeconds": @10.0,
+        @"YTzoom.Preference.Gestures.VolumeSide": @2,
+        @"YTzoom.Preference.Gestures.BrightnessSide": @2,
+        @"YTzoom.Preference.Gestures.Enabled": @NO,
+        @"YTzoom.Preference.Gestures.ActivationArea": @20.0,
+        @"YTzoom.Preference.Gestures.LeftAction": @0,
+        @"YTzoom.Preference.Gestures.RightAction": @0,
+        @"YTzoom.Preference.Gestures.HUDEnabled": @YES,
+        @"YTzoom.Preference.Gestures.HUDSize": @1,
+        @"YTzoom.Preference.Gestures.HUDPosition": @0,
+        @"YTzoom.Preference.Tabs.Startup": @"",
+        @"YTzoom.Preference.Feed.HomeTabsHidden": @NO,
+        @"YTzoom.Preference.Shorts.LimitEnabled": @NO,
+        @"YTzoom.Preference.Playback.HLSMode": @NO,
+        @"YTzoom.Preference.Playback.Fix": @NO,
+        @"YTzoom.Preference.Shorts.LimitCount": @20,
+        @"YTzoom.Preference.Tabs.FrostedHidden": @NO,
+        @"YTzoom.Preference.Tabs.GlassMinimize": @NO,
+        @"YTzoom.Preference.Tabs.SelectedTint": @0,
+        @"YTzoom.Preference.Glass.Menus": @NO,
+        @"YTzoom.Preference.Glass.Notices": @NO,
+        @"YTzoom.Preference.Glass.Player": @NO,
+        @"YTzoom.Preference.Playback.WiFiQuality": @0,
+        @"YTzoom.Preference.Playback.CellularQuality": @0,
+        @"YTzoom.Preference.SponsorBlock.Mode": @0,
+        @"YTzoom.Preference.SponsorBlock.SkipAlertSeconds": @4.0,
+        @"YTzoom.Preference.SponsorBlock.UnskipAlertSeconds": @4.0,
+        @"YTzoom.Preference.Downloads.ClearOnStartup": @NO,
+        @"YTzoom.Preference.Tabs.Hidden.Create": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.Music": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.Live": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.Gaming": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.News": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.Posts": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.Sports": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.Learning": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.Fashion": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.Playlists": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.History": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.Notifs": @YES,
+        @"YTzoom.Preference.Tabs.Hidden.WatchLater": @YES,
+        @"YTzoom.Preference.Tabs.Order": @[@"home", @"shorts", @"subscriptions", @"library", @"ytzoom"]
     }];
     if (!hasPlacement && [legacyDownloadButton boolValue]) {
-        [YTKACEDefaults() setInteger:1
-                              forKey:@"YTKACE.Preference.Downloads.Placement"];
+        [YTzoomDefaults() setInteger:1
+                              forKey:@"YTzoom.Preference.Downloads.Placement"];
     }
     if ((!hasLeftAction || !hasRightAction) &&
         (legacyBrightnessSide != nil || legacyVolumeSide != nil)) {
@@ -169,59 +195,59 @@ void YTKACERegisterDefaults(void) {
         NSInteger rightAction = rightBrightness && rightVolume
             ? 3 : (rightVolume ? 2 : (rightBrightness ? 1 : 0));
         if (!hasLeftAction) {
-            [YTKACEDefaults() setInteger:leftAction
-                                  forKey:@"YTKACE.Preference.Gestures.LeftAction"];
+            [YTzoomDefaults() setInteger:leftAction
+                                  forKey:@"YTzoom.Preference.Gestures.LeftAction"];
         }
         if (!hasRightAction) {
-            [YTKACEDefaults() setInteger:rightAction
-                                   forKey:@"YTKACE.Preference.Gestures.RightAction"];
+            [YTzoomDefaults() setInteger:rightAction
+                                   forKey:@"YTzoom.Preference.Gestures.RightAction"];
         }
     }
-    [YTKACEDefaults() setBool:YES forKey:YTKACEMasterEnabledKey];
-    if ([YTKACEDefaults() objectForKey:@"YTKACE.Preference.Shorts.ProductsHidden"] != nil) {
-        if ([YTKACEDefaults() boolForKey:@"YTKACE.Preference.Shorts.ProductsHidden"]) {
-            [YTKACEDefaults() setBool:YES
-                               forKey:@"YTKACE.Preference.Overlay.ProductsHidden"];
+    [YTzoomDefaults() setBool:YES forKey:YTzoomMasterEnabledKey];
+    if ([YTzoomDefaults() objectForKey:@"YTzoom.Preference.Shorts.ProductsHidden"] != nil) {
+        if ([YTzoomDefaults() boolForKey:@"YTzoom.Preference.Shorts.ProductsHidden"]) {
+            [YTzoomDefaults() setBool:YES
+                               forKey:@"YTzoom.Preference.Overlay.ProductsHidden"];
         }
-        [YTKACEDefaults() removeObjectForKey:@"YTKACE.Preference.Shorts.ProductsHidden"];
+        [YTzoomDefaults() removeObjectForKey:@"YTzoom.Preference.Shorts.ProductsHidden"];
     }
-    if ([YTKACEDefaults() boolForKey:@"YTKACE.Preference.Downloads.ClearOnStartup"]) {
-        NSDate *lastClear = [YTKACEDefaults() objectForKey:@"YTKACE.Preference.Downloads.LastCacheClear"];
+    if ([YTzoomDefaults() boolForKey:@"YTzoom.Preference.Downloads.ClearOnStartup"]) {
+        NSDate *lastClear = [YTzoomDefaults() objectForKey:@"YTzoom.Preference.Downloads.LastCacheClear"];
         if (![lastClear isKindOfClass:NSDate.class] ||
             -lastClear.timeIntervalSinceNow >= 86400.0) {
-            NSURL *cache = [YTKACEApplicationSupportDirectory()
+            NSURL *cache = [YTzoomApplicationSupportDirectory()
                 URLByAppendingPathComponent:@"Cache"
                                 isDirectory:YES];
             [NSFileManager.defaultManager removeItemAtURL:cache error:nil];
-            YTKACEPurgeSystemCaches();
-            [YTKACEDefaults() setObject:NSDate.date
-                                 forKey:@"YTKACE.Preference.Downloads.LastCacheClear"];
+            YTzoomPurgeSystemCaches();
+            [YTzoomDefaults() setObject:NSDate.date
+                                 forKey:@"YTzoom.Preference.Downloads.LastCacheClear"];
         }
     }
-    YTKACEPurgeDownloadScratch(NO);
+    YTzoomPurgeDownloadScratch(NO);
 }
 
-NSInteger YTKACEDownloadPlacement(void) {
-    return [YTKACEDefaults() integerForKey:@"YTKACE.Preference.Downloads.Placement"];
+NSInteger YTzoomDownloadPlacement(void) {
+    return [YTzoomDefaults() integerForKey:@"YTzoom.Preference.Downloads.Placement"];
 }
 
-BOOL YTKACEDownloadsEnabled(void) {
-    return YTKACEDownloadPlacement() != 0;
+BOOL YTzoomDownloadsEnabled(void) {
+    return YTzoomDownloadPlacement() != 0;
 }
 
-BOOL YTKACEMasterEnabled(void) {
+BOOL YTzoomMasterEnabled(void) {
     return YES;
 }
 
-BOOL YTKACEFeatureEnabled(NSString *key) {
-    if (!YTKACEMasterEnabled() || key.length == 0) {
+BOOL YTzoomFeatureEnabled(NSString *key) {
+    if (!YTzoomMasterEnabled() || key.length == 0) {
         return NO;
     }
-    return [YTKACEDefaults() boolForKey:key];
+    return [YTzoomDefaults() boolForKey:key];
 }
 
-BOOL YTKACEOLEDActive(UITraitCollection *traits) {
-    if (!YTKACEFeatureEnabled(YTKACEOLEDKey)) {
+BOOL YTzoomOLEDActive(UITraitCollection *traits) {
+    if (!YTzoomFeatureEnabled(YTzoomOLEDKey)) {
         return NO;
     }
     UITraitCollection *current = traits;
@@ -242,8 +268,8 @@ BOOL YTKACEOLEDActive(UITraitCollection *traits) {
     return current.userInterfaceStyle == UIUserInterfaceStyleDark;
 }
 
-UIColor *YTKACEInterfaceBackgroundColor(UITraitCollection *traits) {
-    if (YTKACEOLEDActive(traits)) return UIColor.blackColor;
+UIColor *YTzoomInterfaceBackgroundColor(UITraitCollection *traits) {
+    if (YTzoomOLEDActive(traits)) return UIColor.blackColor;
     UIUserInterfaceStyle style = traits.userInterfaceStyle;
     if (style == UIUserInterfaceStyleUnspecified) {
         style = UIScreen.mainScreen.traitCollection.userInterfaceStyle;
@@ -253,8 +279,8 @@ UIColor *YTKACEInterfaceBackgroundColor(UITraitCollection *traits) {
         : UIColor.whiteColor;
 }
 
-UIColor *YTKACEInterfaceSurfaceColor(UITraitCollection *traits) {
-    if (YTKACEOLEDActive(traits)) {
+UIColor *YTzoomInterfaceSurfaceColor(UITraitCollection *traits) {
+    if (YTzoomOLEDActive(traits)) {
         return UIColor.blackColor;
     }
     UIUserInterfaceStyle style = traits.userInterfaceStyle;
@@ -266,48 +292,48 @@ UIColor *YTKACEInterfaceSurfaceColor(UITraitCollection *traits) {
         : [UIColor colorWithWhite:0.95 alpha:1.0];
 }
 
-BOOL YTKACESponsorBlockEnabled(void) {
-    if (!YTKACEMasterEnabled()) {
+BOOL YTzoomSponsorBlockEnabled(void) {
+    if (!YTzoomMasterEnabled()) {
         return NO;
     }
 
-    return [YTKACEDefaults() boolForKey:YTKACESponsorBlockKey];
+    return [YTzoomDefaults() boolForKey:YTzoomSponsorBlockKey];
 }
 
-void YTKACESetPreference(NSString *key, BOOL enabled) {
+void YTzoomSetPreference(NSString *key, BOOL enabled) {
     if (key.length == 0) {
         return;
     }
 
-    if ([key isEqualToString:YTKACEMasterEnabledKey]) {
-        [YTKACEDefaults() setBool:YES forKey:key];
-        YTKACEAnnouncePreferenceChange(key);
+    if ([key isEqualToString:YTzoomMasterEnabledKey]) {
+        [YTzoomDefaults() setBool:YES forKey:key];
+        YTzoomAnnouncePreferenceChange(key);
         return;
     }
-    [YTKACEDefaults() setBool:enabled forKey:key];
-    YTKACEAnnouncePreferenceChange(key);
+    [YTzoomDefaults() setBool:enabled forKey:key];
+    YTzoomAnnouncePreferenceChange(key);
 }
 
-id YTKACEPreferenceObject(NSString *key) {
+id YTzoomPreferenceObject(NSString *key) {
     if (key.length == 0) {
         return nil;
     }
-    return [YTKACEDefaults() objectForKey:key];
+    return [YTzoomDefaults() objectForKey:key];
 }
 
-void YTKACESetPreferenceObject(NSString *key, id value) {
+void YTzoomSetPreferenceObject(NSString *key, id value) {
     if (key.length == 0) {
         return;
     }
     if (value == nil) {
-        [YTKACEDefaults() removeObjectForKey:key];
+        [YTzoomDefaults() removeObjectForKey:key];
     } else {
-        [YTKACEDefaults() setObject:value forKey:key];
+        [YTzoomDefaults() setObject:value forKey:key];
     }
-    YTKACEAnnouncePreferenceChange(key);
+    YTzoomAnnouncePreferenceChange(key);
 }
 
-static NSString *YTKACERelativeStoragePath(NSURL *URL, NSURL *baseURL) {
+static NSString *YTzoomRelativeStoragePath(NSURL *URL, NSURL *baseURL) {
     NSString *path = URL.URLByResolvingSymlinksInPath.path.stringByStandardizingPath;
     NSString *base = baseURL.URLByResolvingSymlinksInPath.path.stringByStandardizingPath;
     NSString *prefix = [base stringByAppendingString:@"/"];
@@ -315,7 +341,7 @@ static NSString *YTKACERelativeStoragePath(NSURL *URL, NSURL *baseURL) {
     return [path substringFromIndex:prefix.length];
 }
 
-static void YTKACERepairDownloads(NSURL *root) {
+static void YTzoomRepairDownloads(NSURL *root) {
     NSFileManager *manager = NSFileManager.defaultManager;
     NSURL *downloads = [root URLByAppendingPathComponent:@"Downloads" isDirectory:YES];
     NSArray<NSURL *> *items = [[manager enumeratorAtURL:downloads
@@ -325,7 +351,7 @@ static void YTKACERepairDownloads(NSURL *root) {
         NSNumber *directory = nil;
         [source getResourceValue:&directory forKey:NSURLIsDirectoryKey error:nil];
         if (directory.boolValue) continue;
-        NSString *relative = YTKACERelativeStoragePath(source, downloads);
+        NSString *relative = YTzoomRelativeStoragePath(source, downloads);
         NSArray<NSString *> *components = relative.pathComponents;
         NSUInteger categoryIndex = NSNotFound;
         NSString *category = nil;
@@ -360,7 +386,7 @@ static void YTKACERepairDownloads(NSURL *root) {
     }
 }
 
-NSUInteger YTKACEPurgeSystemCaches(void) {
+NSUInteger YTzoomPurgeSystemCaches(void) {
     NSFileManager *manager = NSFileManager.defaultManager;
     NSArray<NSURL *> *roots = [manager URLsForDirectory:NSCachesDirectory
                                              inDomains:NSUserDomainMask];
@@ -389,34 +415,41 @@ NSUInteger YTKACEPurgeSystemCaches(void) {
     return freed;
 }
 
-NSURL *YTKACEApplicationSupportDirectory(void) {
+NSURL *YTzoomApplicationSupportDirectory(void) {
     NSFileManager *manager = NSFileManager.defaultManager;
     NSURL *documents = [manager URLsForDirectory:NSDocumentDirectory
                                         inDomains:NSUserDomainMask].firstObject;
-    NSURL *directory = [documents URLByAppendingPathComponent:@"YTKACE"
+    NSURL *directory = [documents URLByAppendingPathComponent:@"YTzoom"
                                                    isDirectory:YES];
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSURL *support = [manager URLsForDirectory:NSApplicationSupportDirectory
                                          inDomains:NSUserDomainMask].firstObject;
-        NSURL *legacy = [support URLByAppendingPathComponent:@"YTKACE"
-                                                  isDirectory:YES];
-        BOOL targetExists = [manager fileExistsAtPath:directory.path];
-        if (!targetExists && [manager fileExistsAtPath:legacy.path]) {
-            [manager moveItemAtURL:legacy toURL:directory error:nil];
+        // Folders from older builds, including the ones made before the YTzoom rename.
+        NSArray<NSURL *> *legacyFolders = @[
+            [documents URLByAppendingPathComponent:@"YTKACE" isDirectory:YES],
+            [support URLByAppendingPathComponent:@"YTKACE" isDirectory:YES],
+            [support URLByAppendingPathComponent:@"YTzoom" isDirectory:YES]
+        ];
+        for (NSURL *legacy in legacyFolders) {
+            BOOL targetExists = [manager fileExistsAtPath:directory.path];
+            if (!targetExists && [manager fileExistsAtPath:legacy.path]) {
+                [manager moveItemAtURL:legacy toURL:directory error:nil];
+            }
         }
         [manager createDirectoryAtURL:directory
           withIntermediateDirectories:YES
                            attributes:nil
                                 error:nil];
-        if ([manager fileExistsAtPath:legacy.path]) {
+        for (NSURL *legacy in legacyFolders) {
+            if (![manager fileExistsAtPath:legacy.path]) continue;
             NSDirectoryEnumerator<NSURL *> *items = [manager
                 enumeratorAtURL:legacy
      includingPropertiesForKeys:@[NSURLIsDirectoryKey]
                         options:0
                    errorHandler:nil];
             for (NSURL *source in items) {
-                NSString *relative = YTKACERelativeStoragePath(source, legacy);
+                NSString *relative = YTzoomRelativeStoragePath(source, legacy);
                 if (relative.length == 0) continue;
                 NSURL *destination = [directory URLByAppendingPathComponent:relative];
                 NSNumber *isDirectory = nil;
@@ -432,7 +465,7 @@ NSURL *YTKACEApplicationSupportDirectory(void) {
             }
             [manager removeItemAtURL:legacy error:nil];
         }
-        YTKACERepairDownloads(directory);
+        YTzoomRepairDownloads(directory);
     });
     return directory;
 }

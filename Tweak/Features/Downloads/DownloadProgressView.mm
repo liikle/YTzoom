@@ -7,7 +7,7 @@
 #import <UIKit/UIKit.h>
 #import <math.h>
 
-@interface YTKACEDownloadProgressItem : NSObject
+@interface YTzoomDownloadProgressItem : NSObject
 @property(nonatomic, copy) NSString *identifier;
 @property(nonatomic, copy) NSString *title;
 @property(nonatomic, copy) NSString *stage;
@@ -20,12 +20,12 @@
 @property(nonatomic, copy, nullable) NSString *detail;
 @end
 
-NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownloadJobsDidChangeNotification";
+NSNotificationName const YTzoomDownloadJobsDidChangeNotification = @"YTzoomDownloadJobsDidChangeNotification";
 
-@implementation YTKACEDownloadProgressItem
+@implementation YTzoomDownloadProgressItem
 @end
 
-@interface YTKACEDownloadProgressView () <UIGestureRecognizerDelegate>
+@interface YTzoomDownloadProgressView () <UIGestureRecognizerDelegate>
 @property(nonatomic, strong) UIView *card;
 @property(nonatomic, strong) UIImageView *thumbnailView;
 @property(nonatomic, strong) UILabel *titleLabel;
@@ -35,7 +35,7 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
 @property(nonatomic, strong) UIProgressView *progressView;
 @property(nonatomic, strong) UIButton *cancelButton;
 @property(nonatomic, strong) UIButton *retryButton;
-@property(nonatomic, strong) NSMutableDictionary<NSString *, YTKACEDownloadProgressItem *> *items;
+@property(nonatomic, strong) NSMutableDictionary<NSString *, YTzoomDownloadProgressItem *> *items;
 @property(nonatomic, strong) NSMutableArray<NSString *> *activeIdentifiers;
 @property(nonatomic, copy, nullable) NSString *visibleIdentifier;
 @property(nonatomic, copy, nullable) NSString *renderedIdentifier;
@@ -44,16 +44,16 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
 @property(nonatomic, assign) BOOL dragging;
 @end
 
-@implementation YTKACEDownloadProgressView
+@implementation YTzoomDownloadProgressView
 
 - (void)applyTheme {
     UITraitCollection *traits = self.keyWindow.traitCollection ?:
         UIScreen.mainScreen.traitCollection;
-    BOOL oled = YTKACEOLEDActive(traits);
+    BOOL oled = YTzoomOLEDActive(traits);
     BOOL dark = traits.userInterfaceStyle == UIUserInterfaceStyleDark;
     self.card.backgroundColor = oled ? UIColor.blackColor :
-        (dark ? YTKACEInterfaceSurfaceColor(traits) : UIColor.systemBackgroundColor);
-    self.thumbnailView.backgroundColor = YTKACEInterfaceSurfaceColor(traits);
+        (dark ? YTzoomInterfaceSurfaceColor(traits) : UIColor.systemBackgroundColor);
+    self.thumbnailView.backgroundColor = YTzoomInterfaceSurfaceColor(traits);
     self.titleLabel.textColor = UIColor.labelColor;
     self.detailLabel.textColor = UIColor.tertiaryLabelColor;
     self.percentLabel.textColor = UIColor.labelColor;
@@ -64,7 +64,7 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
         : UIColor.systemGray4Color;
     self.card.layer.borderWidth = dark ? 0.0 : 0.5;
     self.card.layer.borderColor = UIColor.separatorColor.CGColor;
-    if (YTKACEApplyGlassBackground(self.card, NO)) {
+    if (YTzoomApplyGlassBackground(self.card, NO)) {
         self.card.layer.borderWidth = 0.0;
         self.card.clipsToBounds = YES;
     } else {
@@ -75,9 +75,9 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
 }
 
 + (instancetype)sharedView {
-    static YTKACEDownloadProgressView *view;
+    static YTzoomDownloadProgressView *view;
     static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{ view = [YTKACEDownloadProgressView new]; });
+    dispatch_once(&onceToken, ^{ view = [YTzoomDownloadProgressView new]; });
     return view;
 }
 
@@ -232,7 +232,7 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
     self.dragging = NO;
     if (dy > 40.0 || [pan velocityInView:self.card.superview].y > 500.0) {
         self.userHidden = YES;
-        YTKACEDownloadLog(@"progress", @"card hidden by swipe active=%lu", (unsigned long)self.items.count);
+        YTzoomDownloadLog(@"progress", @"card hidden by swipe active=%lu", (unsigned long)self.items.count);
         [self hideCardAnimated];
         return;
     }
@@ -253,7 +253,7 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
     [self applyTheme];
     [self layoutCard];
     [self.positionTimer invalidate];
-    __weak YTKACEDownloadProgressView *weakSelf = self;
+    __weak YTzoomDownloadProgressView *weakSelf = self;
     self.positionTimer = [NSTimer scheduledTimerWithTimeInterval:2.0 repeats:YES
         block:^(NSTimer *timer) {
             (void)timer;
@@ -270,7 +270,7 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
     }
 }
 
-- (void)renderItem:(YTKACEDownloadProgressItem *)item {
+- (void)renderItem:(YTzoomDownloadProgressItem *)item {
     if (item == nil) return;
     [self attach];
     [self applyTheme];
@@ -283,8 +283,8 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
         }
         NSUInteger running = self.activeIdentifiers.count - failed;
         NSMutableArray<NSString *> *parts = [NSMutableArray array];
-        if (running != 0) [parts addObject:[NSString stringWithFormat:YTKACELocalized(@"%lu downloading"), (unsigned long)running]];
-        if (failed != 0) [parts addObject:[NSString stringWithFormat:YTKACELocalized(@"%lu failed"), (unsigned long)failed]];
+        if (running != 0) [parts addObject:[NSString stringWithFormat:YTzoomLocalized(@"%lu downloading"), (unsigned long)running]];
+        if (failed != 0) [parts addObject:[NSString stringWithFormat:YTzoomLocalized(@"%lu failed"), (unsigned long)failed]];
         count = [@"  •  " stringByAppendingString:[parts componentsJoinedByString:@" · "]];
     }
     NSString *bytes = @"";
@@ -331,29 +331,29 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
     }
     self.renderedIdentifier = [item.identifier copy];
     self.thumbnailView.image = item.thumbnail;
-    self.cancelButton.hidden = !item.failed && ([item.stage isEqualToString:YTKACELocalized(@"Merging")] ||
-        [item.stage isEqualToString:YTKACELocalized(@"Complete")] ||
-        [item.stage isEqualToString:YTKACELocalized(@"Cancelled")]);
-    if ([item.stage isEqualToString:YTKACELocalized(@"Downloading audio")]) {
+    self.cancelButton.hidden = !item.failed && ([item.stage isEqualToString:YTzoomLocalized(@"Merging")] ||
+        [item.stage isEqualToString:YTzoomLocalized(@"Complete")] ||
+        [item.stage isEqualToString:YTzoomLocalized(@"Cancelled")]);
+    if ([item.stage isEqualToString:YTzoomLocalized(@"Downloading audio")]) {
         self.progressView.progressTintColor = UIColor.systemPurpleColor;
-    } else if ([item.stage isEqualToString:YTKACELocalized(@"Downloading video")]) {
+    } else if ([item.stage isEqualToString:YTzoomLocalized(@"Downloading video")]) {
         self.progressView.progressTintColor = UIColor.systemBlueColor;
-    } else if ([item.stage isEqualToString:YTKACELocalized(@"Merging")]) {
+    } else if ([item.stage isEqualToString:YTzoomLocalized(@"Merging")]) {
         self.progressView.progressTintColor = UIColor.systemOrangeColor;
-    } else if ([item.stage isEqualToString:YTKACELocalized(@"Complete")]) {
+    } else if ([item.stage isEqualToString:YTzoomLocalized(@"Complete")]) {
         self.progressView.progressTintColor = UIColor.systemGreenColor;
     }
     if (item.failed) self.progressView.progressTintColor = UIColor.systemRedColor;
 }
 
 - (void)postChange {
-    [NSNotificationCenter.defaultCenter postNotificationName:YTKACEDownloadJobsDidChangeNotification object:self];
+    [NSNotificationCenter.defaultCenter postNotificationName:YTzoomDownloadJobsDidChangeNotification object:self];
 }
 
 - (NSArray<NSDictionary *> *)jobSnapshot {
     NSMutableArray<NSDictionary *> *jobs = [NSMutableArray array];
     for (NSString *identifier in self.activeIdentifiers) {
-        YTKACEDownloadProgressItem *item = self.items[identifier];
+        YTzoomDownloadProgressItem *item = self.items[identifier];
         if (item == nil) continue;
         [jobs addObject:@{
             @"identifier": item.identifier,
@@ -403,9 +403,9 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
 }
 
 - (void)cancelOrDismissJob:(NSString *)identifier {
-    YTKACEDownloadProgressItem *item = self.items[identifier];
+    YTzoomDownloadProgressItem *item = self.items[identifier];
     if (item == nil) return;
-    YTKACEDownloadLog(identifier, @"user %@ stage=%@", item.failed ? @"dismissed" : @"cancelled", item.stage);
+    YTzoomDownloadLog(identifier, @"user %@ stage=%@", item.failed ? @"dismissed" : @"cancelled", item.stage);
     if (item.failed) {
         [self removeItem:identifier];
     } else if (self.cancelHandler != nil) {
@@ -414,13 +414,13 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
 }
 
 - (void)retryJob:(NSString *)identifier {
-    YTKACEDownloadProgressItem *item = self.items[identifier];
+    YTzoomDownloadProgressItem *item = self.items[identifier];
     if (item == nil || !item.failed || self.retryHandler == nil) return;
     [self removeItem:identifier];
     self.retryHandler(identifier);
 }
 
-- (void)loadThumbnailForItem:(YTKACEDownloadProgressItem *)item {
+- (void)loadThumbnailForItem:(YTzoomDownloadProgressItem *)item {
     if (item.thumbnailURL == nil) return;
     NSString *identifier = item.identifier;
     NSURLSessionDataTask *task = [NSURLSession.sharedSession
@@ -431,7 +431,7 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
         UIImage *image = [UIImage imageWithData:data];
         if (image == nil) return;
         dispatch_async(dispatch_get_main_queue(), ^{
-            YTKACEDownloadProgressItem *current = self.items[identifier];
+            YTzoomDownloadProgressItem *current = self.items[identifier];
             current.thumbnail = image;
             if ([self.visibleIdentifier isEqualToString:identifier]) [self renderItem:current];
             [self postChange];
@@ -451,10 +451,10 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
            title:(NSString *)title
     thumbnailURL:(NSURL *)thumbnailURL {
     dispatch_async(dispatch_get_main_queue(), ^{
-        YTKACEDownloadProgressItem *item = [YTKACEDownloadProgressItem new];
+        YTzoomDownloadProgressItem *item = [YTzoomDownloadProgressItem new];
         item.identifier = identifier;
-        item.title = title.length != 0 ? title : YTKACELocalized(@"YouTube Download");
-        item.stage = YTKACELocalized(@"Preparing");
+        item.title = title.length != 0 ? title : YTzoomLocalized(@"YouTube Download");
+        item.stage = YTzoomLocalized(@"Preparing");
         item.thumbnailURL = thumbnailURL;
         self.items[identifier] = item;
         [self.activeIdentifiers removeObject:identifier];
@@ -475,7 +475,7 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
   downloadedBytes:(int64_t)downloadedBytes
        totalBytes:(int64_t)totalBytes {
     dispatch_async(dispatch_get_main_queue(), ^{
-        YTKACEDownloadProgressItem *item = self.items[identifier];
+        YTzoomDownloadProgressItem *item = self.items[identifier];
         if (item == nil) return;
         BOOL sameStage = [item.stage isEqualToString:stage];
         item.stage = stage;
@@ -494,16 +494,16 @@ NSNotificationName const YTKACEDownloadJobsDidChangeNotification = @"YTKACEDownl
           success:(BOOL)success
           message:(NSString *)message {
     dispatch_async(dispatch_get_main_queue(), ^{
-        YTKACEDownloadProgressItem *item = self.items[identifier];
+        YTzoomDownloadProgressItem *item = self.items[identifier];
         if (item == nil) return;
-        BOOL cancelled = !success && [message isEqualToString:YTKACELocalized(@"Cancelled")];
-        item.stage = success ? YTKACELocalized(@"Complete")
-            : (cancelled ? YTKACELocalized(@"Cancelled") : YTKACELocalized(@"Failed"));
+        BOOL cancelled = !success && [message isEqualToString:YTzoomLocalized(@"Cancelled")];
+        item.stage = success ? YTzoomLocalized(@"Complete")
+            : (cancelled ? YTzoomLocalized(@"Cancelled") : YTzoomLocalized(@"Failed"));
         item.failed = !success && !cancelled;
-        if (item.failed && message.length != 0 && ![message isEqualToString:YTKACELocalized(@"Failed")]) item.detail = message;
+        if (item.failed && message.length != 0 && ![message isEqualToString:YTzoomLocalized(@"Failed")]) item.detail = message;
         item.progress = success ? 1.0 : item.progress;
         if (item.failed) {
-            YTKACEDownloadLog(identifier, @"kept failed job on card detail=%@", item.detail ?: @"");
+            YTzoomDownloadLog(identifier, @"kept failed job on card detail=%@", item.detail ?: @"");
             self.visibleIdentifier = identifier;
             self.userHidden = NO;
             [self renderItem:item];

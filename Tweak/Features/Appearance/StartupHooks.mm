@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 
@@ -6,14 +6,14 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static NSMutableDictionary<NSString *, NSValue *> *YTKACEStartupOriginals;
+static NSMutableDictionary<NSString *, NSValue *> *YTzoomStartupOriginals;
 
-static IMP YTKACEStartupOriginal(id receiver, SEL selector) {
+static IMP YTzoomStartupOriginal(id receiver, SEL selector) {
     for (Class cls = [receiver class]; cls != Nil; cls = class_getSuperclass(cls)) {
         NSString *key = [NSString stringWithFormat:@"%@|%@",
                          NSStringFromClass(cls),
                          NSStringFromSelector(selector)];
-        NSValue *value = YTKACEStartupOriginals[key];
+        NSValue *value = YTzoomStartupOriginals[key];
         if (value == nil) continue;
         IMP implementation = NULL;
         [value getValue:&implementation];
@@ -22,31 +22,31 @@ static IMP YTKACEStartupOriginal(id receiver, SEL selector) {
     return NULL;
 }
 
-static void YTKACEStartupBlacken(UIView *view) {
+static void YTzoomStartupBlacken(UIView *view) {
     if (view == nil) return;
     UIColor *background = view.backgroundColor;
     if (background != nil && CGColorGetAlpha(background.CGColor) > 0.01) {
         view.backgroundColor = UIColor.blackColor;
     }
     for (UIView *child in view.subviews) {
-        YTKACEStartupBlacken(child);
+        YTzoomStartupBlacken(child);
     }
 }
 
-static void YTKACEStartupViewDidLoad(UIViewController *receiver,
+static void YTzoomStartupViewDidLoad(UIViewController *receiver,
                                      SEL selector) {
-    IMP original = YTKACEStartupOriginal(receiver, selector);
+    IMP original = YTzoomStartupOriginal(receiver, selector);
     if (original != NULL) {
         ((void (*)(id, SEL))original)(receiver, selector);
     }
-    if (YTKACEOLEDActive(receiver.traitCollection)) {
+    if (YTzoomOLEDActive(receiver.traitCollection)) {
         receiver.view.backgroundColor = UIColor.blackColor;
-        YTKACEStartupBlacken(receiver.view);
+        YTzoomStartupBlacken(receiver.view);
         receiver.view.window.backgroundColor = UIColor.blackColor;
     }
 }
 
-static void YTKACEFinishStartup(UIViewController *receiver) {
+static void YTzoomFinishStartup(UIViewController *receiver) {
     SEL delegateSelector = NSSelectorFromString(@"delegate");
     id delegate = [receiver respondsToSelector:delegateSelector]
         ? ((id (*)(id, SEL))objc_msgSend)(receiver, delegateSelector)
@@ -65,52 +65,52 @@ static void YTKACEFinishStartup(UIViewController *receiver) {
     [receiver dismissViewControllerAnimated:NO completion:nil];
 }
 
-static void YTKACEStartupViewDidAppear(UIViewController *receiver,
+static void YTzoomStartupViewDidAppear(UIViewController *receiver,
                                        SEL selector,
                                        BOOL animated) {
-    IMP original = YTKACEStartupOriginal(receiver, selector);
+    IMP original = YTzoomStartupOriginal(receiver, selector);
     if (original != NULL) {
         ((void (*)(id, SEL, BOOL))original)(receiver, selector, animated);
     }
-    if (YTKACEOLEDActive(receiver.traitCollection)) {
+    if (YTzoomOLEDActive(receiver.traitCollection)) {
         receiver.view.backgroundColor = UIColor.blackColor;
-        YTKACEStartupBlacken(receiver.view);
+        YTzoomStartupBlacken(receiver.view);
         receiver.view.window.backgroundColor = UIColor.blackColor;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Appearance.LaunchAnimationDisabled")) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Appearance.LaunchAnimationDisabled")) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            YTKACEFinishStartup(receiver);
+            YTzoomFinishStartup(receiver);
         });
     }
 }
 
-static void YTKACEInstallStartupHook(NSString *className,
+static void YTzoomInstallStartupHook(NSString *className,
                                      NSString *selectorName,
                                      IMP replacement) {
     IMP original = NULL;
-    if (!YTKACEInstallInstanceHook(className, selectorName,
+    if (!YTzoomInstallInstanceHook(className, selectorName,
                                    replacement, &original) ||
         original == NULL || original == replacement) {
         return;
     }
-    YTKACEStartupOriginals[
+    YTzoomStartupOriginals[
         [NSString stringWithFormat:@"%@|%@", className, selectorName]
     ] = [NSValue value:&original withObjCType:@encode(IMP)];
 }
 
-void YTKACEInstallStartupHooks(void) {
+void YTzoomInstallStartupHooks(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        YTKACEStartupOriginals = [NSMutableDictionary dictionary];
+        YTzoomStartupOriginals = [NSMutableDictionary dictionary];
     });
 
     for (NSString *className in @[
         @"YTStartupAnimationViewController",
         @"YTRiveStartupAnimationViewController"
     ]) {
-        YTKACEInstallStartupHook(className, @"viewDidLoad",
-                                 (IMP)YTKACEStartupViewDidLoad);
-        YTKACEInstallStartupHook(className, @"viewDidAppear:",
-                                 (IMP)YTKACEStartupViewDidAppear);
+        YTzoomInstallStartupHook(className, @"viewDidLoad",
+                                 (IMP)YTzoomStartupViewDidLoad);
+        YTzoomInstallStartupHook(className, @"viewDidAppear:",
+                                 (IMP)YTzoomStartupViewDidAppear);
     }
 }

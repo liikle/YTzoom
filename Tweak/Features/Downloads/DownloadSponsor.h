@@ -2,13 +2,13 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-FOUNDATION_EXPORT NSNotificationName const YTKACEDownloadInfoDidChangeNotification;
+FOUNDATION_EXPORT NSNotificationName const YTzoomDownloadInfoDidChangeNotification;
 
-FOUNDATION_EXPORT void YTKACEAttachSponsorSegments(NSURL *fileURL, NSString *videoID,
+FOUNDATION_EXPORT void YTzoomAttachSponsorSegments(NSURL *fileURL, NSString *videoID,
                                                  NSString * _Nullable author);
-FOUNDATION_EXPORT NSString * _Nullable YTKACEStoredChannelName(NSURL *fileURL);
-FOUNDATION_EXPORT NSArray<NSDictionary<NSString *, id> *> *YTKACEStoredSponsorSegments(NSURL *fileURL);
-FOUNDATION_EXPORT void YTKACERefreshSponsorSegments(
+FOUNDATION_EXPORT NSString * _Nullable YTzoomStoredChannelName(NSURL *fileURL);
+FOUNDATION_EXPORT NSArray<NSDictionary<NSString *, id> *> *YTzoomStoredSponsorSegments(NSURL *fileURL);
+FOUNDATION_EXPORT void YTzoomRefreshSponsorSegments(
     NSURL *fileURL, void (^completion)(NSArray<NSDictionary<NSString *, id> *> *segments));
 
 NS_ASSUME_NONNULL_END

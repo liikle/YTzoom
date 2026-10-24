@@ -1,12 +1,12 @@
-#import "../YTKACE.h"
+#import "../YTzoom.h"
 #import "../Runtime/Preferences.h"
 
 #import <UIKit/UIKit.h>
 
-static NSString *const YTKACEExtraDimKey = @"YTKACE.Preference.Appearance.ExtraDim";
-static UIWindow *YTKACEDimWindow;
+static NSString *const YTzoomExtraDimKey = @"YTzoom.Preference.Appearance.ExtraDim";
+static UIWindow *YTzoomDimWindow;
 
-static UIWindowScene *YTKACEActiveScene(void) {
+static UIWindowScene *YTzoomActiveScene(void) {
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if ([scene isKindOfClass:UIWindowScene.class] &&
             scene.activationState == UISceneActivationStateForegroundActive) {
@@ -19,31 +19,31 @@ static UIWindowScene *YTKACEActiveScene(void) {
     return nil;
 }
 
-static void YTKACEUpdateExtraDim(void) {
-    double percent = YTKACEMasterEnabled() ? [YTKACEPreferenceObject(YTKACEExtraDimKey) doubleValue] : 0.0;
+static void YTzoomUpdateExtraDim(void) {
+    double percent = YTzoomMasterEnabled() ? [YTzoomPreferenceObject(YTzoomExtraDimKey) doubleValue] : 0.0;
     CGFloat alpha = (CGFloat)MAX(0.0, MIN(85.0, percent)) / 100.0;
     if (alpha <= 0.001) {
-        YTKACEDimWindow.hidden = YES;
+        YTzoomDimWindow.hidden = YES;
         return;
     }
-    UIWindowScene *scene = YTKACEActiveScene();
+    UIWindowScene *scene = YTzoomActiveScene();
     if (scene == nil) return;
-    if (YTKACEDimWindow == nil || YTKACEDimWindow.windowScene != scene) {
-        YTKACEDimWindow = [[UIWindow alloc] initWithWindowScene:scene];
-        YTKACEDimWindow.windowLevel = UIWindowLevelStatusBar + 100.0;
-        YTKACEDimWindow.userInteractionEnabled = NO;
+    if (YTzoomDimWindow == nil || YTzoomDimWindow.windowScene != scene) {
+        YTzoomDimWindow = [[UIWindow alloc] initWithWindowScene:scene];
+        YTzoomDimWindow.windowLevel = UIWindowLevelStatusBar + 100.0;
+        YTzoomDimWindow.userInteractionEnabled = NO;
     }
-    YTKACEDimWindow.backgroundColor = [UIColor colorWithWhite:0.0 alpha:alpha];
-    YTKACEDimWindow.hidden = NO;
+    YTzoomDimWindow.backgroundColor = [UIColor colorWithWhite:0.0 alpha:alpha];
+    YTzoomDimWindow.hidden = NO;
 }
 
-__attribute__((constructor)) static void YTKACEInstallExtraDim(void) {
+__attribute__((constructor)) static void YTzoomInstallExtraDim(void) {
     NSNotificationCenter *center = NSNotificationCenter.defaultCenter;
     for (NSNotificationName name in @[UIApplicationDidBecomeActiveNotification,
-                                       YTKACEPreferencesDidChangeNotification]) {
+                                       YTzoomPreferencesDidChangeNotification]) {
         [center addObserverForName:name object:nil queue:NSOperationQueue.mainQueue
                         usingBlock:^(__unused NSNotification *note) {
-            YTKACEUpdateExtraDim();
+            YTzoomUpdateExtraDim();
         }];
     }
 }

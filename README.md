@@ -1,4 +1,4 @@
-# YTKACE
+# YTzoom
 
 An open-source YouTube enhancement for iOS.
 
@@ -11,7 +11,7 @@ An open-source YouTube enhancement for iOS.
 | Playback | Background playback, PiP, loop, speed controls, default speed, gestures, tap to seek and an HLS playback mode |
 | SponsorBlock | Category controls, progress markers, skip modes and configurable alerts |
 | Interface | OLED mode, overlay controls, navigation cleanup and native share sheets |
-| Liquid Glass | Glass tab bar, top bar buttons, menus, sheets, player buttons and YTKACE popups on iOS 26, with shrink on scroll and a selected tab color |
+| Liquid Glass | Glass tab bar, top bar buttons, menus, sheets, player buttons and YTzoom popups on iOS 26, with shrink on scroll and a selected tab color |
 | Tabs | Hide, reorder and add YouTube destinations |
 | Library | Downloaded video, Shorts and audio players with resume support |
 | Settings | Searchable settings, 15 languages and a native YouTube settings section |
@@ -20,14 +20,14 @@ An open-source YouTube enhancement for iOS.
 
 - **iOS:** 15.0 and newer (tweak packages); the prebuilt IPAs follow their YouTube base
 - **Architecture:** arm64
-- **YTKACE:** 1.1.2
+- **YTzoom:** 1.1.2
 
 YouTube 21.40.5 requires iOS 17, so two IPAs are published:
 
 | IPA | YouTube base | iOS |
 | --- | --- | --- |
-| `YTKACE_1.1.2_YouTube_iOS16_21.33.6.ipa` | 21.33.6 | 16.0 and newer |
-| `YTKACE_1.1.2_YouTube_21.40.5.ipa` | 21.40.5 | 17.0 and newer |
+| `YTzoom_1.1.2_YouTube_iOS16_21.33.6.ipa` | 21.33.6 | 16.0 and newer |
+| `YTzoom_1.1.2_YouTube_21.40.5.ipa` | 21.40.5 | 17.0 and newer |
 
 Pick the 21.40.5 build unless you are on iOS 16. Either one installs with TrollStore or a developer-certificate sideloader.
 
@@ -36,13 +36,13 @@ Pick the 21.40.5 build unless you are on iOS 16. Either one installs with TrollS
 **Jailbroken.** Add the repository in Sileo, Zebra or Cydia:
 
 ```
-https://itzzace.github.io/ytkace/
+https://liikle.github.io/ytzoom/
 ```
 
 Rootless and roothide packages are both published. The repository page also has an
-[Add to Sileo](https://itzzace.github.io/ytkace/) button.
+[Add to Sileo](https://liikle.github.io/ytzoom/) button.
 
-**Sideloaded.** Download the IPA for your iOS version from the [latest release](https://github.com/itzzace/ytkace/releases/latest) and install it with TrollStore, AltStore, SideStore or LiveContainer.
+**Sideloaded.** Download the IPA for your iOS version from the [latest release](https://github.com/liikle/ytzoom/releases/latest) and install it with TrollStore, AltStore, SideStore or LiveContainer.
 
 ## Build
 
@@ -52,13 +52,13 @@ To build both IPAs in one run, fill in the second URL field as well: the workflo
 
 ## Settings
 
-Open the YTKACE tab and tap the gear, or open YouTube Settings and choose YTKACE.
+Open the YTzoom tab and tap the gear, or open YouTube Settings and choose YTzoom.
 Both pages carry the same options, and the YouTube Settings section has a search bar.
 
 ## Screenshots
 
 <p align="center">
-  <img src="screenshots/framed/settings.png" width="220" alt="YTKACE settings">
+  <img src="screenshots/framed/settings.png" width="220" alt="YTzoom settings">
   <img src="screenshots/framed/video-download-menu.png" width="220" alt="Video download menu">
   <img src="screenshots/framed/audio-player.png" width="220" alt="Audio player">
 </p>
@@ -103,7 +103,7 @@ Both pages carry the same options, and the YouTube Settings section has a search
 
 ## Privacy
 
-YTKACE has no activation service, analytics, telemetry or updater.
+YTzoom has no activation service, analytics, telemetry or updater.
 
 ## Notes
 
@@ -121,19 +121,19 @@ surrounding style. Two things worth knowing:
 - Hooks are installed by name through the helpers in `Tweak/Runtime/Hooking.h`,
   not a hooking framework, so a missing class or selector fails quietly instead
   of crashing on older YouTube versions.
-- New user-facing strings go through `YTKACELocalized` and belong in
-  `Resources/YTKACE.bundle/en.lproj/Localizable.strings`. Translations for the
+- New user-facing strings go through `YTzoomLocalized` and belong in
+  `Resources/YTzoom.bundle/en.lproj/Localizable.strings`. Translations for the
   other 14 languages can follow separately.
 
 Build instructions are above.
 
 ## Donate
 
-If YTKACE is useful to you, you can support it on [Ko-fi](https://ko-fi.com/itzzace) or with crypto:
+If YTzoom is useful to you, you can support it on [Ko-fi](https://ko-fi.com/itzzace) or with crypto:
 
 - **BTC:** `bc1q6ahl2mghgq34r3w26yhwevsza0vl8436gugxke`
 - **LTC:** `LYQ2ivZ52d2zAsm896MwWEkPEi15WwprS4`
 
 ## License
 
-YTKACE source is available under the [MIT License](LICENSE). See [Third-Party Notices](THIRD_PARTY_NOTICES.md) for components and services with separate terms.
+YTzoom source is available under the [MIT License](LICENSE). See [Third-Party Notices](THIRD_PARTY_NOTICES.md) for components and services with separate terms.

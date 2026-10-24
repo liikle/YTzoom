@@ -2,17 +2,17 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef void (^YTKACESponsorCompletion)(
+typedef void (^YTzoomSponsorCompletion)(
     NSArray<NSDictionary<NSString *, id> *> *segments
 );
 
-@interface YTKACESponsorClient : NSObject
+@interface YTzoomSponsorClient : NSObject
 + (instancetype)sharedClient;
 - (void)segmentsForVideoID:(NSString *)videoID
-                completion:(YTKACESponsorCompletion)completion;
+                completion:(YTzoomSponsorCompletion)completion;
 - (void)segmentsForVideoID:(NSString *)videoID
                 categories:(NSArray<NSString *> *)categories
-                completion:(YTKACESponsorCompletion)completion;
+                completion:(YTzoomSponsorCompletion)completion;
 @end
 
 NS_ASSUME_NONNULL_END

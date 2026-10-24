@@ -11,7 +11,7 @@
 | Playback | Background playback, PiP, native-visibility overlay controls, loop, speed, default playback speed, sleep timer, and custom double-tap duration |
 | Appearance | OLED theme and Premium logo |
 | Streaming | Legacy quality mode, autoplay blocking, cellular HD preference, and custom double-tap duration |
-| Tab bar | Hide and reorder tabs, Create-tab conversion, YTKACE downloads tab, Music/Live/Gaming/News/Sports tabs, startup selection, label hiding, and custom names |
+| Tab bar | Hide and reorder tabs, Create-tab conversion, YTzoom downloads tab, Music/Live/Gaming/News/Sports tabs, startup selection, label hiding, and custom names |
 | Gestures | Volume, brightness, and hold-to-seek |
 | Overlay | Double-tap blocking, continue-watching and quick-action hiding, persistent controls, dark-overlay removal, captions/progress controls, previous/next modes, related-video hiding, and creator-product hiding across the feed, player, and Shorts |
 | Shorts | Bottom progress bar, automatic advance, feed hiding, and pause-card blocking |

@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 
 #import <Foundation/Foundation.h>
@@ -7,8 +7,8 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static NSString * const YTKACEYouTubeIdentifier = @"com.google.ios.youtube";
-static NSString * const YTKACEYouTubeName = @"YouTube";
+static NSString * const YTzoomYouTubeIdentifier = @"com.google.ios.youtube";
+static NSString * const YTzoomYouTubeName = @"YouTube";
 
 static IMP OriginalBundleWithIdentifier;
 static IMP OriginalBundleIdentifier;
@@ -19,21 +19,21 @@ static IMP OriginalSSOConfigurationInit;
 static IMP OriginalGroupContainerURL;
 static IMP OriginalApplicationSetDelegate;
 
-static BOOL YTKACEIsSideloaded(void) {
+static BOOL YTzoomIsSideloaded(void) {
     NSURL *receiptURL = NSBundle.mainBundle.appStoreReceiptURL;
     NSString *path = receiptURL.path;
     return path.length == 0 ||
         ![NSFileManager.defaultManager fileExistsAtPath:path];
 }
 
-static NSString *YTKACECurrentAccessGroup(void) {
+static NSString *YTzoomCurrentAccessGroup(void) {
     static NSString *accessGroup;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSDictionary *query = @{
             (__bridge id)kSecClass: (__bridge id)kSecClassGenericPassword,
-            (__bridge id)kSecAttrAccount: @"YTKACEDummyItem",
-            (__bridge id)kSecAttrService: @"YTKACEDummyService",
+            (__bridge id)kSecAttrAccount: @"YTzoomDummyItem",
+            (__bridge id)kSecAttrService: @"YTzoomDummyService",
             (__bridge id)kSecReturnAttributes: @YES
         };
         CFTypeRef result = NULL;
@@ -63,16 +63,16 @@ static NSString *YTKACECurrentAccessGroup(void) {
     return accessGroup;
 }
 
-static NSString *YTKACEAccessGroup(id receiver, SEL selector) {
+static NSString *YTzoomAccessGroup(id receiver, SEL selector) {
     (void)receiver;
     (void)selector;
-    return YTKACECurrentAccessGroup();
+    return YTzoomCurrentAccessGroup();
 }
 
-static NSBundle *YTKACEBundleWithIdentifier(id receiver,
+static NSBundle *YTzoomBundleWithIdentifier(id receiver,
                                             SEL selector,
                                             NSString *identifier) {
-    if ([identifier isEqualToString:YTKACEYouTubeIdentifier]) {
+    if ([identifier isEqualToString:YTzoomYouTubeIdentifier]) {
         return NSBundle.mainBundle;
     }
     return OriginalBundleWithIdentifier == NULL
@@ -82,16 +82,16 @@ static NSBundle *YTKACEBundleWithIdentifier(id receiver,
         );
 }
 
-static NSString *YTKACEBundleIdentifier(NSBundle *receiver, SEL selector) {
+static NSString *YTzoomBundleIdentifier(NSBundle *receiver, SEL selector) {
     if (receiver == NSBundle.mainBundle) {
-        return YTKACEYouTubeIdentifier;
+        return YTzoomYouTubeIdentifier;
     }
     return OriginalBundleIdentifier == NULL
         ? nil
         : ((id (*)(id, SEL))OriginalBundleIdentifier)(receiver, selector);
 }
 
-static NSDictionary *YTKACEInfoDictionary(NSBundle *receiver, SEL selector) {
+static NSDictionary *YTzoomInfoDictionary(NSBundle *receiver, SEL selector) {
     NSDictionary *info = OriginalInfoDictionary == NULL
         ? nil
         : ((id (*)(id, SEL))OriginalInfoDictionary)(receiver, selector);
@@ -99,22 +99,22 @@ static NSDictionary *YTKACEInfoDictionary(NSBundle *receiver, SEL selector) {
         return info;
     }
     NSMutableDictionary *updated = [info mutableCopy];
-    updated[@"CFBundleIdentifier"] = YTKACEYouTubeIdentifier;
-    updated[@"CFBundleDisplayName"] = YTKACEYouTubeName;
-    updated[@"CFBundleName"] = YTKACEYouTubeName;
+    updated[@"CFBundleIdentifier"] = YTzoomYouTubeIdentifier;
+    updated[@"CFBundleDisplayName"] = YTzoomYouTubeName;
+    updated[@"CFBundleName"] = YTzoomYouTubeName;
     return [updated copy];
 }
 
-static id YTKACEInfoValue(NSBundle *receiver,
+static id YTzoomInfoValue(NSBundle *receiver,
                           SEL selector,
                           NSString *key) {
     if (receiver == NSBundle.mainBundle) {
         if ([key isEqualToString:@"CFBundleIdentifier"]) {
-            return YTKACEYouTubeIdentifier;
+            return YTzoomYouTubeIdentifier;
         }
         if ([key isEqualToString:@"CFBundleDisplayName"] ||
             [key isEqualToString:@"CFBundleName"]) {
-            return YTKACEYouTubeName;
+            return YTzoomYouTubeName;
         }
     }
     return OriginalInfoValue == NULL
@@ -122,31 +122,31 @@ static id YTKACEInfoValue(NSBundle *receiver,
         : ((id (*)(id, SEL, id))OriginalInfoValue)(receiver, selector, key);
 }
 
-static BOOL YTKACETrue(id receiver, SEL selector) {
+static BOOL YTzoomTrue(id receiver, SEL selector) {
     (void)receiver;
     (void)selector;
     return YES;
 }
 
-static BOOL YTKACEFalse(id receiver, SEL selector) {
+static BOOL YTzoomFalse(id receiver, SEL selector) {
     (void)receiver;
     (void)selector;
     return NO;
 }
 
-static NSString *YTKACEAppName(id receiver, SEL selector) {
+static NSString *YTzoomAppName(id receiver, SEL selector) {
     (void)receiver;
     (void)selector;
-    return YTKACEYouTubeName;
+    return YTzoomYouTubeName;
 }
 
-static NSString *YTKACEAppIdentifier(id receiver, SEL selector) {
+static NSString *YTzoomAppIdentifier(id receiver, SEL selector) {
     (void)receiver;
     (void)selector;
-    return YTKACEYouTubeIdentifier;
+    return YTzoomYouTubeIdentifier;
 }
 
-static void YTKACESetTemporaryDisabled(id receiver,
+static void YTzoomSetTemporaryDisabled(id receiver,
                                        SEL selector,
                                        BOOL disabled) {
     (void)disabled;
@@ -157,7 +157,7 @@ static void YTKACESetTemporaryDisabled(id receiver,
     }
 }
 
-static id YTKACEConfigurationInit(id receiver,
+static id YTzoomConfigurationInit(id receiver,
                                   SEL selector,
                                   id clientID,
                                   id services) {
@@ -168,8 +168,8 @@ static id YTKACEConfigurationInit(id receiver,
         );
     if (value != nil) {
         @try {
-            [value setValue:YTKACEYouTubeName forKey:@"_shortAppName"];
-            [value setValue:YTKACEYouTubeIdentifier
+            [value setValue:YTzoomYouTubeName forKey:@"_shortAppName"];
+            [value setValue:YTzoomYouTubeIdentifier
                      forKey:@"_applicationIdentifier"];
         } @catch (__unused NSException *exception) {
         }
@@ -177,7 +177,7 @@ static id YTKACEConfigurationInit(id receiver,
     return value;
 }
 
-static NSURL *YTKACEGroupContainerURL(NSFileManager *receiver,
+static NSURL *YTzoomGroupContainerURL(NSFileManager *receiver,
                                       SEL selector,
                                       NSString *identifier) {
     NSURL *original = OriginalGroupContainerURL == NULL
@@ -202,7 +202,7 @@ static NSURL *YTKACEGroupContainerURL(NSFileManager *receiver,
     return fallback;
 }
 
-static BOOL YTKACEApplicationOpenURL(id receiver,
+static BOOL YTzoomApplicationOpenURL(id receiver,
                                      SEL selector,
                                      UIApplication *application,
                                      NSURL *URL,
@@ -235,7 +235,7 @@ static BOOL YTKACEApplicationOpenURL(id receiver,
     return NO;
 }
 
-static void YTKACEApplicationSetDelegate(UIApplication *receiver,
+static void YTzoomApplicationSetDelegate(UIApplication *receiver,
                                          SEL selector,
                                          id delegate) {
     if (delegate != nil &&
@@ -246,7 +246,7 @@ static void YTKACEApplicationSetDelegate(UIApplication *receiver,
         if (class_getInstanceMethod(delegateClass, openSelector) == NULL) {
             class_addMethod(delegateClass,
                             openSelector,
-                            (IMP)YTKACEApplicationOpenURL,
+                            (IMP)YTzoomApplicationOpenURL,
                             "B@:@@@");
         }
     }
@@ -259,67 +259,67 @@ static void YTKACEApplicationSetDelegate(UIApplication *receiver,
     }
 }
 
-void YTKACEInstallSideloadCompatibilityHooks(void) {
-    if (!YTKACEIsSideloaded()) {
+void YTzoomInstallSideloadCompatibilityHooks(void) {
+    if (!YTzoomIsSideloaded()) {
         return;
     }
-    YTKACECurrentAccessGroup();
+    YTzoomCurrentAccessGroup();
 
-    YTKACEInstallInstanceHook(@"UIApplication", @"setDelegate:",
-                              (IMP)YTKACEApplicationSetDelegate,
+    YTzoomInstallInstanceHook(@"UIApplication", @"setDelegate:",
+                              (IMP)YTzoomApplicationSetDelegate,
                               &OriginalApplicationSetDelegate);
 
     NSString *realIdentifier = NSBundle.mainBundle.bundleIdentifier;
-    if (![realIdentifier isEqualToString:YTKACEYouTubeIdentifier]) {
-        YTKACEInstallClassHook(@"NSBundle", @"bundleWithIdentifier:",
-                               (IMP)YTKACEBundleWithIdentifier,
+    if (![realIdentifier isEqualToString:YTzoomYouTubeIdentifier]) {
+        YTzoomInstallClassHook(@"NSBundle", @"bundleWithIdentifier:",
+                               (IMP)YTzoomBundleWithIdentifier,
                                &OriginalBundleWithIdentifier);
-        YTKACEInstallInstanceHook(@"NSBundle", @"bundleIdentifier",
-                                  (IMP)YTKACEBundleIdentifier,
+        YTzoomInstallInstanceHook(@"NSBundle", @"bundleIdentifier",
+                                  (IMP)YTzoomBundleIdentifier,
                                   &OriginalBundleIdentifier);
-        YTKACEInstallInstanceHook(@"NSBundle", @"infoDictionary",
-                                  (IMP)YTKACEInfoDictionary,
+        YTzoomInstallInstanceHook(@"NSBundle", @"infoDictionary",
+                                  (IMP)YTzoomInfoDictionary,
                                   &OriginalInfoDictionary);
-        YTKACEInstallInstanceHook(@"NSBundle", @"objectForInfoDictionaryKey:",
-                                  (IMP)YTKACEInfoValue,
+        YTzoomInstallInstanceHook(@"NSBundle", @"objectForInfoDictionaryKey:",
+                                  (IMP)YTzoomInfoValue,
                                   &OriginalInfoValue);
     }
 
-    YTKACEInstallClassHook(@"YTVersionUtils", @"appName",
-                           (IMP)YTKACEAppName, NULL);
-    YTKACEInstallClassHook(@"YTVersionUtils", @"appID",
-                           (IMP)YTKACEAppIdentifier, NULL);
-    YTKACEInstallInstanceHook(@"SSOConfiguration", @"shouldEnableSafariSignIn",
-                              (IMP)YTKACETrue, NULL);
-    YTKACEInstallInstanceHook(@"SSOConfiguration", @"temporarilyDisableSafariSignIn",
-                              (IMP)YTKACEFalse, NULL);
-    YTKACEInstallInstanceHook(@"SSOConfiguration", @"setTemporarilyDisableSafariSignIn:",
-                              (IMP)YTKACESetTemporaryDisabled,
+    YTzoomInstallClassHook(@"YTVersionUtils", @"appName",
+                           (IMP)YTzoomAppName, NULL);
+    YTzoomInstallClassHook(@"YTVersionUtils", @"appID",
+                           (IMP)YTzoomAppIdentifier, NULL);
+    YTzoomInstallInstanceHook(@"SSOConfiguration", @"shouldEnableSafariSignIn",
+                              (IMP)YTzoomTrue, NULL);
+    YTzoomInstallInstanceHook(@"SSOConfiguration", @"temporarilyDisableSafariSignIn",
+                              (IMP)YTzoomFalse, NULL);
+    YTzoomInstallInstanceHook(@"SSOConfiguration", @"setTemporarilyDisableSafariSignIn:",
+                              (IMP)YTzoomSetTemporaryDisabled,
                               &OriginalSSOSetTemporary);
-    YTKACEInstallInstanceHook(@"SSOConfiguration",
+    YTzoomInstallInstanceHook(@"SSOConfiguration",
                               @"initWithClientID:supportedAccountServices:",
-                              (IMP)YTKACEConfigurationInit,
+                              (IMP)YTzoomConfigurationInit,
                               &OriginalSSOConfigurationInit);
 
-    YTKACEInstallClassHook(@"SSOKeychainHelper", @"accessGroup",
-                           (IMP)YTKACEAccessGroup, NULL);
-    YTKACEInstallClassHook(@"SSOKeychainHelper", @"sharedAccessGroup",
-                           (IMP)YTKACEAccessGroup, NULL);
-    YTKACEInstallClassHook(@"SSOKeychainCore", @"accessGroup",
-                           (IMP)YTKACEAccessGroup, NULL);
-    YTKACEInstallClassHook(@"SSOKeychainCore", @"sharedAccessGroup",
-                           (IMP)YTKACEAccessGroup, NULL);
-    YTKACEInstallInstanceHook(@"UICKeyChainStore", @"accessGroup",
-                              (IMP)YTKACEAccessGroup, NULL);
+    YTzoomInstallClassHook(@"SSOKeychainHelper", @"accessGroup",
+                           (IMP)YTzoomAccessGroup, NULL);
+    YTzoomInstallClassHook(@"SSOKeychainHelper", @"sharedAccessGroup",
+                           (IMP)YTzoomAccessGroup, NULL);
+    YTzoomInstallClassHook(@"SSOKeychainCore", @"accessGroup",
+                           (IMP)YTzoomAccessGroup, NULL);
+    YTzoomInstallClassHook(@"SSOKeychainCore", @"sharedAccessGroup",
+                           (IMP)YTzoomAccessGroup, NULL);
+    YTzoomInstallInstanceHook(@"UICKeyChainStore", @"accessGroup",
+                              (IMP)YTzoomAccessGroup, NULL);
 
-    YTKACEInstallInstanceHook(@"NSFileManager",
+    YTzoomInstallInstanceHook(@"NSFileManager",
                               @"containerURLForSecurityApplicationGroupIdentifier:",
-                              (IMP)YTKACEGroupContainerURL,
+                              (IMP)YTzoomGroupContainerURL,
                               &OriginalGroupContainerURL);
-    YTKACEInstallClassHook(@"GULAppEnvironmentUtil", @"isFromAppStore",
-                           (IMP)YTKACETrue, NULL);
-    YTKACEInstallClassHook(@"APMAEU", @"isFAS",
-                           (IMP)YTKACETrue, NULL);
-    YTKACEInstallClassHook(@"SSOClientLogin", @"defaultSourceString",
-                           (IMP)YTKACEAppIdentifier, NULL);
+    YTzoomInstallClassHook(@"GULAppEnvironmentUtil", @"isFromAppStore",
+                           (IMP)YTzoomTrue, NULL);
+    YTzoomInstallClassHook(@"APMAEU", @"isFAS",
+                           (IMP)YTzoomTrue, NULL);
+    YTzoomInstallClassHook(@"SSOClientLogin", @"defaultSourceString",
+                           (IMP)YTzoomAppIdentifier, NULL);
 }

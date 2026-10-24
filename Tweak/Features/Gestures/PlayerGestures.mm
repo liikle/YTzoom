@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../../UI/Notice.h"
@@ -9,28 +9,28 @@
 #import <objc/runtime.h>
 
 static IMP OriginalOverlayDidMoveToWindow;
-static const void *YTKACEEdgePanAssociation = &YTKACEEdgePanAssociation;
-static const void *YTKACEGestureSurfaceAssociation =
-    &YTKACEGestureSurfaceAssociation;
-static const void *YTKACELongPressAssociation = &YTKACELongPressAssociation;
-static const void *YTKACEGestureInitialAssociation = &YTKACEGestureInitialAssociation;
-static const void *YTKACEGestureSecondaryInitialAssociation =
-    &YTKACEGestureSecondaryInitialAssociation;
-static const void *YTKACEGestureActionAssociation = &YTKACEGestureActionAssociation;
-static const void *YTKACEIndicatorAssociation = &YTKACEIndicatorAssociation;
-static const void *YTKACEIndicatorIconAssociation = &YTKACEIndicatorIconAssociation;
-static const void *YTKACEIndicatorTrackAssociation = &YTKACEIndicatorTrackAssociation;
-static const void *YTKACEIndicatorFillAssociation = &YTKACEIndicatorFillAssociation;
-static const void *YTKACEIndicatorLabelAssociation = &YTKACEIndicatorLabelAssociation;
-static const void *YTKACEVolumeViewAssociation = &YTKACEVolumeViewAssociation;
-static const void *YTKACESeekIndicatorAssociation = &YTKACESeekIndicatorAssociation;
-static const void *YTKACESeekIconAssociation = &YTKACESeekIconAssociation;
-static const void *YTKACESeekLabelAssociation = &YTKACESeekLabelAssociation;
+static const void *YTzoomEdgePanAssociation = &YTzoomEdgePanAssociation;
+static const void *YTzoomGestureSurfaceAssociation =
+    &YTzoomGestureSurfaceAssociation;
+static const void *YTzoomLongPressAssociation = &YTzoomLongPressAssociation;
+static const void *YTzoomGestureInitialAssociation = &YTzoomGestureInitialAssociation;
+static const void *YTzoomGestureSecondaryInitialAssociation =
+    &YTzoomGestureSecondaryInitialAssociation;
+static const void *YTzoomGestureActionAssociation = &YTzoomGestureActionAssociation;
+static const void *YTzoomIndicatorAssociation = &YTzoomIndicatorAssociation;
+static const void *YTzoomIndicatorIconAssociation = &YTzoomIndicatorIconAssociation;
+static const void *YTzoomIndicatorTrackAssociation = &YTzoomIndicatorTrackAssociation;
+static const void *YTzoomIndicatorFillAssociation = &YTzoomIndicatorFillAssociation;
+static const void *YTzoomIndicatorLabelAssociation = &YTzoomIndicatorLabelAssociation;
+static const void *YTzoomVolumeViewAssociation = &YTzoomVolumeViewAssociation;
+static const void *YTzoomSeekIndicatorAssociation = &YTzoomSeekIndicatorAssociation;
+static const void *YTzoomSeekIconAssociation = &YTzoomSeekIconAssociation;
+static const void *YTzoomSeekLabelAssociation = &YTzoomSeekLabelAssociation;
 
-@interface YTKACEPriorityPanGestureRecognizer : UIPanGestureRecognizer
+@interface YTzoomPriorityPanGestureRecognizer : UIPanGestureRecognizer
 @end
 
-@implementation YTKACEPriorityPanGestureRecognizer
+@implementation YTzoomPriorityPanGestureRecognizer
 
 - (BOOL)canPreventGestureRecognizer:(UIGestureRecognizer *)preventedGestureRecognizer {
     return YES;
@@ -42,7 +42,7 @@ static const void *YTKACESeekLabelAssociation = &YTKACESeekLabelAssociation;
 
 @end
 
-@interface YTKACEGestureCoordinator : NSObject <UIGestureRecognizerDelegate>
+@interface YTzoomGestureCoordinator : NSObject <UIGestureRecognizerDelegate>
 + (instancetype)sharedCoordinator;
 @property(nonatomic, strong) NSTimer *seekTimer;
 @property(nonatomic, weak) UIResponder *seekTarget;
@@ -54,26 +54,26 @@ static const void *YTKACESeekLabelAssociation = &YTKACESeekLabelAssociation;
 - (void)handleTwoFingerTap:(UITapGestureRecognizer *)recognizer;
 @end
 
-@implementation YTKACEGestureCoordinator
+@implementation YTzoomGestureCoordinator
 
 + (instancetype)sharedCoordinator {
-    static YTKACEGestureCoordinator *coordinator;
+    static YTzoomGestureCoordinator *coordinator;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        coordinator = [YTKACEGestureCoordinator new];
+        coordinator = [YTzoomGestureCoordinator new];
     });
     return coordinator;
 }
 
 - (UISlider *)volumeSliderInView:(UIView *)view {
     MPVolumeView *volumeView =
-        objc_getAssociatedObject(view, YTKACEVolumeViewAssociation);
+        objc_getAssociatedObject(view, YTzoomVolumeViewAssociation);
     if (volumeView == nil) {
         volumeView = [[MPVolumeView alloc] initWithFrame:CGRectMake(-100, -100, 1, 1)];
         volumeView.alpha = 0.01;
         [view addSubview:volumeView];
         objc_setAssociatedObject(view,
-                                 YTKACEVolumeViewAssociation,
+                                 YTzoomVolumeViewAssociation,
                                  volumeView,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
@@ -85,15 +85,15 @@ static const void *YTKACESeekLabelAssociation = &YTKACESeekLabelAssociation;
     return nil;
 }
 
-static void YTKACEStyleGestureIndicator(UIView *indicator, CGFloat alpha, CGFloat radius, CGFloat glassRadius) {
+static void YTzoomStyleGestureIndicator(UIView *indicator, CGFloat alpha, CGFloat radius, CGFloat glassRadius) {
     indicator.layer.cornerRadius = glassRadius;
-    if (YTKACEApplyGlassBackground(indicator, YES)) return;
+    if (YTzoomApplyGlassBackground(indicator, YES)) return;
     indicator.backgroundColor = [UIColor colorWithWhite:0.0 alpha:alpha];
     indicator.layer.cornerRadius = radius;
 }
 
 - (UIView *)indicatorInView:(UIView *)view {
-    UIView *indicator = objc_getAssociatedObject(view, YTKACEIndicatorAssociation);
+    UIView *indicator = objc_getAssociatedObject(view, YTzoomIndicatorAssociation);
     if (indicator != nil) {
         return indicator;
     }
@@ -129,22 +129,22 @@ static void YTKACEStyleGestureIndicator(UIView *indicator, CGFloat alpha, CGFloa
 
     [view addSubview:indicator];
     objc_setAssociatedObject(view,
-                             YTKACEIndicatorAssociation,
+                             YTzoomIndicatorAssociation,
                              indicator,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(view, YTKACEIndicatorIconAssociation, icon,
+    objc_setAssociatedObject(view, YTzoomIndicatorIconAssociation, icon,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(view, YTKACEIndicatorTrackAssociation, track,
+    objc_setAssociatedObject(view, YTzoomIndicatorTrackAssociation, track,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(view, YTKACEIndicatorFillAssociation, fill,
+    objc_setAssociatedObject(view, YTzoomIndicatorFillAssociation, fill,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(view, YTKACEIndicatorLabelAssociation, label,
+    objc_setAssociatedObject(view, YTzoomIndicatorLabelAssociation, label,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return indicator;
 }
 
 - (UIView *)seekIndicatorInView:(UIView *)view {
-    UIView *indicator = objc_getAssociatedObject(view, YTKACESeekIndicatorAssociation);
+    UIView *indicator = objc_getAssociatedObject(view, YTzoomSeekIndicatorAssociation);
     if (indicator != nil) return indicator;
     indicator = [[UIView alloc] initWithFrame:CGRectMake(0.0, 0.0, 120.0, 120.0)];
     indicator.backgroundColor = [UIColor colorWithWhite:0.0 alpha:0.75];
@@ -162,18 +162,18 @@ static void YTKACEStyleGestureIndicator(UIView *indicator, CGFloat alpha, CGFloa
     label.textAlignment = NSTextAlignmentCenter;
     [indicator addSubview:label];
     [view addSubview:indicator];
-    objc_setAssociatedObject(view, YTKACESeekIndicatorAssociation, indicator,
+    objc_setAssociatedObject(view, YTzoomSeekIndicatorAssociation, indicator,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(view, YTKACESeekIconAssociation, icon,
+    objc_setAssociatedObject(view, YTzoomSeekIconAssociation, icon,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(view, YTKACESeekLabelAssociation, label,
+    objc_setAssociatedObject(view, YTzoomSeekLabelAssociation, label,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     return indicator;
 }
 
 - (BOOL)isEdgePan:(UIGestureRecognizer *)recognizer {
     return recognizer == objc_getAssociatedObject(recognizer.view,
-                                                   YTKACEEdgePanAssociation);
+                                                   YTzoomEdgePanAssociation);
 }
 
 - (UIViewController *)playerControllerForView:(UIView *)view {
@@ -220,7 +220,7 @@ static void YTKACEStyleGestureIndicator(UIView *indicator, CGFloat alpha, CGFloa
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
 shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other {
     if (gestureRecognizer == objc_getAssociatedObject(gestureRecognizer.view,
-                                                       YTKACELongPressAssociation)) {
+                                                       YTzoomLongPressAssociation)) {
         return NO;
     }
     UIGestureRecognizer *edgePan = nil;
@@ -234,15 +234,15 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
 }
 
 - (BOOL)gestureRecognizerShouldBegin:(UIGestureRecognizer *)gestureRecognizer {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Gestures.LandscapeOnly")) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Gestures.LandscapeOnly")) {
         const CGSize screen = gestureRecognizer.view.window.bounds.size;
         if (screen.height > 0.0 && screen.width <= screen.height) return NO;
     }
     if ([self isEdgePan:gestureRecognizer]) {
-        if (!YTKACEMasterEnabled()) return NO;
+        if (!YTzoomMasterEnabled()) return NO;
         UIView *view = gestureRecognizer.view;
         NSInteger surface = [objc_getAssociatedObject(
-            gestureRecognizer, YTKACEGestureSurfaceAssociation) integerValue];
+            gestureRecognizer, YTzoomGestureSurfaceAssociation) integerValue];
         CGPoint location = [gestureRecognizer locationInView:view];
         CGPoint velocity = [(UIPanGestureRecognizer *)gestureRecognizer
             velocityInView:view];
@@ -250,8 +250,8 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
         CGRect activeBounds = view.bounds;
         if (CGRectIsEmpty(activeBounds) || CGRectIsNull(activeBounds)) return NO;
         if (fabs(velocity.y) <= fabs(velocity.x)) return NO;
-        double storedArea = [YTKACEPreferenceObject(
-            @"YTKACE.Preference.Gestures.ActivationArea") doubleValue];
+        double storedArea = [YTzoomPreferenceObject(
+            @"YTzoom.Preference.Gestures.ActivationArea") doubleValue];
         double areaPercent = storedArea > 0.0 ? storedArea : 20.0;
         CGFloat edge = CGRectGetWidth(activeBounds) *
             MIN(0.5, MAX(0.1, areaPercent / 100.0));
@@ -261,11 +261,11 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
             location.x >= CGRectGetMaxX(activeBounds) - edge;
         if (!left && !right) return NO;
         NSString *key = left
-            ? @"YTKACE.Preference.Gestures.LeftAction"
-            : @"YTKACE.Preference.Gestures.RightAction";
-        NSInteger action = [YTKACEPreferenceObject(key) integerValue];
+            ? @"YTzoom.Preference.Gestures.LeftAction"
+            : @"YTzoom.Preference.Gestures.RightAction";
+        NSInteger action = [YTzoomPreferenceObject(key) integerValue];
         objc_setAssociatedObject(gestureRecognizer,
-                                 YTKACEGestureActionAssociation,
+                                 YTzoomGestureActionAssociation,
                                  @(action),
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return action >= 1 && action <= 3;
@@ -273,7 +273,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
     if (![gestureRecognizer isKindOfClass:UILongPressGestureRecognizer.class]) {
         return YES;
     }
-    if (!YTKACEFeatureEnabled(@"YTKACE.Preference.Gestures.HoldToSeek")) {
+    if (!YTzoomFeatureEnabled(@"YTzoom.Preference.Gestures.HoldToSeek")) {
         return NO;
     }
     UIView *view = gestureRecognizer.view;
@@ -286,16 +286,16 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
 }
 
 - (void)layoutIndicator:(UIView *)indicator inView:(UIView *)view {
-    NSInteger size = [YTKACEPreferenceObject(
-        @"YTKACE.Preference.Gestures.HUDSize") integerValue];
+    NSInteger size = [YTzoomPreferenceObject(
+        @"YTzoom.Preference.Gestures.HUDSize") integerValue];
     CGSize dimensions = CGSizeMake(200.0, 50.0);
     if (size == 0) dimensions = CGSizeMake(164.0, 44.0);
     if (size == 2) dimensions = CGSizeMake(236.0, 58.0);
     indicator.bounds = (CGRect){CGPointZero, dimensions};
 
     UIEdgeInsets safe = view.safeAreaInsets;
-    NSInteger position = [YTKACEPreferenceObject(
-        @"YTKACE.Preference.Gestures.HUDPosition") integerValue];
+    NSInteger position = [YTzoomPreferenceObject(
+        @"YTzoom.Preference.Gestures.HUDPosition") integerValue];
     CGFloat centerY = safe.top + dimensions.height * 0.5 + 18.0;
     if (position == 1) {
         centerY = CGRectGetMidY(view.bounds);
@@ -306,12 +306,12 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
     centerY = MIN(CGRectGetHeight(view.bounds) - dimensions.height * 0.5,
                   MAX(dimensions.height * 0.5, centerY));
     indicator.center = CGPointMake(CGRectGetMidX(view.bounds), centerY);
-    YTKACEStyleGestureIndicator(indicator, 0.65, 10.0, dimensions.height * 0.5);
+    YTzoomStyleGestureIndicator(indicator, 0.65, 10.0, dimensions.height * 0.5);
 
-    UIImageView *icon = objc_getAssociatedObject(view, YTKACEIndicatorIconAssociation);
-    UIView *track = objc_getAssociatedObject(view, YTKACEIndicatorTrackAssociation);
-    UIView *fill = objc_getAssociatedObject(view, YTKACEIndicatorFillAssociation);
-    UILabel *label = objc_getAssociatedObject(view, YTKACEIndicatorLabelAssociation);
+    UIImageView *icon = objc_getAssociatedObject(view, YTzoomIndicatorIconAssociation);
+    UIView *track = objc_getAssociatedObject(view, YTzoomIndicatorTrackAssociation);
+    UIView *fill = objc_getAssociatedObject(view, YTzoomIndicatorFillAssociation);
+    UILabel *label = objc_getAssociatedObject(view, YTzoomIndicatorLabelAssociation);
     CGFloat scale = dimensions.height / 50.0;
     icon.frame = CGRectMake(15.0 * scale, 12.0 * scale,
                             26.0 * scale, 26.0 * scale);
@@ -327,11 +327,11 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
 }
 
 - (void)updateIndicatorInView:(UIView *)view value:(double)value volume:(BOOL)volume {
-    if (!YTKACEFeatureEnabled(@"YTKACE.Preference.Gestures.HUDEnabled")) return;
+    if (!YTzoomFeatureEnabled(@"YTzoom.Preference.Gestures.HUDEnabled")) return;
     UIView *indicator = [self indicatorInView:view];
-    UIImageView *icon = objc_getAssociatedObject(view, YTKACEIndicatorIconAssociation);
-    UIView *fill = objc_getAssociatedObject(view, YTKACEIndicatorFillAssociation);
-    UILabel *label = objc_getAssociatedObject(view, YTKACEIndicatorLabelAssociation);
+    UIImageView *icon = objc_getAssociatedObject(view, YTzoomIndicatorIconAssociation);
+    UIView *fill = objc_getAssociatedObject(view, YTzoomIndicatorFillAssociation);
+    UILabel *label = objc_getAssociatedObject(view, YTzoomIndicatorLabelAssociation);
     NSString *symbol = nil;
     if (volume) {
         if (value <= 0.01) symbol = @"speaker.slash.fill";
@@ -355,7 +355,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
 - (void)handleEdgePan:(UIPanGestureRecognizer *)recognizer {
     UIView *view = recognizer.view;
     NSInteger action = [objc_getAssociatedObject(
-        recognizer, YTKACEGestureActionAssociation) integerValue];
+        recognizer, YTzoomGestureActionAssociation) integerValue];
     BOOL volume = action == 2;
     BOOL both = action == 3;
     if (recognizer.state == UIGestureRecognizerStateBegan) {
@@ -363,16 +363,16 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
             ? AVAudioSession.sharedInstance.outputVolume
             : UIScreen.mainScreen.brightness;
         objc_setAssociatedObject(recognizer,
-                                 YTKACEGestureInitialAssociation,
+                                 YTzoomGestureInitialAssociation,
                                  @(start),
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         if (both) {
             objc_setAssociatedObject(
-                recognizer, YTKACEGestureSecondaryInitialAssociation,
+                recognizer, YTzoomGestureSecondaryInitialAssociation,
                 @(AVAudioSession.sharedInstance.outputVolume),
                 OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
-        if (YTKACEFeatureEnabled(@"YTKACE.Preference.Gestures.HUDEnabled")) {
+        if (YTzoomFeatureEnabled(@"YTzoom.Preference.Gestures.HUDEnabled")) {
             [self updateIndicatorInView:view value:start volume:volume];
             UIView *indicator = [self indicatorInView:view];
             [UIView animateWithDuration:0.15 animations:^{ indicator.alpha = 1.0; }];
@@ -380,7 +380,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
     }
     if (recognizer.state == UIGestureRecognizerStateChanged) {
         double start = [objc_getAssociatedObject(recognizer,
-            YTKACEGestureInitialAssociation) doubleValue];
+            YTzoomGestureInitialAssociation) doubleValue];
         CGFloat height = MAX(180.0, CGRectGetHeight(view.bounds) * 0.72);
         CGFloat translation = [recognizer translationInView:view].y;
         double value = MIN(1.0, MAX(0.0, start - translation / height));
@@ -392,7 +392,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
             UIScreen.mainScreen.brightness = value;
             if (both) {
                 double volumeStart = [objc_getAssociatedObject(
-                    recognizer, YTKACEGestureSecondaryInitialAssociation)
+                    recognizer, YTzoomGestureSecondaryInitialAssociation)
                     doubleValue];
                 double volumeValue = MIN(1.0, MAX(
                     0.0, volumeStart - translation / height));
@@ -401,13 +401,13 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
                 [slider sendActionsForControlEvents:UIControlEventValueChanged];
             }
         }
-        if (YTKACEFeatureEnabled(@"YTKACE.Preference.Gestures.HUDEnabled")) {
+        if (YTzoomFeatureEnabled(@"YTzoom.Preference.Gestures.HUDEnabled")) {
             [self updateIndicatorInView:view value:value volume:volume];
         }
     }
     if (recognizer.state == UIGestureRecognizerStateEnded ||
         recognizer.state == UIGestureRecognizerStateCancelled) {
-        if (YTKACEFeatureEnabled(@"YTKACE.Preference.Gestures.HUDEnabled")) {
+        if (YTzoomFeatureEnabled(@"YTzoom.Preference.Gestures.HUDEnabled")) {
             UIView *indicator = [self indicatorInView:view];
             [UIView animateWithDuration:0.22
                                   delay:0.45
@@ -415,17 +415,17 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
                              animations:^{ indicator.alpha = 0.0; }
                              completion:nil];
         }
-        objc_setAssociatedObject(recognizer, YTKACEGestureActionAssociation,
+        objc_setAssociatedObject(recognizer, YTzoomGestureActionAssociation,
                                  nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         objc_setAssociatedObject(
-            recognizer, YTKACEGestureSecondaryInitialAssociation,
+            recognizer, YTzoomGestureSecondaryInitialAssociation,
             nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
 - (double)seekStep {
     double value = [NSUserDefaults.standardUserDefaults
-        doubleForKey:@"YTKACE.Preference.Gestures.HoldSeekSeconds"];
+        doubleForKey:@"YTzoom.Preference.Gestures.HoldSeekSeconds"];
     return MIN(60.0, MAX(1.0, value > 0.0 ? value : 10.0));
 }
 
@@ -493,9 +493,9 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
     }
 
     UIView *indicator = [self seekIndicatorInView:self.seekView];
-    YTKACEStyleGestureIndicator(indicator, 0.75, 12.0, 28.0);
-    UIImageView *icon = objc_getAssociatedObject(self.seekView, YTKACESeekIconAssociation);
-    UILabel *label = objc_getAssociatedObject(self.seekView, YTKACESeekLabelAssociation);
+    YTzoomStyleGestureIndicator(indicator, 0.75, 12.0, 28.0);
+    UIImageView *icon = objc_getAssociatedObject(self.seekView, YTzoomSeekIconAssociation);
+    UILabel *label = objc_getAssociatedObject(self.seekView, YTzoomSeekLabelAssociation);
     NSString *symbol = self.seekDirection < 0 ? @"gobackward" : @"goforward";
     icon.image = [[UIImage systemImageNamed:symbol]
         imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
@@ -510,7 +510,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
 
 - (void)handleTwoFingerTap:(UITapGestureRecognizer *)recognizer {
     if (recognizer.state != UIGestureRecognizerStateEnded ||
-        !YTKACEFeatureEnabled(@"YTKACE.Preference.Gestures.TwoFingerTap")) return;
+        !YTzoomFeatureEnabled(@"YTzoom.Preference.Gestures.TwoFingerTap")) return;
     SEL toggle = NSSelectorFromString(@"didTogglePlayPause");
     for (UIResponder *responder = recognizer.view; responder != nil; responder = responder.nextResponder) {
         if ([responder respondsToSelector:toggle]) {
@@ -537,7 +537,7 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
                                            @"mediaTime"
                                        ]];
         [self performSeek];
-        __weak YTKACEGestureCoordinator *weakSelf = self;
+        __weak YTzoomGestureCoordinator *weakSelf = self;
         self.seekTimer =
             [NSTimer scheduledTimerWithTimeInterval:0.1
                                            repeats:YES
@@ -564,30 +564,30 @@ shouldRecognizeSimultaneouslyWithGestureRecognizer:(UIGestureRecognizer *)other 
 
 @end
 
-static void YTKACEAttachPlayerGestures(UIView *playerView,
+static void YTzoomAttachPlayerGestures(UIView *playerView,
                                        NSInteger surface) {
     if (![playerView isKindOfClass:UIView.class]) return;
     UIGestureRecognizer *existing = objc_getAssociatedObject(
-        playerView, YTKACEEdgePanAssociation);
+        playerView, YTzoomEdgePanAssociation);
     if (existing != nil) return;
 
     UIPanGestureRecognizer *edgePan =
-        [[YTKACEPriorityPanGestureRecognizer alloc]
-            initWithTarget:YTKACEGestureCoordinator.sharedCoordinator
+        [[YTzoomPriorityPanGestureRecognizer alloc]
+            initWithTarget:YTzoomGestureCoordinator.sharedCoordinator
                     action:@selector(handleEdgePan:)];
     edgePan.maximumNumberOfTouches = 1;
     edgePan.cancelsTouchesInView = YES;
     edgePan.delaysTouchesBegan = NO;
     edgePan.delaysTouchesEnded = NO;
-    edgePan.delegate = YTKACEGestureCoordinator.sharedCoordinator;
+    edgePan.delegate = YTzoomGestureCoordinator.sharedCoordinator;
     objc_setAssociatedObject(edgePan,
-                             YTKACEGestureSurfaceAssociation,
+                             YTzoomGestureSurfaceAssociation,
                              @(surface),
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
     [playerView addGestureRecognizer:edgePan];
     objc_setAssociatedObject(playerView,
-                             YTKACEEdgePanAssociation,
+                             YTzoomEdgePanAssociation,
                              edgePan,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     for (UIGestureRecognizer *native in [playerView.gestureRecognizers copy]) {
@@ -599,37 +599,37 @@ static void YTKACEAttachPlayerGestures(UIView *playerView,
 
     UILongPressGestureRecognizer *hold =
         [[UILongPressGestureRecognizer alloc]
-            initWithTarget:YTKACEGestureCoordinator.sharedCoordinator
+            initWithTarget:YTzoomGestureCoordinator.sharedCoordinator
                     action:@selector(handleHold:)];
     hold.minimumPressDuration = 0.5;
     hold.cancelsTouchesInView = YES;
-    hold.delegate = YTKACEGestureCoordinator.sharedCoordinator;
+    hold.delegate = YTzoomGestureCoordinator.sharedCoordinator;
     [playerView addGestureRecognizer:hold];
     UITapGestureRecognizer *twoFinger =
         [[UITapGestureRecognizer alloc]
-            initWithTarget:YTKACEGestureCoordinator.sharedCoordinator
+            initWithTarget:YTzoomGestureCoordinator.sharedCoordinator
                     action:@selector(handleTwoFingerTap:)];
     twoFinger.numberOfTouchesRequired = 2;
     twoFinger.cancelsTouchesInView = YES;
     [playerView addGestureRecognizer:twoFinger];
     objc_setAssociatedObject(playerView,
-                             YTKACELongPressAssociation,
+                             YTzoomLongPressAssociation,
                              hold,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-static void YTKACEOverlayDidMoveToWindow(UIView *receiver, SEL selector) {
+static void YTzoomOverlayDidMoveToWindow(UIView *receiver, SEL selector) {
     if (OriginalOverlayDidMoveToWindow != NULL) {
         ((void (*)(id, SEL))OriginalOverlayDidMoveToWindow)(receiver, selector);
     }
-    YTKACEAttachPlayerGestures(receiver, 1);
+    YTzoomAttachPlayerGestures(receiver, 1);
 }
 
-void YTKACEInstallPlayerGestureHooks(void) {
-    YTKACEInstallInstanceHook(
+void YTzoomInstallPlayerGestureHooks(void) {
+    YTzoomInstallInstanceHook(
         @"YTMainAppVideoPlayerOverlayView",
         @"didMoveToWindow",
-        (IMP)YTKACEOverlayDidMoveToWindow,
+        (IMP)YTzoomOverlayDidMoveToWindow,
         &OriginalOverlayDidMoveToWindow
     );
 }

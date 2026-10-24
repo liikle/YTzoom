@@ -4,9 +4,9 @@ THEOS_PACKAGE_SCHEME ?= rootless
 
 include $(THEOS)/makefiles/common.mk
 
-LIBRARY_NAME = YTKACE
+LIBRARY_NAME = YTzoom
 
-YTKACE_FILES = \
+YTzoom_FILES = \
 	Tweak/Entry.mm \
 	Tweak/Runtime/Hooking.mm \
 	Tweak/Runtime/Preferences.mm \
@@ -24,8 +24,8 @@ YTKACE_FILES = \
 	Tweak/Features/Downloads/SABRDownloader.mm \
 	Tweak/Features/Downloads/DirectDownloader.mm \
 	Tweak/Features/Downloads/FFmpegMuxer.mm \
-	Tweak/Features/Downloads/YTKACEBackupManager.mm \
-	Tweak/Features/Downloads/YTKACEMediaImporter.mm \
+	Tweak/Features/Downloads/YTzoomBackupManager.mm \
+	Tweak/Features/Downloads/YTzoomMediaImporter.mm \
 	Tweak/Features/Downloads/MediaArtwork.mm \
 	Tweak/Features/Downloads/DownloadLog.mm \
 	Tweak/Features/Downloads/DownloadProgressView.mm \
@@ -33,8 +33,8 @@ YTKACE_FILES = \
 	Tweak/Features/Downloads/DownloadSponsor.mm \
 	Tweak/Features/Downloads/DownloadHooks.mm \
 	Tweak/Features/Downloads/PlaylistDownloader.mm \
-	Tweak/Features/Downloads/YTKACEDownloadPlayerController.mm \
-	Tweak/Features/Downloads/YTKACEAudioPlayerController.mm \
+	Tweak/Features/Downloads/YTzoomDownloadPlayerController.mm \
+	Tweak/Features/Downloads/YTzoomAudioPlayerController.mm \
 	Tweak/Features/Downloads/GlobalDownloadMiniPlayer.mm \
 	Tweak/Features/Appearance/OLEDHooks.mm \
 	Tweak/Features/Appearance/StartupHooks.mm \
@@ -83,34 +83,34 @@ YTKACE_FILES = \
 	Tweak/Features/Interface/NavigationVisibility.mm \
 	Tweak/Settings/SettingsEntry.mm \
 	Tweak/Settings/NativeSettingsEntry.mm \
-	Tweak/Settings/YTKACERootOptionsController.mm \
-	Tweak/Settings/YTKACESettingsPages.mm \
-	Tweak/Settings/YTKACESettingsSearch.mm \
-	Tweak/Settings/YTKACETabEditorController.mm \
-	Tweak/Settings/YTKACEDownloadsController.mm
+	Tweak/Settings/YTzoomRootOptionsController.mm \
+	Tweak/Settings/YTzoomSettingsPages.mm \
+	Tweak/Settings/YTzoomSettingsSearch.mm \
+	Tweak/Settings/YTzoomTabEditorController.mm \
+	Tweak/Settings/YTzoomDownloadsController.mm
 
-YTKACE_CFLAGS = -fobjc-arc -Wall -Wextra -Werror=return-type
-YTKACE_CFLAGS += -DYTKACE_COMBINED_SABR=1
-YTKACE_CFLAGS += -DYTKACE_VERSION_STRING=\"$(shell awk '/^Version:/ {print $$2}' $(THEOS_PROJECT_DIR)/control)\"
-YTKACE_CFLAGS += -Wno-module-import-in-extern-c
-YTKACE_CFLAGS += -I$(THEOS_PROJECT_DIR)/Vendor/FFmpeg/include
-YTKACE_CCFLAGS = -std=c++17
-YTKACE_FRAMEWORKS = Foundation UIKit JavaScriptCore AVFoundation AVKit AudioToolbox Photos QuartzCore MediaPlayer Security SystemConfiguration UniformTypeIdentifiers VideoToolbox CoreMedia
-YTKACE_LIBRARIES = z
-YTKACE_LDFLAGS = -Wl,-install_name,@rpath/YTKACE.dylib
-YTKACE_LDFLAGS += $(THEOS_PROJECT_DIR)/Vendor/FFmpeg/lib/libavformat.a
-YTKACE_LDFLAGS += $(THEOS_PROJECT_DIR)/Vendor/FFmpeg/lib/libavcodec.a
-YTKACE_LDFLAGS += $(THEOS_PROJECT_DIR)/Vendor/FFmpeg/lib/libavutil.a
-YTKACE_LDFLAGS += $(THEOS_PROJECT_DIR)/Vendor/FFmpeg/lib/libswscale.a
-YTKACE_INSTALL_PATH = /Library/MobileSubstrate/DynamicLibraries
+YTzoom_CFLAGS = -fobjc-arc -Wall -Wextra -Werror=return-type
+YTzoom_CFLAGS += -DYTzoom_COMBINED_SABR=1
+YTzoom_CFLAGS += -DYTzoom_VERSION_STRING=\"$(shell awk '/^Version:/ {print $$2}' $(THEOS_PROJECT_DIR)/control)\"
+YTzoom_CFLAGS += -Wno-module-import-in-extern-c
+YTzoom_CFLAGS += -I$(THEOS_PROJECT_DIR)/Vendor/FFmpeg/include
+YTzoom_CCFLAGS = -std=c++17
+YTzoom_FRAMEWORKS = Foundation UIKit JavaScriptCore AVFoundation AVKit AudioToolbox Photos QuartzCore MediaPlayer Security SystemConfiguration UniformTypeIdentifiers VideoToolbox CoreMedia
+YTzoom_LIBRARIES = z
+YTzoom_LDFLAGS = -Wl,-install_name,@rpath/YTzoom.dylib
+YTzoom_LDFLAGS += $(THEOS_PROJECT_DIR)/Vendor/FFmpeg/lib/libavformat.a
+YTzoom_LDFLAGS += $(THEOS_PROJECT_DIR)/Vendor/FFmpeg/lib/libavcodec.a
+YTzoom_LDFLAGS += $(THEOS_PROJECT_DIR)/Vendor/FFmpeg/lib/libavutil.a
+YTzoom_LDFLAGS += $(THEOS_PROJECT_DIR)/Vendor/FFmpeg/lib/libswscale.a
+YTzoom_INSTALL_PATH = /Library/MobileSubstrate/DynamicLibraries
 
 include $(THEOS_MAKE_PATH)/library.mk
 
 after-all::
 	@mkdir -p "$(THEOS_PROJECT_DIR)/dist"
-	@cp "$(THEOS_OBJ_DIR)/YTKACE.dylib" "$(THEOS_PROJECT_DIR)/dist/YTKACE.dylib"
+	@cp "$(THEOS_OBJ_DIR)/YTzoom.dylib" "$(THEOS_PROJECT_DIR)/dist/YTzoom.dylib"
 
 after-stage::
 	@mkdir -p "$(THEOS_STAGING_DIR)/Library/MobileSubstrate/DynamicLibraries"
-	@cp -R "$(THEOS_PROJECT_DIR)/Resources/YTKACE.bundle" "$(THEOS_STAGING_DIR)/Library/MobileSubstrate/DynamicLibraries/YTKACE.bundle"
-	@cp "$(THEOS_PROJECT_DIR)/YTKACE.plist" "$(THEOS_STAGING_DIR)/Library/MobileSubstrate/DynamicLibraries/YTKACE.plist"
+	@cp -R "$(THEOS_PROJECT_DIR)/Resources/YTzoom.bundle" "$(THEOS_STAGING_DIR)/Library/MobileSubstrate/DynamicLibraries/YTzoom.bundle"
+	@cp "$(THEOS_PROJECT_DIR)/YTzoom.plist" "$(THEOS_STAGING_DIR)/Library/MobileSubstrate/DynamicLibraries/YTzoom.plist"

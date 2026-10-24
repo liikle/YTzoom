@@ -2,38 +2,38 @@
 
 #import <dlfcn.h>
 
-static NSString *YTKACELoadedImagePath(void) {
+static NSString *YTzoomLoadedImagePath(void) {
     Dl_info image;
     memset(&image, 0, sizeof(image));
-    if (dladdr((const void *)&YTKACEAssetsBundle, &image) == 0) return nil;
+    if (dladdr((const void *)&YTzoomAssetsBundle, &image) == 0) return nil;
     if (image.dli_fname == NULL) return nil;
     return [NSString stringWithUTF8String:image.dli_fname];
 }
 
-static NSArray<NSString *> *YTKACECandidateBundlePaths(void) {
+static NSArray<NSString *> *YTzoomCandidateBundlePaths(void) {
     NSMutableArray<NSString *> *candidates = [NSMutableArray array];
-    NSString *loaded = YTKACELoadedImagePath();
+    NSString *loaded = YTzoomLoadedImagePath();
     if (loaded.length != 0) {
         NSString *directory = loaded.stringByDeletingLastPathComponent;
         while (directory.length > 1) {
             [candidates addObject:
-                [directory stringByAppendingPathComponent:@"YTKACE.bundle"]];
+                [directory stringByAppendingPathComponent:@"YTzoom.bundle"]];
             if (candidates.count >= 2) break;
             directory = directory.stringByDeletingLastPathComponent;
         }
     }
-    NSString *packaged = [NSBundle.mainBundle pathForResource:@"YTKACE"
+    NSString *packaged = [NSBundle.mainBundle pathForResource:@"YTzoom"
                                                        ofType:@"bundle"];
     if (packaged.length != 0) [candidates addObject:packaged];
     return candidates;
 }
 
-NSBundle *YTKACEAssetsBundle(void) {
+NSBundle *YTzoomAssetsBundle(void) {
     static NSBundle *bundle;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
         NSFileManager *manager = NSFileManager.defaultManager;
-        for (NSString *path in YTKACECandidateBundlePaths()) {
+        for (NSString *path in YTzoomCandidateBundlePaths()) {
             BOOL directory = NO;
             if (![manager fileExistsAtPath:path isDirectory:&directory]) continue;
             if (!directory) continue;
@@ -44,9 +44,9 @@ NSBundle *YTKACEAssetsBundle(void) {
     return bundle;
 }
 
-UIImage *YTKACEAssetImage(NSString *name, NSString *fallbackSymbol) {
+UIImage *YTzoomAssetImage(NSString *name, NSString *fallbackSymbol) {
     UIImage *image = nil;
-    NSBundle *bundle = YTKACEAssetsBundle();
+    NSBundle *bundle = YTzoomAssetsBundle();
     if (bundle != nil && name.length != 0) {
         image = [UIImage imageNamed:name
                            inBundle:bundle
@@ -60,7 +60,7 @@ UIImage *YTKACEAssetImage(NSString *name, NSString *fallbackSymbol) {
     return image;
 }
 
-UIImage *YTKACEYouTubeImage(NSArray<NSString *> *names, NSString *fallbackSymbol) {
+UIImage *YTzoomYouTubeImage(NSArray<NSString *> *names, NSString *fallbackSymbol) {
     for (NSString *name in names) {
         UIImage *image = [UIImage imageNamed:name];
         if (image != nil) return image;
@@ -68,31 +68,31 @@ UIImage *YTKACEYouTubeImage(NSArray<NSString *> *names, NSString *fallbackSymbol
     return fallbackSymbol.length == 0 ? nil : [UIImage systemImageNamed:fallbackSymbol];
 }
 
-UIImage *YTKACEGearImage(void) {
-    return YTKACEYouTubeImage(@[
+UIImage *YTzoomGearImage(void) {
+    return YTzoomYouTubeImage(@[
         @"yt_outline_gear_24pt",
         @"yt_outline_gear_vd_theme_24",
         @"yt_outline_experimental_gear_vd_theme_24"
     ], @"gearshape");
 }
 
-UIImage *YTKACEShortsImage(BOOL selected) {
+UIImage *YTzoomShortsImage(BOOL selected) {
     return selected
-        ? YTKACEYouTubeImage(@[
+        ? YTzoomYouTubeImage(@[
             @"yt_fill_youtube_shorts_24pt",
             @"yt_fill_youtube_shorts_vd_theme_24"
         ], @"play.rectangle.fill")
-        : YTKACEYouTubeImage(@[
+        : YTzoomYouTubeImage(@[
             @"yt_outline_youtube_shorts_24pt",
             @"yt_outline_youtube_shorts_vd_theme_24"
         ], @"play.rectangle");
 }
 
-UIImage *YTKACEDownloadTabImage(BOOL selected) {
+UIImage *YTzoomDownloadTabImage(BOOL selected) {
     return [UIImage systemImageNamed:selected
         ? @"arrow.down.square.fill" : @"arrow.down.square"];
 }
 
-UIColor *YTKACEAccentColor(void) {
+UIColor *YTzoomAccentColor(void) {
     return [UIColor colorWithRed:0.749 green:0.0 blue:0.075 alpha:1.0];
 }

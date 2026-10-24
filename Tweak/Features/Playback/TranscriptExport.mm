@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../../Runtime/Localization.h"
@@ -12,16 +12,16 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static NSString *const YTKACETranscriptKey =
-    @"YTKACE.Preference.Playback.Transcript";
+static NSString *const YTzoomTranscriptKey =
+    @"YTzoom.Preference.Playback.Transcript";
 
-static id YTKACETranscriptSend(id receiver, NSString *name) {
+static id YTzoomTranscriptSend(id receiver, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     if (receiver == nil || ![receiver respondsToSelector:selector]) return nil;
     return ((id (*)(id, SEL))objc_msgSend)(receiver, selector);
 }
 
-static id YTKACETranscriptPlayer(UIView *view) {
+static id YTzoomTranscriptPlayer(UIView *view) {
     UIResponder *responder = view;
     while (responder != nil) {
         if ([responder respondsToSelector:NSSelectorFromString(@"activeVideo")]) {
@@ -32,25 +32,25 @@ static id YTKACETranscriptPlayer(UIView *view) {
     return nil;
 }
 
-static NSArray *YTKACETranscriptTracks(id player) {
-    id video = YTKACETranscriptSend(player, @"activeVideo");
-    id tracks = YTKACETranscriptSend(video, @"availableCaptionTracks")
-        ?: YTKACETranscriptSend(player, @"availableCaptionTracks");
+static NSArray *YTzoomTranscriptTracks(id player) {
+    id video = YTzoomTranscriptSend(player, @"activeVideo");
+    id tracks = YTzoomTranscriptSend(video, @"availableCaptionTracks")
+        ?: YTzoomTranscriptSend(player, @"availableCaptionTracks");
     return [tracks isKindOfClass:NSArray.class] ? tracks : nil;
 }
 
-static NSString *YTKACETrackLabel(id track) {
-    NSString *name = YTKACETranscriptSend(track, @"displayName");
+static NSString *YTzoomTrackLabel(id track) {
+    NSString *name = YTzoomTranscriptSend(track, @"displayName");
     if ([name isKindOfClass:NSString.class] && name.length != 0) return name;
-    NSString *language = YTKACETranscriptSend(track, @"languageCode");
+    NSString *language = YTzoomTranscriptSend(track, @"languageCode");
     if ([language isKindOfClass:NSString.class] && language.length != 0) {
         return language;
     }
-    return YTKACELocalized(@"Captions");
+    return YTzoomLocalized(@"Captions");
 }
 
-static NSURL *YTKACETrackJSONURL(id track) {
-    id value = YTKACETranscriptSend(track, @"URL");
+static NSURL *YTzoomTrackJSONURL(id track) {
+    id value = YTzoomTranscriptSend(track, @"URL");
     NSURL *URL = [value isKindOfClass:NSURL.class] ? value
         : ([value isKindOfClass:NSString.class]
             ? [NSURL URLWithString:value] : nil);
@@ -68,7 +68,7 @@ static NSURL *YTKACETrackJSONURL(id track) {
     return components.URL ?: URL;
 }
 
-static NSString *YTKACETimestamp(double seconds) {
+static NSString *YTzoomTimestamp(double seconds) {
     if (seconds < 0.0) seconds = 0.0;
     const NSInteger total = (NSInteger)seconds;
     const NSInteger hours = total / 3600;
@@ -82,7 +82,7 @@ static NSString *YTKACETimestamp(double seconds) {
             (long)minutes, (long)remainder];
 }
 
-static NSString *YTKACEParseTranscript(NSData *data, BOOL timestamps) {
+static NSString *YTzoomParseTranscript(NSData *data, BOOL timestamps) {
     if (data.length == 0) return nil;
     NSDictionary *root = [NSJSONSerialization JSONObjectWithData:data
                                                          options:0
@@ -110,7 +110,7 @@ static NSString *YTKACEParseTranscript(NSData *data, BOOL timestamps) {
             const double seconds = [start isKindOfClass:NSNumber.class]
                 ? start.doubleValue / 1000.0 : 0.0;
             [lines addObject:[NSString stringWithFormat:@"[%@] %@",
-                              YTKACETimestamp(seconds), trimmed]];
+                              YTzoomTimestamp(seconds), trimmed]];
         } else {
             [lines addObject:trimmed];
         }
@@ -120,7 +120,7 @@ static NSString *YTKACEParseTranscript(NSData *data, BOOL timestamps) {
 }
 
 
-static id YTKACEProbe(id object, NSArray<NSString *> *names) {
+static id YTzoomProbe(id object, NSArray<NSString *> *names) {
     for (NSString *name in names) {
         SEL selector = NSSelectorFromString(name);
         if (object != nil && [object respondsToSelector:selector]) {
@@ -131,17 +131,17 @@ static id YTKACEProbe(id object, NSArray<NSString *> *names) {
     return nil;
 }
 
-static NSString *YTKACEFormattedText(id value);
+static NSString *YTzoomFormattedText(id value);
 
-static NSURL *YTKACEURLFromValue(id value) {
+static NSURL *YTzoomURLFromValue(id value) {
     if ([value isKindOfClass:NSURL.class]) return value;
     if ([value isKindOfClass:NSString.class]) return [NSURL URLWithString:value];
-    id nested = YTKACEProbe(value, @[@"baseUrl", @"URL", @"url", @"privateDoNotAccessOrElseSafeUrlStringValue"]);
-    if (nested != nil && nested != value) return YTKACEURLFromValue(nested);
+    id nested = YTzoomProbe(value, @[@"baseUrl", @"URL", @"url", @"privateDoNotAccessOrElseSafeUrlStringValue"]);
+    if (nested != nil && nested != value) return YTzoomURLFromValue(nested);
     return nil;
 }
 
-NSArray<NSDictionary *> *YTKACEParseCaptionCues(NSData *data) {
+NSArray<NSDictionary *> *YTzoomParseCaptionCues(NSData *data) {
     if (data.length == 0) return nil;
     NSDictionary *root = [NSJSONSerialization JSONObjectWithData:data
                                                          options:0 error:NULL];
@@ -175,7 +175,7 @@ NSArray<NSDictionary *> *YTKACEParseCaptionCues(NSData *data) {
     return cues.count != 0 ? cues : nil;
 }
 
-static BOOL YTKACESkipObject(id object) {
+static BOOL YTzoomSkipObject(id object) {
     return object == nil ||
         [object isKindOfClass:NSString.class] ||
         [object isKindOfClass:NSNumber.class] ||
@@ -185,22 +185,22 @@ static BOOL YTKACESkipObject(id object) {
         [object isKindOfClass:NSValue.class];
 }
 
-static id YTKACEDeepCaptionTracks(id root, int depth, NSMutableSet *seen) {
-    if (root == nil || depth < 0 || YTKACESkipObject(root)) return nil;
+static id YTzoomDeepCaptionTracks(id root, int depth, NSMutableSet *seen) {
+    if (root == nil || depth < 0 || YTzoomSkipObject(root)) return nil;
     NSValue *identity = [NSValue valueWithNonretainedObject:root];
     if ([seen containsObject:identity]) return nil;
     [seen addObject:identity];
     if (seen.count > 400) return nil;
 
-    id direct = YTKACEProbe(root, @[@"captionTracksArray", @"captionTracks"]);
+    id direct = YTzoomProbe(root, @[@"captionTracksArray", @"captionTracks"]);
     if ([direct isKindOfClass:NSArray.class] && [direct count] != 0) {
-        YTKACEDownloadLog(@"subs", @"tracks on %@",
+        YTzoomDownloadLog(@"subs", @"tracks on %@",
                           NSStringFromClass(object_getClass(root)));
         return direct;
     }
     if ([root isKindOfClass:NSArray.class]) {
         for (id child in (NSArray *)root) {
-            id found = YTKACEDeepCaptionTracks(child, depth - 1, seen);
+            id found = YTzoomDeepCaptionTracks(child, depth - 1, seen);
             if (found != nil) return found;
         }
         return nil;
@@ -225,7 +225,7 @@ static id YTKACEDeepCaptionTracks(id root, int depth, NSMutableSet *seen) {
             SEL getter = NSSelectorFromString(key);
             if (![root respondsToSelector:getter]) continue;
             id value = ((id (*)(id, SEL))objc_msgSend)(root, getter);
-            id found = YTKACEDeepCaptionTracks(value, depth - 1, seen);
+            id found = YTzoomDeepCaptionTracks(value, depth - 1, seen);
             if (found != nil) {
                 free(properties);
                 return found;
@@ -237,36 +237,36 @@ static id YTKACEDeepCaptionTracks(id root, int depth, NSMutableSet *seen) {
 }
 
 
-NSArray *YTKACECaptionTracksForResponse(id playerResponse) {
-    id data = YTKACEProbe(playerResponse, @[@"playerData"]) ?: playerResponse;
-    id captionsRoot = YTKACEProbe(data, @[@"captions"]);
+NSArray *YTzoomCaptionTracksForResponse(id playerResponse) {
+    id data = YTzoomProbe(playerResponse, @[@"playerData"]) ?: playerResponse;
+    id captionsRoot = YTzoomProbe(data, @[@"captions"]);
     if (captionsRoot != nil) {
         NSMutableSet *budget = [NSMutableSet set];
-        id found = YTKACEDeepCaptionTracks(captionsRoot, 6, budget);
+        id found = YTzoomDeepCaptionTracks(captionsRoot, 6, budget);
         if ([found isKindOfClass:NSArray.class] && [found count] != 0) {
-            YTKACEDownloadLog(@"subs", @"tracks via captions -> %lu",
+            YTzoomDownloadLog(@"subs", @"tracks via captions -> %lu",
                               (unsigned long)[found count]);
             return found;
         }
-        YTKACEDownloadLog(@"subs", @"captions node %@ had no tracks",
+        YTzoomDownloadLog(@"subs", @"captions node %@ had no tracks",
                           NSStringFromClass(object_getClass(captionsRoot)));
     }
-    id captions = YTKACEProbe(playerResponse, @[@"captions"]);
-    id renderer = YTKACEProbe(captions, @[@"playerCaptionsTracklistRenderer",
+    id captions = YTzoomProbe(playerResponse, @[@"captions"]);
+    id renderer = YTzoomProbe(captions, @[@"playerCaptionsTracklistRenderer",
                                           @"playerCaptionsTrackListRenderer"]);
-    id tracks = YTKACEProbe(renderer, @[@"captionTracksArray", @"captionTracks"]);
+    id tracks = YTzoomProbe(renderer, @[@"captionTracksArray", @"captionTracks"]);
     if (![tracks isKindOfClass:NSArray.class] || [tracks count] == 0) {
         NSMutableSet *seen = [NSMutableSet set];
-        tracks = YTKACEDeepCaptionTracks(playerResponse, 6, seen);
+        tracks = YTzoomDeepCaptionTracks(playerResponse, 6, seen);
     }
     if (![tracks isKindOfClass:NSArray.class] || [tracks count] == 0) {
-        id data = YTKACEProbe(playerResponse, @[@"playerData", @"playerResponse"]);
+        id data = YTzoomProbe(playerResponse, @[@"playerData", @"playerResponse"]);
         if (data != nil) {
             NSMutableSet *other = [NSMutableSet set];
-            tracks = YTKACEDeepCaptionTracks(data, 6, other);
+            tracks = YTzoomDeepCaptionTracks(data, 6, other);
         }
     }
-    YTKACEDownloadLog(@"subs", @"tracks for %@ -> %lu",
+    YTzoomDownloadLog(@"subs", @"tracks for %@ -> %lu",
                       NSStringFromClass(object_getClass(playerResponse)),
                       (unsigned long)([tracks isKindOfClass:NSArray.class]
                                           ? [tracks count] : 0));
@@ -274,32 +274,32 @@ NSArray *YTKACECaptionTracksForResponse(id playerResponse) {
 }
 
 
-NSArray<NSDictionary *> *YTKACECaptionChoicesForResponse(id playerResponse) {
-    NSArray *tracks = YTKACECaptionTracksForResponse(playerResponse);
+NSArray<NSDictionary *> *YTzoomCaptionChoicesForResponse(id playerResponse) {
+    NSArray *tracks = YTzoomCaptionTracksForResponse(playerResponse);
     if (tracks.count == 0) return nil;
     NSMutableArray<NSDictionary *> *choices = [NSMutableArray array];
     for (id track in tracks) {
-        NSURL *URL = YTKACECaptionTrackURL(track);
+        NSURL *URL = YTzoomCaptionTrackURL(track);
         if (URL == nil) continue;
         [choices addObject:@{
-            @"label": YTKACECaptionTrackLabel(track),
+            @"label": YTzoomCaptionTrackLabel(track),
             @"url": URL,
-            @"language": YTKACECaptionTrackLanguage(track) ?: @""
+            @"language": YTzoomCaptionTrackLanguage(track) ?: @""
         }];
     }
 
-    id data = YTKACEProbe(playerResponse, @[@"playerData"]) ?: playerResponse;
-    id captions = YTKACEProbe(data, @[@"captions"]);
-    id renderer = YTKACEProbe(captions, @[@"playerCaptionsTracklistRenderer",
+    id data = YTzoomProbe(playerResponse, @[@"playerData"]) ?: playerResponse;
+    id captions = YTzoomProbe(data, @[@"captions"]);
+    id renderer = YTzoomProbe(captions, @[@"playerCaptionsTracklistRenderer",
                                           @"playerCaptionsTrackListRenderer"]);
     if (renderer == nil && captions != nil) {
         NSMutableSet *seen = [NSMutableSet set];
-        renderer = YTKACEDeepCaptionTracks(captions, 4, seen) != nil
+        renderer = YTzoomDeepCaptionTracks(captions, 4, seen) != nil
             ? captions : nil;
     }
-    id languages = YTKACEProbe(renderer, @[@"translationLanguagesArray",
+    id languages = YTzoomProbe(renderer, @[@"translationLanguagesArray",
                                            @"translationLanguages"]);
-    YTKACEDownloadLog(@"subs", @"translations=%lu",
+    YTzoomDownloadLog(@"subs", @"translations=%lu",
                       (unsigned long)([languages isKindOfClass:NSArray.class]
                                           ? [languages count] : 0));
     NSMutableSet<NSString *> *seenCodes = [NSMutableSet set];
@@ -310,15 +310,15 @@ NSArray<NSDictionary *> *YTKACECaptionChoicesForResponse(id playerResponse) {
     NSURL *base = choices.firstObject[@"url"];
     if ([languages isKindOfClass:NSArray.class] && base != nil) {
         for (id language in (NSArray *)languages) {
-            id codeValue = YTKACEProbe(language, @[@"languageCode"]);
+            id codeValue = YTzoomProbe(language, @[@"languageCode"]);
             if (![codeValue isKindOfClass:NSString.class] ||
                 [codeValue length] == 0) {
                 continue;
             }
             if ([seenCodes containsObject:codeValue]) continue;
             [seenCodes addObject:codeValue];
-            NSString *label = YTKACEFormattedText(
-                YTKACEProbe(language, @[@"languageName"]));
+            NSString *label = YTzoomFormattedText(
+                YTzoomProbe(language, @[@"languageName"]));
             if (label.length == 0) {
                 label = [NSLocale.currentLocale
                     localizedStringForLanguageCode:codeValue];
@@ -344,23 +344,23 @@ NSArray<NSDictionary *> *YTKACECaptionChoicesForResponse(id playerResponse) {
             }];
         }
     }
-    YTKACEDownloadLog(@"subs", @"choices=%lu", (unsigned long)choices.count);
+    YTzoomDownloadLog(@"subs", @"choices=%lu", (unsigned long)choices.count);
     return choices.count != 0 ? choices : nil;
 }
 
-static NSString *YTKACEFormattedText(id value) {
+static NSString *YTzoomFormattedText(id value) {
     if ([value isKindOfClass:NSString.class]) {
         return [value length] != 0 ? value : nil;
     }
-    id simple = YTKACEProbe(value, @[@"simpleText", @"stringValue"]);
+    id simple = YTzoomProbe(value, @[@"simpleText", @"stringValue"]);
     if ([simple isKindOfClass:NSString.class] && [simple length] != 0) {
         return simple;
     }
-    id runs = YTKACEProbe(value, @[@"runsArray", @"runs"]);
+    id runs = YTzoomProbe(value, @[@"runsArray", @"runs"]);
     if ([runs isKindOfClass:NSArray.class]) {
         NSMutableString *joined = [NSMutableString string];
         for (id run in (NSArray *)runs) {
-            id text = YTKACEProbe(run, @[@"text"]);
+            id text = YTzoomProbe(run, @[@"text"]);
             if ([text isKindOfClass:NSString.class]) [joined appendString:text];
         }
         if (joined.length != 0) return joined;
@@ -368,26 +368,26 @@ static NSString *YTKACEFormattedText(id value) {
     return nil;
 }
 
-NSString *YTKACECaptionTrackLabel(id track) {
-    NSString *text = YTKACEFormattedText(
-        YTKACEProbe(track, @[@"name", @"displayName", @"trackName"]));
+NSString *YTzoomCaptionTrackLabel(id track) {
+    NSString *text = YTzoomFormattedText(
+        YTzoomProbe(track, @[@"name", @"displayName", @"trackName"]));
     if (text.length != 0) return text;
-    id language = YTKACEProbe(track, @[@"languageCode"]);
+    id language = YTzoomProbe(track, @[@"languageCode"]);
     if ([language isKindOfClass:NSString.class] && [language length] != 0) {
         NSString *display = [NSLocale.currentLocale
             localizedStringForLanguageCode:language];
         return display.length != 0 ? display : [language uppercaseString];
     }
-    return YTKACELocalized(@"Captions");
+    return YTzoomLocalized(@"Captions");
 }
 
-NSString *YTKACECaptionTrackLanguage(id track) {
-    id language = YTKACEProbe(track, @[@"languageCode"]);
+NSString *YTzoomCaptionTrackLanguage(id track) {
+    id language = YTzoomProbe(track, @[@"languageCode"]);
     return [language isKindOfClass:NSString.class] ? language : nil;
 }
 
-NSURL *YTKACECaptionTrackURL(id track) {
-    NSURL *URL = YTKACEURLFromValue(YTKACEProbe(track, @[@"baseUrl", @"baseURL"]));
+NSURL *YTzoomCaptionTrackURL(id track) {
+    NSURL *URL = YTzoomURLFromValue(YTzoomProbe(track, @[@"baseUrl", @"baseURL"]));
     if (URL == nil) return nil;
     NSURLComponents *components =
         [NSURLComponents componentsWithURL:URL resolvingAgainstBaseURL:NO];
@@ -402,7 +402,7 @@ NSURL *YTKACECaptionTrackURL(id track) {
     return components.URL ?: URL;
 }
 
-void YTKACEFetchCuesForURL(NSURL *url,
+void YTzoomFetchCuesForURL(NSURL *url,
                            void (^completion)(NSArray<NSDictionary *> *cues)) {
     if (url == nil) {
         completion(nil);
@@ -413,32 +413,32 @@ void YTKACEFetchCuesForURL(NSURL *url,
                             NSError *error) {
         (void)response;
         NSArray<NSDictionary *> *cues =
-            error != nil ? nil : YTKACEParseCaptionCues(data);
-        YTKACEDownloadLog(@"subs", @"fetched %lu cues",
+            error != nil ? nil : YTzoomParseCaptionCues(data);
+        YTzoomDownloadLog(@"subs", @"fetched %lu cues",
                           (unsigned long)cues.count);
         dispatch_async(dispatch_get_main_queue(), ^{ completion(cues); });
     }] resume];
 }
 
-void YTKACEResolveCaptionTrack(id playerResponse,
+void YTzoomResolveCaptionTrack(id playerResponse,
                                void (^completion)(NSURL *url,
                                                   NSString *language)) {
-    id captions = YTKACEProbe(playerResponse, @[@"captions"]);
-    id renderer = YTKACEProbe(captions, @[@"playerCaptionsTracklistRenderer",
+    id captions = YTzoomProbe(playerResponse, @[@"captions"]);
+    id renderer = YTzoomProbe(captions, @[@"playerCaptionsTracklistRenderer",
                                           @"playerCaptionsTrackListRenderer"]);
-    id tracks = YTKACEProbe(renderer, @[@"captionTracksArray", @"captionTracks"]);
+    id tracks = YTzoomProbe(renderer, @[@"captionTracksArray", @"captionTracks"]);
     if (![tracks isKindOfClass:NSArray.class] || [tracks count] == 0) {
         NSMutableSet *seen = [NSMutableSet set];
-        tracks = YTKACEDeepCaptionTracks(playerResponse, 6, seen);
+        tracks = YTzoomDeepCaptionTracks(playerResponse, 6, seen);
         if (tracks == nil) {
-            id data = YTKACEProbe(playerResponse, @[@"playerData", @"playerResponse"]);
+            id data = YTzoomProbe(playerResponse, @[@"playerData", @"playerResponse"]);
             if (data != nil) {
                 NSMutableSet *other = [NSMutableSet set];
-                tracks = YTKACEDeepCaptionTracks(data, 6, other);
+                tracks = YTzoomDeepCaptionTracks(data, 6, other);
             }
         }
     }
-    YTKACEDownloadLog(@"subs", @"resolve root=%@ captions=%d renderer=%d tracks=%lu",
+    YTzoomDownloadLog(@"subs", @"resolve root=%@ captions=%d renderer=%d tracks=%lu",
                       NSStringFromClass(object_getClass(playerResponse)),
                       captions != nil, renderer != nil,
                       (unsigned long)([tracks isKindOfClass:NSArray.class]
@@ -448,8 +448,8 @@ void YTKACEResolveCaptionTrack(id playerResponse,
         return;
     }
     id track = [tracks firstObject];
-    NSURL *URL = YTKACEURLFromValue(YTKACEProbe(track, @[@"baseUrl", @"baseURL"]));
-    id languageValue = YTKACEProbe(track, @[@"languageCode"]);
+    NSURL *URL = YTzoomURLFromValue(YTzoomProbe(track, @[@"baseUrl", @"baseURL"]));
+    id languageValue = YTzoomProbe(track, @[@"languageCode"]);
     NSString *language = [languageValue isKindOfClass:NSString.class]
         ? languageValue : nil;
     if (URL == nil) {
@@ -468,10 +468,10 @@ void YTKACEResolveCaptionTrack(id playerResponse,
     completion(components.URL ?: URL, language);
 }
 
-void YTKACEFetchCaptionCues(id playerResponse,
+void YTzoomFetchCaptionCues(id playerResponse,
                             void (^completion)(NSArray<NSDictionary *> *cues,
                                                NSString *language)) {
-    YTKACEResolveCaptionTrack(playerResponse, ^(NSURL *url, NSString *language) {
+    YTzoomResolveCaptionTrack(playerResponse, ^(NSURL *url, NSString *language) {
         if (url == nil) {
             completion(nil, nil);
             return;
@@ -481,15 +481,15 @@ void YTKACEFetchCaptionCues(id playerResponse,
                                 NSError *error) {
             (void)response;
             NSArray<NSDictionary *> *cues =
-                error != nil ? nil : YTKACEParseCaptionCues(data);
-            YTKACEDownloadLog(@"subs", @"fetched %lu cues lang=%@",
+                error != nil ? nil : YTzoomParseCaptionCues(data);
+            YTzoomDownloadLog(@"subs", @"fetched %lu cues lang=%@",
                               (unsigned long)cues.count, language ?: @"?");
             completion(cues, language);
         }] resume];
     });
 }
 
-static UIViewController *YTKACETranscriptPresenter(void) {
+static UIViewController *YTzoomTranscriptPresenter(void) {
     UIWindow *key = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class]) continue;
@@ -504,8 +504,8 @@ static UIViewController *YTKACETranscriptPresenter(void) {
     return controller;
 }
 
-static void YTKACEShareTranscript(NSString *text, UIView *sourceView) {
-    UIViewController *presenter = YTKACETranscriptPresenter();
+static void YTzoomShareTranscript(NSString *text, UIView *sourceView) {
+    UIViewController *presenter = YTzoomTranscriptPresenter();
     if (presenter == nil) return;
     UIActivityViewController *sheet =
         [[UIActivityViewController alloc] initWithActivityItems:@[text]
@@ -521,10 +521,10 @@ static void YTKACEShareTranscript(NSString *text, UIView *sourceView) {
     [presenter presentViewController:sheet animated:YES completion:nil];
 }
 
-static void YTKACEFetchTranscript(id track,
+static void YTzoomFetchTranscript(id track,
                                   BOOL timestamps,
                                   void (^completion)(NSString *)) {
-    NSURL *URL = YTKACETrackJSONURL(track);
+    NSURL *URL = YTzoomTrackJSONURL(track);
     if (URL == nil) {
         completion(nil);
         return;
@@ -534,99 +534,99 @@ static void YTKACEFetchTranscript(id track,
       completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {
         (void)response;
         NSString *text = error != nil
-            ? nil : YTKACEParseTranscript(data, timestamps);
+            ? nil : YTzoomParseTranscript(data, timestamps);
         dispatch_async(dispatch_get_main_queue(), ^{ completion(text); });
     }];
     [task resume];
 }
 
-@interface YTKACETranscriptCoordinator : NSObject
+@interface YTzoomTranscriptCoordinator : NSObject
 @property(nonatomic, weak) UIView *overlay;
 @property(nonatomic, weak) UIButton *button;
 + (instancetype)sharedCoordinator;
 - (void)presentTranscript;
 @end
 
-@implementation YTKACETranscriptCoordinator
+@implementation YTzoomTranscriptCoordinator
 
 + (instancetype)sharedCoordinator {
-    static YTKACETranscriptCoordinator *shared;
+    static YTzoomTranscriptCoordinator *shared;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{ shared = [self new]; });
     return shared;
 }
 
 - (void)deliver:(id)track timestamps:(BOOL)timestamps share:(BOOL)share {
-    __weak YTKACETranscriptCoordinator *weakSelf = self;
-    YTKACEShowNotice(YTKACELocalized(@"Loading transcript…"));
-    YTKACEFetchTranscript(track, timestamps, ^(NSString *text) {
+    __weak YTzoomTranscriptCoordinator *weakSelf = self;
+    YTzoomShowNotice(YTzoomLocalized(@"Loading transcript…"));
+    YTzoomFetchTranscript(track, timestamps, ^(NSString *text) {
         if (text.length == 0) {
-            YTKACEShowNotice(YTKACELocalized(@"No transcript available"));
+            YTzoomShowNotice(YTzoomLocalized(@"No transcript available"));
             return;
         }
         if (share) {
-            YTKACEShareTranscript(text, weakSelf.button);
+            YTzoomShareTranscript(text, weakSelf.button);
             return;
         }
         UIPasteboard.generalPasteboard.string = text;
-        YTKACEShowNotice(YTKACELocalized(@"Transcript copied"));
+        YTzoomShowNotice(YTzoomLocalized(@"Transcript copied"));
     });
 }
 
 - (void)presentOptionsForTrack:(id)track {
-    __weak YTKACETranscriptCoordinator *weakSelf = self;
-    YTKACEPresentNativeSheet(YTKACELocalized(@"Transcript"),
-                             YTKACETrackLabel(track),
+    __weak YTzoomTranscriptCoordinator *weakSelf = self;
+    YTzoomPresentNativeSheet(YTzoomLocalized(@"Transcript"),
+                             YTzoomTrackLabel(track),
                              self.button, @[
-        @{ @"title": YTKACELocalized(@"Copy Text"),
+        @{ @"title": YTzoomLocalized(@"Copy Text"),
            @"handler": ^{ [weakSelf deliver:track timestamps:NO share:NO]; } },
-        @{ @"title": YTKACELocalized(@"Copy With Timestamps"),
+        @{ @"title": YTzoomLocalized(@"Copy With Timestamps"),
            @"handler": ^{ [weakSelf deliver:track timestamps:YES share:NO]; } },
-        @{ @"title": YTKACELocalized(@"Share…"),
+        @{ @"title": YTzoomLocalized(@"Share…"),
            @"handler": ^{ [weakSelf deliver:track timestamps:YES share:YES]; } }
     ]);
 }
 
 - (void)presentTranscript {
-    id player = YTKACETranscriptPlayer(self.overlay);
-    NSArray *tracks = YTKACETranscriptTracks(player);
+    id player = YTzoomTranscriptPlayer(self.overlay);
+    NSArray *tracks = YTzoomTranscriptTracks(player);
     if (tracks.count == 0) {
-        YTKACEShowNotice(YTKACELocalized(@"No captions for this video"));
+        YTzoomShowNotice(YTzoomLocalized(@"No captions for this video"));
         return;
     }
     if (tracks.count == 1) {
         [self presentOptionsForTrack:tracks.firstObject];
         return;
     }
-    __weak YTKACETranscriptCoordinator *weakSelf = self;
+    __weak YTzoomTranscriptCoordinator *weakSelf = self;
     NSMutableArray<NSDictionary *> *actions = [NSMutableArray array];
     for (id track in tracks) {
         [actions addObject:@{
-            @"title": YTKACETrackLabel(track),
+            @"title": YTzoomTrackLabel(track),
             @"handler": ^{ [weakSelf presentOptionsForTrack:track]; }
         }];
     }
-    YTKACEPresentNativeSheet(YTKACELocalized(@"Transcript"),
-                             YTKACELocalized(@"Choose a caption track"),
+    YTzoomPresentNativeSheet(YTzoomLocalized(@"Transcript"),
+                             YTzoomLocalized(@"Choose a caption track"),
                              self.button, actions);
 }
 
 @end
 
-void YTKACEInstallTranscriptHooks(void) {
-    YTKACERegisterOverlayConfigurator(@"transcript",
+void YTzoomInstallTranscriptHooks(void) {
+    YTzoomRegisterOverlayConfigurator(@"transcript",
         ^(UIView *overlay, UIStackView *stack) {
-        YTKACETranscriptCoordinator *coordinator =
-            YTKACETranscriptCoordinator.sharedCoordinator;
+        YTzoomTranscriptCoordinator *coordinator =
+            YTzoomTranscriptCoordinator.sharedCoordinator;
         coordinator.overlay = overlay;
-        UIButton *button = YTKACEOverlayButton(
+        UIButton *button = YTzoomOverlayButton(
             stack,
-            @"YTKACE Transcript",
+            @"YTzoom Transcript",
             @"text.bubble",
             coordinator,
             @selector(presentTranscript)
         );
         coordinator.button = button;
-        button.hidden = !YTKACEFeatureEnabled(YTKACETranscriptKey);
+        button.hidden = !YTzoomFeatureEnabled(YTzoomTranscriptKey);
     });
 }

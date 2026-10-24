@@ -2,14 +2,14 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-typedef void (^YTKACEOverlayConfigurator)(UIView *overlay, UIStackView *stack);
+typedef void (^YTzoomOverlayConfigurator)(UIView *overlay, UIStackView *stack);
 
-FOUNDATION_EXPORT void YTKACERegisterOverlayConfigurator(
+FOUNDATION_EXPORT void YTzoomRegisterOverlayConfigurator(
     NSString *identifier,
-    YTKACEOverlayConfigurator configurator
+    YTzoomOverlayConfigurator configurator
 );
 
-FOUNDATION_EXPORT UIButton *YTKACEOverlayButton(
+FOUNDATION_EXPORT UIButton *YTzoomOverlayButton(
     UIStackView *stack,
     NSString *identifier,
     NSString *symbolName,
@@ -17,15 +17,15 @@ FOUNDATION_EXPORT UIButton *YTKACEOverlayButton(
     SEL action
 );
 
-FOUNDATION_EXPORT void YTKACEPresentNativeSheet(
+FOUNDATION_EXPORT void YTzoomPresentNativeSheet(
     NSString *_Nullable title,
     NSString *_Nullable subtitle,
     UIView *_Nullable sourceView,
     NSArray<NSDictionary *> *actions
 );
 
-FOUNDATION_EXPORT id _Nullable YTKACEMakeSheet(NSString *_Nullable title, NSString *_Nullable subtitle);
+FOUNDATION_EXPORT id _Nullable YTzoomMakeSheet(NSString *_Nullable title, NSString *_Nullable subtitle);
 
-FOUNDATION_EXPORT BOOL YTKACEShowSheet(id _Nullable sheet, UIViewController *_Nullable presenter);
+FOUNDATION_EXPORT BOOL YTzoomShowSheet(id _Nullable sheet, UIViewController *_Nullable presenter);
 
 NS_ASSUME_NONNULL_END

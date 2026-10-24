@@ -15,12 +15,12 @@ FORBIDDEN_PREFERENCE_PREFIXES = (
     "ACE" + "Enable",
     "ACE" + "Hide",
     "AudioNotification" + "OnSkip",
-    "YTKACE" + "DownloadsTab",
-    "YTKACE" + "TabNames",
+    "YTzoom" + "DownloadsTab",
+    "YTzoom" + "TabNames",
     "YTKSaved" + "PlaybackRate",
-    "kYTKACE" + "Progress",
-    "YTKACESponsor" + "Behavior",
-    "YTKACESponsor" + "Color",
+    "kYTzoom" + "Progress",
+    "YTzoomSponsor" + "Behavior",
+    "YTzoomSponsor" + "Color",
 )
 STRING_LITERAL = re.compile(r'@?"([^"\n]*)"')
 SKIP = {".git", ".build", "dist", "packages", ".theos"}

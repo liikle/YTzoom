@@ -5,59 +5,59 @@
 
 #import <objc/message.h>
 
-NSString * const YTKACEDownloadMethodKey = @"YTKACE.Preference.Downloads.Method";
+NSString * const YTzoomDownloadMethodKey = @"YTzoom.Preference.Downloads.Method";
 
-static NSString * const YTKACEDirectUserAgent =
+static NSString * const YTzoomDirectUserAgent =
     @"Mozilla/5.0 (Macintosh; Intel Mac OS X 15_7_3) AppleWebKit/605.1.15 "
      "(KHTML, like Gecko) Version/26.0 Safari/605.1.15";
-static NSString * const YTKACEDirectVisitorKey = @"YTKACE.Cache.DirectVisitor";
-static const NSTimeInterval YTKACEDirectVisitorLifetime = 7.0 * 24.0 * 60.0 * 60.0;
-static const int64_t YTKACEDirectChunkSize = 8 * 1024 * 1024;
-static const NSInteger YTKACEDirectChunkAttempts = 4;
+static NSString * const YTzoomDirectVisitorKey = @"YTzoom.Cache.DirectVisitor";
+static const NSTimeInterval YTzoomDirectVisitorLifetime = 7.0 * 24.0 * 60.0 * 60.0;
+static const int64_t YTzoomDirectChunkSize = 8 * 1024 * 1024;
+static const NSInteger YTzoomDirectChunkAttempts = 4;
 
-static NSInteger YTKACEDownloadMethod(void) {
-    id stored = YTKACEPreferenceObject(YTKACEDownloadMethodKey);
+static NSInteger YTzoomDownloadMethod(void) {
+    id stored = YTzoomPreferenceObject(YTzoomDownloadMethodKey);
     if ([stored respondsToSelector:@selector(integerValue)]) return [stored integerValue];
-    return YTKACEFeatureEnabled(@"YTKACE.Preference.Downloads.TVClient") ? 2 : 0;
+    return YTzoomFeatureEnabled(@"YTzoom.Preference.Downloads.TVClient") ? 2 : 0;
 }
 
-BOOL YTKACEDirectDownloadsEnabled(void) {
-    return YTKACEDownloadMethod() == 1;
+BOOL YTzoomDirectDownloadsEnabled(void) {
+    return YTzoomDownloadMethod() == 1;
 }
 
-BOOL YTKACETVDownloadsEnabled(void) {
-    return YTKACEDownloadMethod() == 2;
+BOOL YTzoomTVDownloadsEnabled(void) {
+    return YTzoomDownloadMethod() == 2;
 }
 
-@interface YTKACEDirectTask ()
+@interface YTzoomDirectTask ()
 @property(atomic, assign) BOOL cancelled;
 @property(atomic, strong) NSURLSessionTask *currentTask;
 @end
 
-@implementation YTKACEDirectTask
+@implementation YTzoomDirectTask
 - (void)cancel {
     self.cancelled = YES;
     [self.currentTask cancel];
 }
 @end
 
-static NSError *YTKACEDirectError(NSInteger code, NSString *message) {
-    return [NSError errorWithDomain:@"YTKACEDirect" code:code
+static NSError *YTzoomDirectError(NSInteger code, NSString *message) {
+    return [NSError errorWithDomain:@"YTzoomDirect" code:code
                            userInfo:@{NSLocalizedDescriptionKey: message}];
 }
 
-static NSDictionary *YTKACEDirectContext(NSString *visitor) {
+static NSDictionary *YTzoomDirectContext(NSString *visitor) {
     NSMutableDictionary *client = [@{
         @"clientName": @"VISIONOS", @"clientVersion": @"1.02",
         @"osName": @"visionOS", @"osVersion": @"26.5.23O471",
         @"deviceMake": @"Apple", @"deviceModel": @"RealityDevice17,1",
-        @"userAgent": YTKACEDirectUserAgent,
+        @"userAgent": YTzoomDirectUserAgent,
         @"hl": @"en", @"gl": @"US"} mutableCopy];
     if (visitor.length != 0) client[@"visitorData"] = visitor;
     return @{@"client": client};
 }
 
-static NSData *YTKACEDirectFetch(NSURLRequest *request, YTKACEDirectTask *task,
+static NSData *YTzoomDirectFetch(NSURLRequest *request, YTzoomDirectTask *task,
                                  NSInteger *status, NSError **error) {
     __block NSData *result = nil;
     __block NSInteger code = 0;
@@ -76,7 +76,7 @@ static NSData *YTKACEDirectFetch(NSURLRequest *request, YTKACEDirectTask *task,
     if (dispatch_semaphore_wait(done, dispatch_time(DISPATCH_TIME_NOW,
             (int64_t)(90 * NSEC_PER_SEC))) != 0) {
         [dataTask cancel];
-        failure = YTKACEDirectError(2, @"request timed out");
+        failure = YTzoomDirectError(2, @"request timed out");
     }
     task.currentTask = nil;
     if (status != NULL) *status = code;
@@ -84,7 +84,7 @@ static NSData *YTKACEDirectFetch(NSURLRequest *request, YTKACEDirectTask *task,
     return result;
 }
 
-@interface YTKACEDirectChunkReceiver : NSObject <NSURLSessionDataDelegate>
+@interface YTzoomDirectChunkReceiver : NSObject <NSURLSessionDataDelegate>
 @property(nonatomic, strong) NSMutableData *data;
 @property(nonatomic, assign) NSInteger status;
 @property(nonatomic, strong) NSError *error;
@@ -93,7 +93,7 @@ static NSData *YTKACEDirectFetch(NSURLRequest *request, YTKACEDirectTask *task,
 @property(nonatomic, assign) CFAbsoluteTime lastReport;
 @end
 
-@implementation YTKACEDirectChunkReceiver
+@implementation YTzoomDirectChunkReceiver
 
 - (void)URLSession:(NSURLSession *)session dataTask:(NSURLSessionDataTask *)dataTask
     didReceiveResponse:(NSURLResponse *)response
@@ -127,10 +127,10 @@ static NSData *YTKACEDirectFetch(NSURLRequest *request, YTKACEDirectTask *task,
 
 @end
 
-static NSData *YTKACEDirectFetchChunk(NSURLRequest *request, YTKACEDirectTask *task,
+static NSData *YTzoomDirectFetchChunk(NSURLRequest *request, YTzoomDirectTask *task,
                                       void (^received)(int64_t bytes),
                                       NSInteger *status, NSError **error) {
-    YTKACEDirectChunkReceiver *receiver = [YTKACEDirectChunkReceiver new];
+    YTzoomDirectChunkReceiver *receiver = [YTzoomDirectChunkReceiver new];
     receiver.data = [NSMutableData data];
     receiver.done = dispatch_semaphore_create(0);
     receiver.received = received;
@@ -141,7 +141,7 @@ static NSData *YTKACEDirectFetchChunk(NSURLRequest *request, YTKACEDirectTask *t
     if (dispatch_semaphore_wait(receiver.done, dispatch_time(DISPATCH_TIME_NOW,
             (int64_t)(90 * NSEC_PER_SEC))) != 0) {
         [dataTask cancel];
-        receiver.error = YTKACEDirectError(2, @"request timed out");
+        receiver.error = YTzoomDirectError(2, @"request timed out");
     }
     task.currentTask = nil;
     if (status != NULL) *status = receiver.status;
@@ -149,7 +149,7 @@ static NSData *YTKACEDirectFetchChunk(NSURLRequest *request, YTKACEDirectTask *t
     return receiver.error == nil ? receiver.data : nil;
 }
 
-static NSMutableURLRequest *YTKACEDirectAPIRequest(NSString *path, NSDictionary *body,
+static NSMutableURLRequest *YTzoomDirectAPIRequest(NSString *path, NSDictionary *body,
                                                    NSString *visitor) {
     NSURL *URL = [NSURL URLWithString:
         [@"https://youtubei.googleapis.com/youtubei/v1/" stringByAppendingString:path]];
@@ -157,39 +157,39 @@ static NSMutableURLRequest *YTKACEDirectAPIRequest(NSString *path, NSDictionary 
     request.HTTPMethod = @"POST";
     request.HTTPBody = [NSJSONSerialization dataWithJSONObject:body options:0 error:nil];
     [request setValue:@"application/json" forHTTPHeaderField:@"Content-Type"];
-    [request setValue:YTKACEDirectUserAgent forHTTPHeaderField:@"User-Agent"];
+    [request setValue:YTzoomDirectUserAgent forHTTPHeaderField:@"User-Agent"];
     if (visitor.length != 0) [request setValue:visitor forHTTPHeaderField:@"X-Goog-Visitor-Id"];
     return request;
 }
 
-static NSString *YTKACEDirectVisitor(BOOL refresh, YTKACEDirectTask *task) {
-    NSDictionary *cached = YTKACEPreferenceObject(YTKACEDirectVisitorKey);
+static NSString *YTzoomDirectVisitor(BOOL refresh, YTzoomDirectTask *task) {
+    NSDictionary *cached = YTzoomPreferenceObject(YTzoomDirectVisitorKey);
     if (!refresh && [cached isKindOfClass:NSDictionary.class]) {
         NSString *value = cached[@"id"];
         NSNumber *time = cached[@"time"];
         if ([value isKindOfClass:NSString.class] && value.length != 0 &&
             [time isKindOfClass:NSNumber.class] &&
-            NSDate.date.timeIntervalSince1970 - time.doubleValue < YTKACEDirectVisitorLifetime) {
+            NSDate.date.timeIntervalSince1970 - time.doubleValue < YTzoomDirectVisitorLifetime) {
             return value;
         }
     }
     NSString *visitor = nil;
     for (NSInteger attempt = 0; attempt < 3 && visitor.length == 0 && !task.cancelled; attempt++) {
         if (attempt > 0) [NSThread sleepForTimeInterval:0.4];
-        NSData *data = YTKACEDirectFetch(YTKACEDirectAPIRequest(
+        NSData *data = YTzoomDirectFetch(YTzoomDirectAPIRequest(
             @"guide?prettyPrint=false&fields=responseContext.visitorData",
-            @{@"context": YTKACEDirectContext(nil)}, nil), task, NULL, NULL);
+            @{@"context": YTzoomDirectContext(nil)}, nil), task, NULL, NULL);
         id json = data.length != 0 ? [NSJSONSerialization JSONObjectWithData:data options:0 error:nil] : nil;
         id value = [json isKindOfClass:NSDictionary.class] ? json[@"responseContext"][@"visitorData"] : nil;
         visitor = [value isKindOfClass:NSString.class] ? value : nil;
     }
     if (visitor.length == 0) return nil;
-    YTKACESetPreferenceObject(YTKACEDirectVisitorKey,
+    YTzoomSetPreferenceObject(YTzoomDirectVisitorKey,
         @{@"id": visitor, @"time": @(NSDate.date.timeIntervalSince1970)});
     return visitor;
 }
 
-static NSArray<YTKACEStreamOption *> *YTKACEDirectOptions(NSString *videoID, YTKACEDirectTask *task,
+static NSArray<YTzoomStreamOption *> *YTzoomDirectOptions(NSString *videoID, YTzoomDirectTask *task,
                                                           NSString **reason) {
     Class responseClass = NSClassFromString(@"YTIPlayerResponse");
     SEL initSelector = NSSelectorFromString(@"initWithData:error:");
@@ -198,17 +198,17 @@ static NSArray<YTKACEStreamOption *> *YTKACEDirectOptions(NSString *videoID, YTK
         return @[];
     }
     for (NSInteger attempt = 0; attempt < 2 && !task.cancelled; attempt++) {
-        NSString *visitor = YTKACEDirectVisitor(attempt > 0, task);
-        NSDictionary *body = @{@"context": YTKACEDirectContext(visitor), @"videoId": videoID,
+        NSString *visitor = YTzoomDirectVisitor(attempt > 0, task);
+        NSDictionary *body = @{@"context": YTzoomDirectContext(visitor), @"videoId": videoID,
                                @"contentCheckOk": @YES, @"racyCheckOk": @YES};
         NSInteger status = 0;
-        NSData *proto = YTKACEDirectFetch(
-            YTKACEDirectAPIRequest(@"player?alt=proto", body, visitor), task, &status, NULL);
+        NSData *proto = YTzoomDirectFetch(
+            YTzoomDirectAPIRequest(@"player?alt=proto", body, visitor), task, &status, NULL);
         id response = proto.length != 0
             ? ((id (*)(id, SEL, id, NSError **))objc_msgSend)(
                 [responseClass alloc], initSelector, proto, NULL) : nil;
-        NSMutableArray<YTKACEStreamOption *> *options = [NSMutableArray array];
-        for (YTKACEStreamOption *option in [YTKACEStreamResolver optionsFromPlayerResponse:response]) {
+        NSMutableArray<YTzoomStreamOption *> *options = [NSMutableArray array];
+        for (YTzoomStreamOption *option in [YTzoomStreamResolver optionsFromPlayerResponse:response]) {
             if (option.URL != nil && option.adaptive) [options addObject:option];
         }
         if (options.count != 0) return options;
@@ -221,7 +221,7 @@ static NSArray<YTKACEStreamOption *> *YTKACEDirectOptions(NSString *videoID, YTK
     return @[];
 }
 
-static NSString *YTKACEDirectCodec(YTKACEStreamOption *option) {
+static NSString *YTzoomDirectCodec(YTzoomStreamOption *option) {
     NSString *mime = option.mimeType ?: @"";
     NSRange codecs = [mime rangeOfString:@"codecs=\""];
     if (codecs.location == NSNotFound) return mime;
@@ -232,27 +232,27 @@ static NSString *YTKACEDirectCodec(YTKACEStreamOption *option) {
     return [NSString stringWithFormat:@"%@|%@", container, family];
 }
 
-static YTKACEStreamOption *YTKACEDirectMatch(NSArray<YTKACEStreamOption *> *options,
-                                             YTKACEStreamOption *wanted, BOOL audio) {
-    NSMutableArray<YTKACEStreamOption *> *pool = [NSMutableArray array];
-    for (YTKACEStreamOption *option in options) {
+static YTzoomStreamOption *YTzoomDirectMatch(NSArray<YTzoomStreamOption *> *options,
+                                             YTzoomStreamOption *wanted, BOOL audio) {
+    NSMutableArray<YTzoomStreamOption *> *pool = [NSMutableArray array];
+    for (YTzoomStreamOption *option in options) {
         if (option.audioOnly == audio) [pool addObject:option];
     }
     if (pool.count == 0) return nil;
     if (wanted == nil) return pool.firstObject;
     BOOL wantsTrack = audio && wanted.audioTrackID.length != 0;
-    for (YTKACEStreamOption *option in pool) {
+    for (YTzoomStreamOption *option in pool) {
         if (option.itag == wanted.itag &&
             (!wantsTrack || [option.audioTrackID isEqualToString:wanted.audioTrackID])) {
             return option;
         }
     }
-    for (YTKACEStreamOption *option in pool) {
+    for (YTzoomStreamOption *option in pool) {
         if (option.itag == wanted.itag) return option;
     }
-    NSString *codec = YTKACEDirectCodec(wanted);
-    for (YTKACEStreamOption *option in pool) {
-        if (![YTKACEDirectCodec(option) isEqualToString:codec]) continue;
+    NSString *codec = YTzoomDirectCodec(wanted);
+    for (YTzoomStreamOption *option in pool) {
+        if (![YTzoomDirectCodec(option) isEqualToString:codec]) continue;
         if (audio) {
             if (!wantsTrack || [option.audioTrackID isEqualToString:wanted.audioTrackID]) return option;
         } else if (option.height == wanted.height) {
@@ -262,27 +262,27 @@ static YTKACEStreamOption *YTKACEDirectMatch(NSArray<YTKACEStreamOption *> *opti
     return nil;
 }
 
-@interface YTKACEDirectJob : NSObject
+@interface YTzoomDirectJob : NSObject
 @property(nonatomic, copy) NSString *videoID;
 @property(nonatomic, copy) NSString *identifier;
-@property(nonatomic, strong) YTKACEDirectTask *task;
-@property(nonatomic, copy) NSArray<YTKACEStreamOption *> *options;
+@property(nonatomic, strong) YTzoomDirectTask *task;
+@property(nonatomic, copy) NSArray<YTzoomStreamOption *> *options;
 @end
 
-@implementation YTKACEDirectJob
+@implementation YTzoomDirectJob
 
 - (BOOL)refreshOptions {
     NSString *reason = nil;
-    NSArray *options = YTKACEDirectOptions(self.videoID, self.task, &reason);
+    NSArray *options = YTzoomDirectOptions(self.videoID, self.task, &reason);
     if (options.count == 0) {
-        YTKACEDownloadLog(self.identifier, @"direct refresh failed %@", reason ?: @"");
+        YTzoomDownloadLog(self.identifier, @"direct refresh failed %@", reason ?: @"");
         return NO;
     }
     self.options = options;
     return YES;
 }
 
-- (BOOL)downloadOption:(YTKACEStreamOption *)option
+- (BOOL)downloadOption:(YTzoomStreamOption *)option
                  audio:(BOOL)audio
                 toFile:(NSURL *)file
               progress:(void (^)(int64_t bytes))progress
@@ -290,7 +290,7 @@ static YTKACEStreamOption *YTKACEDirectMatch(NSArray<YTKACEStreamOption *> *opti
     [NSFileManager.defaultManager createFileAtPath:file.path contents:nil attributes:nil];
     NSFileHandle *handle = [NSFileHandle fileHandleForWritingToURL:file error:error];
     if (handle == nil) return NO;
-    YTKACEStreamOption *current = option;
+    YTzoomStreamOption *current = option;
     int64_t total = MAX((int64_t)current.contentLength, 0);
     int64_t offset = 0;
     BOOL finished = NO;
@@ -301,21 +301,21 @@ static YTKACEStreamOption *YTKACEDirectMatch(NSArray<YTKACEStreamOption *> *opti
                 code:NSURLErrorCancelled userInfo:nil];
             return NO;
         }
-        int64_t end = total > 0 ? MIN(offset + YTKACEDirectChunkSize, total) - 1
-                                : offset + YTKACEDirectChunkSize - 1;
+        int64_t end = total > 0 ? MIN(offset + YTzoomDirectChunkSize, total) - 1
+                                : offset + YTzoomDirectChunkSize - 1;
         NSData *chunk = nil;
         NSInteger status = 0;
-        for (NSInteger attempt = 0; attempt < YTKACEDirectChunkAttempts && chunk == nil; attempt++) {
+        for (NSInteger attempt = 0; attempt < YTzoomDirectChunkAttempts && chunk == nil; attempt++) {
             if (self.task.cancelled) break;
             if (attempt > 0) [NSThread sleepForTimeInterval:0.6 * attempt];
             NSMutableURLRequest *request = [NSMutableURLRequest requestWithURL:current.URL];
             [request setValue:[NSString stringWithFormat:@"bytes=%lld-%lld", offset, end]
                 forHTTPHeaderField:@"Range"];
-            [request setValue:YTKACEDirectUserAgent forHTTPHeaderField:@"User-Agent"];
+            [request setValue:YTzoomDirectUserAgent forHTTPHeaderField:@"User-Agent"];
             request.timeoutInterval = 45.0;
             NSError *fetchError = nil;
             int64_t chunkStart = offset;
-            NSData *data = YTKACEDirectFetchChunk(request, self.task, ^(int64_t bytes) {
+            NSData *data = YTzoomDirectFetchChunk(request, self.task, ^(int64_t bytes) {
                 if (progress != nil) progress(chunkStart + bytes);
             }, &status, &fetchError);
             BOOL ok = (status == 206 || status == 200) && data.length != 0 &&
@@ -324,10 +324,10 @@ static YTKACEStreamOption *YTKACEDirectMatch(NSArray<YTKACEStreamOption *> *opti
                 chunk = data;
                 break;
             }
-            YTKACEDownloadLog(self.identifier, @"direct chunk retry itag=%ld offset=%lld http=%ld error=%@",
+            YTzoomDownloadLog(self.identifier, @"direct chunk retry itag=%ld offset=%lld http=%ld error=%@",
                 (long)current.itag, offset, (long)status, fetchError.localizedDescription ?: @"none");
             if ((status == 403 || status == 410 || attempt == 1) && [self refreshOptions]) {
-                YTKACEStreamOption *renewed = YTKACEDirectMatch(self.options, current, audio);
+                YTzoomStreamOption *renewed = YTzoomDirectMatch(self.options, current, audio);
                 if (renewed != nil) current = renewed;
             }
         }
@@ -336,7 +336,7 @@ static YTKACEStreamOption *YTKACEDirectMatch(NSArray<YTKACEStreamOption *> *opti
             if (error != NULL) {
                 *error = self.task.cancelled
                     ? [NSError errorWithDomain:NSURLErrorDomain code:NSURLErrorCancelled userInfo:nil]
-                    : YTKACEDirectError(3, [NSString stringWithFormat:
+                    : YTzoomDirectError(3, [NSString stringWithFormat:
                         @"chunk failed at %lld http=%ld", offset, (long)status]);
             }
             return NO;
@@ -344,7 +344,7 @@ static YTKACEStreamOption *YTKACEDirectMatch(NSArray<YTKACEStreamOption *> *opti
         [handle writeData:chunk];
         offset += (int64_t)chunk.length;
         if (progress != nil) progress(offset);
-        finished = total > 0 ? offset >= total : (int64_t)chunk.length < YTKACEDirectChunkSize;
+        finished = total > 0 ? offset >= total : (int64_t)chunk.length < YTzoomDirectChunkSize;
     }
     [handle closeFile];
     return YES;
@@ -352,21 +352,21 @@ static YTKACEStreamOption *YTKACEDirectMatch(NSArray<YTKACEStreamOption *> *opti
 
 @end
 
-@implementation YTKACEDirectDownloader
+@implementation YTzoomDirectDownloader
 
 + (void)fetchOptionsForVideoID:(NSString *)videoID
-                    completion:(void (^)(NSArray<YTKACEStreamOption *> *options))completion {
+                    completion:(void (^)(NSArray<YTzoomStreamOption *> *options))completion {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSString *reason = nil;
         NSArray *options = videoID.length == 0 ? @[] :
-            YTKACEDirectOptions(videoID, [YTKACEDirectTask new], &reason);
-        YTKACEDownloadLog(@"direct", @"formats video=%@ count=%lu %@", videoID,
+            YTzoomDirectOptions(videoID, [YTzoomDirectTask new], &reason);
+        YTzoomDownloadLog(@"direct", @"formats video=%@ count=%lu %@", videoID,
             (unsigned long)options.count, reason ?: @"");
         dispatch_async(dispatch_get_main_queue(), ^{ completion(options); });
     });
 }
 
-+ (NSString *)codecNameForOption:(YTKACEStreamOption *)option {
++ (NSString *)codecNameForOption:(YTzoomStreamOption *)option {
     NSString *mime = option.mimeType.lowercaseString ?: @"";
     if ([mime containsString:@"avc1"]) return @"H.264";
     if ([mime containsString:@"av01"]) return @"AV1";
@@ -376,15 +376,15 @@ static YTKACEStreamOption *YTKACEDirectMatch(NSArray<YTKACEStreamOption *> *opti
     return [mime componentsSeparatedByString:@";"].firstObject ?: @"";
 }
 
-+ (YTKACEDirectTask *)downloadVideoID:(NSString *)videoID
-                          videoOption:(YTKACEStreamOption *)videoOption
-                          audioOption:(YTKACEStreamOption *)audioOption
++ (YTzoomDirectTask *)downloadVideoID:(NSString *)videoID
+                          videoOption:(YTzoomStreamOption *)videoOption
+                          audioOption:(YTzoomStreamOption *)audioOption
                             audioOnly:(BOOL)audioOnly
                            identifier:(NSString *)identifier
-                             progress:(YTKACESABRProgress)progress
-                           completion:(YTKACESABRCompletion)completion {
-    YTKACEDirectTask *task = [YTKACEDirectTask new];
-    YTKACEDirectJob *job = [YTKACEDirectJob new];
+                             progress:(YTzoomSABRProgress)progress
+                           completion:(YTzoomSABRCompletion)completion {
+    YTzoomDirectTask *task = [YTzoomDirectTask new];
+    YTzoomDirectJob *job = [YTzoomDirectJob new];
     job.videoID = videoID;
     job.identifier = identifier;
     job.task = task;
@@ -393,27 +393,27 @@ static YTKACEStreamOption *YTKACEDirectMatch(NSArray<YTKACEStreamOption *> *opti
     };
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         if (videoID.length == 0) {
-            finish(nil, nil, YTKACEDirectError(1, @"missing video id"));
+            finish(nil, nil, YTzoomDirectError(1, @"missing video id"));
             return;
         }
         if (![job refreshOptions]) {
-            finish(nil, nil, YTKACEDirectError(1, @"no direct formats"));
+            finish(nil, nil, YTzoomDirectError(1, @"no direct formats"));
             return;
         }
-        YTKACEStreamOption *video = audioOnly ? nil : YTKACEDirectMatch(job.options, videoOption, NO);
-        YTKACEStreamOption *audio = YTKACEDirectMatch(job.options, audioOption, YES);
+        YTzoomStreamOption *video = audioOnly ? nil : YTzoomDirectMatch(job.options, videoOption, NO);
+        YTzoomStreamOption *audio = YTzoomDirectMatch(job.options, audioOption, YES);
         if (audio == nil || (!audioOnly && video == nil)) {
-            finish(nil, nil, YTKACEDirectError(4, @"selected format not offered directly"));
+            finish(nil, nil, YTzoomDirectError(4, @"selected format not offered directly"));
             return;
         }
-        YTKACEDownloadLog(identifier, @"direct start video=%ld audio=%ld",
+        YTzoomDownloadLog(identifier, @"direct start video=%ld audio=%ld",
             (long)video.itag, (long)audio.itag);
         NSURL *directory = [[NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES]
-            URLByAppendingPathComponent:[NSString stringWithFormat:@"YTKACE-%@",
+            URLByAppendingPathComponent:[NSString stringWithFormat:@"YTzoom-%@",
                 NSUUID.UUID.UUIDString] isDirectory:YES];
         [NSFileManager.defaultManager createDirectoryAtURL:directory
             withIntermediateDirectories:YES attributes:nil error:nil];
-        NSString *(^extension)(YTKACEStreamOption *) = ^NSString *(YTKACEStreamOption *option) {
+        NSString *(^extension)(YTzoomStreamOption *) = ^NSString *(YTzoomStreamOption *option) {
             return [option.mimeType containsString:@"webm"] ? @"webm" :
                 ([option.mimeType hasPrefix:@"audio/"] ? @"m4a" : @"mp4");
         };
@@ -438,18 +438,18 @@ static YTKACEStreamOption *YTKACEDirectMatch(NSArray<YTKACEStreamOption *> *opti
         if (video != nil && ![job downloadOption:video audio:NO toFile:videoURL
                 progress:^(int64_t bytes) { videoBytes = bytes; report(0); } error:&error]) {
             [NSFileManager.defaultManager removeItemAtURL:directory error:nil];
-            YTKACEDownloadLog(identifier, @"direct video failed %@", error.localizedDescription);
+            YTzoomDownloadLog(identifier, @"direct video failed %@", error.localizedDescription);
             finish(nil, nil, error);
             return;
         }
         if (![job downloadOption:audio audio:YES toFile:audioURL
                 progress:^(int64_t bytes) { audioBytes = bytes; report(1); } error:&error]) {
             [NSFileManager.defaultManager removeItemAtURL:directory error:nil];
-            YTKACEDownloadLog(identifier, @"direct audio failed %@", error.localizedDescription);
+            YTzoomDownloadLog(identifier, @"direct audio failed %@", error.localizedDescription);
             finish(nil, nil, error);
             return;
         }
-        YTKACEDownloadLog(identifier, @"direct complete video=%lld audio=%lld",
+        YTzoomDownloadLog(identifier, @"direct complete video=%lld audio=%lld",
             videoBytes, audioBytes);
         finish(videoURL, audioURL, nil);
     });

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ $# -lt 1 || $# -gt 2 ]]; then
-  echo "usage: verify-artifacts.sh YTKACE.dylib [YTKACE_YouTube.ipa]" >&2
+  echo "usage: verify-artifacts.sh YTzoom.dylib [YTzoom_YouTube.ipa]" >&2
   exit 2
 fi
 
@@ -36,7 +36,7 @@ if [[ $# -eq 2 ]]; then
   APP="$(find "$WORK/Payload" -mindepth 1 -maxdepth 1 -type d -name '*.app' -print -quit)"
   test -n "$APP"
   test ! -e "$APP/Frameworks/CydiaSubstrate.framework"
-  test -f "$APP/Frameworks/YTKACE.dylib"
+  test -f "$APP/Frameworks/YTzoom.dylib"
 
   EXECUTABLE="$(
     python3 - "$APP/Info.plist" <<'PY'
@@ -47,7 +47,7 @@ with open(sys.argv[1], "rb") as handle:
 PY
   )"
   LOADS="$(python3 "$ROOT/Tools/macho_inject.py" "$APP/$EXECUTABLE" --list)"
-  [[ "$LOADS" == *'@rpath/YTKACE.dylib'* ]]
+  [[ "$LOADS" == *'@rpath/YTzoom.dylib'* ]]
 fi
 
 echo "verified"

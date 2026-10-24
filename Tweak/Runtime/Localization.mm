@@ -4,14 +4,14 @@
 
 #import <UIKit/UIKit.h>
 
-NSString * const YTKACELanguageKey = @"YTKACE.Preference.Language";
+NSString * const YTzoomLanguageKey = @"YTzoom.Preference.Language";
 
-NSArray<NSString *> *YTKACEAvailableLanguages(void) {
+NSArray<NSString *> *YTzoomAvailableLanguages(void) {
     return @[@"system", @"en", @"ar", @"ckb", @"de", @"es", @"fr", @"it",
              @"ja", @"ko", @"pl", @"pt-BR", @"ru", @"tr", @"vi", @"zh-Hans", @"zh-Hant"];
 }
 
-NSString *YTKACELanguageDisplayName(NSString *code) {
+NSString *YTzoomLanguageDisplayName(NSString *code) {
     if ([code isEqualToString:@"system"]) return @"System";
     static NSDictionary<NSString *, NSString *> *names;
     static dispatch_once_t onceToken;
@@ -38,12 +38,12 @@ NSString *YTKACELanguageDisplayName(NSString *code) {
     return names[code] ?: code;
 }
 
-static NSString *YTKACEPreferredLanguage(void) {
-    id stored = YTKACEPreferenceObject(YTKACELanguageKey);
+static NSString *YTzoomPreferredLanguage(void) {
+    id stored = YTzoomPreferenceObject(YTzoomLanguageKey);
     NSString *choice = [stored isKindOfClass:NSString.class] ? stored : @"system";
     if (![choice isEqualToString:@"system"]) return choice;
 
-    NSArray<NSString *> *available = YTKACEAvailableLanguages();
+    NSArray<NSString *> *available = YTzoomAvailableLanguages();
     for (NSString *preferred in NSLocale.preferredLanguages) {
         NSString *code = preferred;
         if ([code hasPrefix:@"zh-Hans"] || [code hasPrefix:@"zh-CN"] ||
@@ -61,8 +61,8 @@ static NSString *YTKACEPreferredLanguage(void) {
     return @"en";
 }
 
-static NSDictionary<NSString *, NSString *> *YTKACEStringsForLanguage(NSString *code) {
-    NSBundle *bundle = YTKACEAssetsBundle();
+static NSDictionary<NSString *, NSString *> *YTzoomStringsForLanguage(NSString *code) {
+    NSBundle *bundle = YTzoomAssetsBundle();
     if (bundle == nil) return nil;
     NSString *path = [bundle pathForResource:@"Localizable"
                                       ofType:@"strings"
@@ -75,21 +75,21 @@ static NSDictionary<NSString *, NSString *> *YTKACEStringsForLanguage(NSString *
     return [NSDictionary dictionaryWithContentsOfFile:path];
 }
 
-static NSDictionary<NSString *, NSString *> *YTKACEActiveStrings;
-static NSString *YTKACEActiveLanguage;
+static NSDictionary<NSString *, NSString *> *YTzoomActiveStrings;
+static NSString *YTzoomActiveLanguage;
 
-void YTKACEResetLocalizationCache(void) {
-    YTKACEActiveStrings = nil;
-    YTKACEActiveLanguage = nil;
+void YTzoomResetLocalizationCache(void) {
+    YTzoomActiveStrings = nil;
+    YTzoomActiveLanguage = nil;
 }
 
-NSString *YTKACELocalized(NSString *key) {
+NSString *YTzoomLocalized(NSString *key) {
     if (key.length == 0) return key;
-    NSString *language = YTKACEPreferredLanguage();
-    if (![language isEqualToString:YTKACEActiveLanguage]) {
-        YTKACEActiveLanguage = language;
-        YTKACEActiveStrings = YTKACEStringsForLanguage(language);
+    NSString *language = YTzoomPreferredLanguage();
+    if (![language isEqualToString:YTzoomActiveLanguage]) {
+        YTzoomActiveLanguage = language;
+        YTzoomActiveStrings = YTzoomStringsForLanguage(language);
     }
-    NSString *value = YTKACEActiveStrings[key];
+    NSString *value = YTzoomActiveStrings[key];
     return value.length != 0 ? value : key;
 }

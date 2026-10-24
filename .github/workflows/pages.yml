@@ -23,7 +23,7 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          pattern: YTKACE-deb-*
+          pattern: YTzoom-deb-*
           merge-multiple: true
           path: fresh
 
@@ -52,14 +52,14 @@ jobs:
           printf '' > .nojekyll
           date_now="$(date -Ru | sed 's/+0000/GMT/')"
           {
-            echo "Origin: YTKACE"
-            echo "Label: YTKACE"
+            echo "Origin: YTzoom"
+            echo "Label: YTzoom"
             echo "Suite: stable"
             echo "Version: 1.0"
             echo "Codename: ios"
             echo "Architectures: iphoneos-arm64 iphoneos-arm64e"
             echo "Components: main"
-            echo "Description: YTKACE - open-source YouTube enhancement for iOS"
+            echo "Description: YTzoom - open-source YouTube enhancement for iOS"
             echo "Date: $date_now"
           } > Release
           for algo in MD5Sum:md5sum SHA1:sha1sum SHA256:sha256sum; do

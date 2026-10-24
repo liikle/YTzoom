@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Localization.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
@@ -13,18 +13,18 @@ static IMP OriginalCommentNodeDidLoad;
 static IMP OriginalCommentViewSetNode;
 static IMP OriginalCommentUIViewDidMove;
 static IMP OriginalCommentNodeSetFrame;
-static const void *YTKACEStoredCommentAssociation = &YTKACEStoredCommentAssociation;
-static const void *YTKACECommentTextAssociation = &YTKACECommentTextAssociation;
-static const void *YTKACECommentNodeAssociation = &YTKACECommentNodeAssociation;
-static const void *YTKACECommentGestureAssociation = &YTKACECommentGestureAssociation;
+static const void *YTzoomStoredCommentAssociation = &YTzoomStoredCommentAssociation;
+static const void *YTzoomCommentTextAssociation = &YTzoomCommentTextAssociation;
+static const void *YTzoomCommentNodeAssociation = &YTzoomCommentNodeAssociation;
+static const void *YTzoomCommentGestureAssociation = &YTzoomCommentGestureAssociation;
 
-static id YTKACEObjectMessage(id receiver, NSString *selectorName) {
+static id YTzoomObjectMessage(id receiver, NSString *selectorName) {
     SEL selector = NSSelectorFromString(selectorName);
     return receiver != nil && [receiver respondsToSelector:selector]
         ? ((id (*)(id, SEL))objc_msgSend)(receiver, selector) : nil;
 }
 
-static NSString *YTKACECleanCommentText(NSString *text) {
+static NSString *YTzoomCleanCommentText(NSString *text) {
     if (![text isKindOfClass:NSString.class]) {
         return nil;
     }
@@ -33,45 +33,45 @@ static NSString *YTKACECleanCommentText(NSString *text) {
     return cleaned.length == 0 ? nil : cleaned;
 }
 
-static BOOL YTKACEIsCommentToken(NSString *token) {
+static BOOL YTzoomIsCommentToken(NSString *token) {
     NSString *lower = token.lowercaseString;
     return [lower containsString:@"comment"] ||
            [lower containsString:@"id_ui_comment_cell"];
 }
 
-static BOOL YTKACEIsCommentTextToken(NSString *token) {
+static BOOL YTzoomIsCommentTextToken(NSString *token) {
     NSString *lower = token.lowercaseString;
     return [lower containsString:@"comment_content"] ||
            [lower containsString:@"comment_text"] ||
            [lower containsString:@"comment_body"];
 }
 
-static NSString *YTKACECommentTextInNode(id node, NSUInteger depth) {
+static NSString *YTzoomCommentTextInNode(id node, NSUInteger depth) {
     if (node == nil || depth > 16) {
         return nil;
     }
-    NSString *stored = YTKACECleanCommentText(
-        objc_getAssociatedObject(node, YTKACECommentTextAssociation)
+    NSString *stored = YTzoomCleanCommentText(
+        objc_getAssociatedObject(node, YTzoomCommentTextAssociation)
     );
     if (stored.length != 0) {
         return stored;
     }
-    NSString *identifier = YTKACEObjectMessage(node, @"accessibilityIdentifier");
+    NSString *identifier = YTzoomObjectMessage(node, @"accessibilityIdentifier");
     NSString *description = [node description];
-    id attributedText = YTKACEObjectMessage(node, @"attributedText");
-    NSString *text = YTKACECleanCommentText(
-        YTKACEObjectMessage(attributedText, @"string")
+    id attributedText = YTzoomObjectMessage(node, @"attributedText");
+    NSString *text = YTzoomCleanCommentText(
+        YTzoomObjectMessage(attributedText, @"string")
     );
-    if (text.length != 0 && YTKACEIsCommentTextToken(
+    if (text.length != 0 && YTzoomIsCommentTextToken(
         [NSString stringWithFormat:@"%@ %@", identifier ?: @"", description ?: @""])) {
         return text;
     }
-    NSArray *children = YTKACEObjectMessage(node, @"subnodes");
+    NSArray *children = YTzoomObjectMessage(node, @"subnodes");
     if (![children isKindOfClass:NSArray.class]) {
-        children = YTKACEObjectMessage(node, @"children");
+        children = YTzoomObjectMessage(node, @"children");
     }
     for (id child in children) {
-        NSString *candidate = YTKACECommentTextInNode(child, depth + 1);
+        NSString *candidate = YTzoomCommentTextInNode(child, depth + 1);
         if (candidate.length != 0) {
             return candidate;
         }
@@ -79,24 +79,24 @@ static NSString *YTKACECommentTextInNode(id node, NSUInteger depth) {
     return nil;
 }
 
-static NSString *YTKACETextFromView(UIView *view) {
+static NSString *YTzoomTextFromView(UIView *view) {
     if ([view isKindOfClass:UILabel.class]) {
-        return YTKACECleanCommentText(((UILabel *)view).text);
+        return YTzoomCleanCommentText(((UILabel *)view).text);
     }
     if ([view isKindOfClass:UITextView.class]) {
-        return YTKACECleanCommentText(((UITextView *)view).text);
+        return YTzoomCleanCommentText(((UITextView *)view).text);
     }
-    NSString *label = YTKACECleanCommentText(view.accessibilityLabel);
+    NSString *label = YTzoomCleanCommentText(view.accessibilityLabel);
     return [view isKindOfClass:UIControl.class] ? nil : label;
 }
 
-static NSString *YTKACECommentTextInView(UIView *view, BOOL exact,
+static NSString *YTzoomCommentTextInView(UIView *view, BOOL exact,
                                          NSUInteger depth) {
     if (view == nil || depth > 16) {
         return nil;
     }
-    NSString *stored = YTKACECleanCommentText(
-        objc_getAssociatedObject(view, YTKACECommentTextAssociation)
+    NSString *stored = YTzoomCleanCommentText(
+        objc_getAssociatedObject(view, YTzoomCommentTextAssociation)
     );
     if (stored.length != 0) {
         return stored;
@@ -105,33 +105,33 @@ static NSString *YTKACECommentTextInView(UIView *view, BOOL exact,
         view.accessibilityIdentifier ?: @"",
         NSStringFromClass(view.class) ?: @"",
         [view description] ?: @""];
-    NSString *ownText = YTKACETextFromView(view);
-    if (ownText.length != 0 && (!exact || YTKACEIsCommentTextToken(token))) {
+    NSString *ownText = YTzoomTextFromView(view);
+    if (ownText.length != 0 && (!exact || YTzoomIsCommentTextToken(token))) {
         return ownText;
     }
-    id node = objc_getAssociatedObject(view, YTKACECommentNodeAssociation);
+    id node = objc_getAssociatedObject(view, YTzoomCommentNodeAssociation);
     if (node == nil) {
-        node = YTKACEObjectMessage(view, @"keepalive_node");
+        node = YTzoomObjectMessage(view, @"keepalive_node");
     }
-    NSString *nodeText = YTKACECommentTextInNode(node, 0);
+    NSString *nodeText = YTzoomCommentTextInNode(node, 0);
     if (nodeText.length != 0) {
         return nodeText;
     }
     NSString *best = nil;
     for (UIView *subview in view.subviews) {
-        NSString *candidate = YTKACECommentTextInView(subview, exact, depth + 1);
+        NSString *candidate = YTzoomCommentTextInView(subview, exact, depth + 1);
         if (candidate.length > best.length) {
             best = candidate;
         }
     }
     NSArray *elements = view.accessibilityElements;
     for (id element in elements) {
-        NSString *identifier = YTKACEObjectMessage(element, @"accessibilityIdentifier");
-        NSString *label = YTKACECleanCommentText(
-            YTKACEObjectMessage(element, @"accessibilityLabel")
+        NSString *identifier = YTzoomObjectMessage(element, @"accessibilityIdentifier");
+        NSString *label = YTzoomCleanCommentText(
+            YTzoomObjectMessage(element, @"accessibilityLabel")
         );
         if (label.length != 0 &&
-            (!exact || YTKACEIsCommentTextToken(identifier ?: @"")) &&
+            (!exact || YTzoomIsCommentTextToken(identifier ?: @"")) &&
             label.length > best.length) {
             best = label;
         }
@@ -139,7 +139,7 @@ static NSString *YTKACECommentTextInView(UIView *view, BOOL exact,
     return best;
 }
 
-static UIViewController *YTKACEControllerForView(UIView *view) {
+static UIViewController *YTzoomControllerForView(UIView *view) {
     UIResponder *responder = view;
     while (responder != nil) {
         if ([responder isKindOfClass:UIViewController.class]) {
@@ -154,34 +154,34 @@ static UIViewController *YTKACEControllerForView(UIView *view) {
     return controller;
 }
 
-static NSString *YTKACEStoredCommentForView(UIView *view) {
+static NSString *YTzoomStoredCommentForView(UIView *view) {
     for (UIView *candidate = view; candidate != nil;
          candidate = candidate.superview) {
         NSString *direct = objc_getAssociatedObject(
-            candidate, YTKACEStoredCommentAssociation);
+            candidate, YTzoomStoredCommentAssociation);
         if ([direct isKindOfClass:NSString.class] && direct.length != 0) {
             return direct;
         }
-        id node = objc_getAssociatedObject(candidate, YTKACECommentNodeAssociation);
-        if (node == nil) node = YTKACEObjectMessage(candidate, @"keepalive_node");
+        id node = objc_getAssociatedObject(candidate, YTzoomCommentNodeAssociation);
+        if (node == nil) node = YTzoomObjectMessage(candidate, @"keepalive_node");
         for (NSUInteger depth = 0; node != nil && depth < 14; depth++) {
             NSString *stored = objc_getAssociatedObject(
-                node, YTKACEStoredCommentAssociation);
+                node, YTzoomStoredCommentAssociation);
             if ([stored isKindOfClass:NSString.class] && stored.length != 0) {
                 return stored;
             }
-            node = YTKACEObjectMessage(node, @"supernode");
+            node = YTzoomObjectMessage(node, @"supernode");
         }
     }
     return nil;
 }
 
-static NSString *YTKACECommentTextForView(UIView *view) {
-    NSString *stored = YTKACEStoredCommentForView(view);
+static NSString *YTzoomCommentTextForView(UIView *view) {
+    NSString *stored = YTzoomStoredCommentForView(view);
     if (stored.length != 0) return stored;
     UIView *candidate = view;
     for (NSUInteger depth = 0; candidate != nil && depth < 8; depth++) {
-        NSString *text = YTKACECommentTextInView(candidate, YES, 0);
+        NSString *text = YTzoomCommentTextInView(candidate, YES, 0);
         if (text.length != 0) {
             return text;
         }
@@ -190,25 +190,25 @@ static NSString *YTKACECommentTextForView(UIView *view) {
     return nil;
 }
 
-@interface YTKACECopyCommentTarget : NSObject
+@interface YTzoomCopyCommentTarget : NSObject
 + (instancetype)sharedTarget;
 - (void)handleCopyComment:(UILongPressGestureRecognizer *)gesture;
 @end
 
-@implementation YTKACECopyCommentTarget
+@implementation YTzoomCopyCommentTarget
 + (instancetype)sharedTarget {
-    static YTKACECopyCommentTarget *target;
+    static YTzoomCopyCommentTarget *target;
     static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{ target = [YTKACECopyCommentTarget new]; });
+    dispatch_once(&onceToken, ^{ target = [YTzoomCopyCommentTarget new]; });
     return target;
 }
 
 - (void)handleCopyComment:(UILongPressGestureRecognizer *)gesture {
-    if (gesture.state != UIGestureRecognizerStateBegan || !YTKACEMasterEnabled()) {
+    if (gesture.state != UIGestureRecognizerStateBegan || !YTzoomMasterEnabled()) {
         return;
     }
     UIView *view = gesture.view;
-    NSString *text = YTKACECommentTextForView(view);
+    NSString *text = YTzoomCommentTextForView(view);
     if (text.length == 0) {
         return;
     }
@@ -217,55 +217,55 @@ static NSString *YTKACECommentTextForView(UIView *view) {
     [feedback impactOccurred];
     UIAlertController *menu = [UIAlertController alertControllerWithTitle:nil
         message:nil preferredStyle:UIAlertControllerStyleActionSheet];
-    [menu addAction:[UIAlertAction actionWithTitle:YTKACELocalized(@"Copy Comment")
+    [menu addAction:[UIAlertAction actionWithTitle:YTzoomLocalized(@"Copy Comment")
         style:UIAlertActionStyleDefault handler:^(__unused UIAlertAction *action) {
             UIPasteboard.generalPasteboard.string = text;
             UINotificationFeedbackGenerator *confirmation =
                 [UINotificationFeedbackGenerator new];
             [confirmation notificationOccurred:UINotificationFeedbackTypeSuccess];
         }]];
-    [menu addAction:[UIAlertAction actionWithTitle:YTKACELocalized(@"Cancel")
+    [menu addAction:[UIAlertAction actionWithTitle:YTzoomLocalized(@"Cancel")
         style:UIAlertActionStyleCancel handler:nil]];
     menu.popoverPresentationController.sourceView = view;
     menu.popoverPresentationController.sourceRect = view.bounds;
-    UIViewController *controller = YTKACEControllerForView(view);
+    UIViewController *controller = YTzoomControllerForView(view);
     if (controller.presentedViewController == nil) {
         [controller presentViewController:menu animated:YES completion:nil];
     }
 }
 @end
 
-static void YTKACEAttachCommentGesture(UIView *view, id node) {
+static void YTzoomAttachCommentGesture(UIView *view, id node) {
     if (view == nil) {
         return;
     }
     if (node != nil) {
-        objc_setAssociatedObject(view, YTKACECommentNodeAssociation,
+        objc_setAssociatedObject(view, YTzoomCommentNodeAssociation,
                                  node, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
-    if (objc_getAssociatedObject(view, YTKACECommentGestureAssociation) != nil) {
+    if (objc_getAssociatedObject(view, YTzoomCommentGestureAssociation) != nil) {
         return;
     }
     UILongPressGestureRecognizer *gesture = [[UILongPressGestureRecognizer alloc]
-        initWithTarget:YTKACECopyCommentTarget.sharedTarget
+        initWithTarget:YTzoomCopyCommentTarget.sharedTarget
                 action:@selector(handleCopyComment:)];
     gesture.minimumPressDuration = 0.25;
     gesture.cancelsTouchesInView = NO;
     [view addGestureRecognizer:gesture];
     view.userInteractionEnabled = YES;
-    objc_setAssociatedObject(view, YTKACECommentGestureAssociation,
+    objc_setAssociatedObject(view, YTzoomCommentGestureAssociation,
                              gesture, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-static BOOL YTKACEIsCommentContainer(id node) {
+static BOOL YTzoomIsCommentContainer(id node) {
     NSString *description = [node description];
     return [description containsString:@"id.ui.comment_cell"] ||
            [description containsString:@"id.ui.comment_thread"] ||
            [description containsString:@"comment_reply"];
 }
 
-static NSString *YTKACENodeIdentifier(id node) {
-    NSString *identifier = YTKACEObjectMessage(node, @"accessibilityIdentifier");
+static NSString *YTzoomNodeIdentifier(id node) {
+    NSString *identifier = YTzoomObjectMessage(node, @"accessibilityIdentifier");
     if ([identifier isKindOfClass:NSString.class] && identifier.length != 0) {
         return identifier;
     }
@@ -277,8 +277,8 @@ static NSString *YTKACENodeIdentifier(id node) {
     }
 }
 
-static void YTKACEStoreCommentOnContainers(id node, NSString *text) {
-    id supernodes = YTKACEObjectMessage(node, @"supernodes");
+static void YTzoomStoreCommentOnContainers(id node, NSString *text) {
+    id supernodes = YTzoomObjectMessage(node, @"supernodes");
     NSArray *all = nil;
     if ([supernodes respondsToSelector:@selector(allObjects)]) {
         all = [supernodes allObjects];
@@ -286,84 +286,84 @@ static void YTKACEStoreCommentOnContainers(id node, NSString *text) {
         all = supernodes;
     }
     for (id container in all) {
-        if (!YTKACEIsCommentContainer(container)) continue;
-        objc_setAssociatedObject(container, YTKACEStoredCommentAssociation,
+        if (!YTzoomIsCommentContainer(container)) continue;
+        objc_setAssociatedObject(container, YTzoomStoredCommentAssociation,
                                  text, OBJC_ASSOCIATION_COPY_NONATOMIC);
-        UIView *rendered = YTKACEObjectMessage(container, @"view");
+        UIView *rendered = YTzoomObjectMessage(container, @"view");
         if ([rendered isKindOfClass:UIView.class]) {
-            objc_setAssociatedObject(rendered, YTKACEStoredCommentAssociation,
+            objc_setAssociatedObject(rendered, YTzoomStoredCommentAssociation,
                                      text, OBJC_ASSOCIATION_COPY_NONATOMIC);
         }
         return;
     }
 }
 
-static void YTKACECommentNodeSetFrame(id receiver, SEL selector, CGRect frame) {
+static void YTzoomCommentNodeSetFrame(id receiver, SEL selector, CGRect frame) {
     if (OriginalCommentNodeSetFrame != NULL) {
         ((void (*)(id, SEL, CGRect))OriginalCommentNodeSetFrame)(receiver, selector,
                                                                  frame);
     }
-    NSString *identifier = YTKACENodeIdentifier(receiver);
+    NSString *identifier = YTzoomNodeIdentifier(receiver);
     if (identifier.length == 0) return;
     if (![identifier isEqualToString:@"id.comment.content.label"]) return;
-    id attributed = YTKACEObjectMessage(receiver, @"attributedText");
-    NSString *text = YTKACECleanCommentText(
-        YTKACEObjectMessage(attributed, @"string"));
+    id attributed = YTzoomObjectMessage(receiver, @"attributedText");
+    NSString *text = YTzoomCleanCommentText(
+        YTzoomObjectMessage(attributed, @"string"));
     if (text.length == 0) return;
-    YTKACEStoreCommentOnContainers(receiver, text);
+    YTzoomStoreCommentOnContainers(receiver, text);
 }
 
-static void YTKACECommentNodeDidLoad(id receiver, SEL selector) {
+static void YTzoomCommentNodeDidLoad(id receiver, SEL selector) {
     if (OriginalCommentNodeDidLoad != NULL) {
         ((void (*)(id, SEL))OriginalCommentNodeDidLoad)(receiver, selector);
     }
-    NSString *identifier = YTKACEObjectMessage(receiver, @"accessibilityIdentifier");
+    NSString *identifier = YTzoomObjectMessage(receiver, @"accessibilityIdentifier");
     NSString *token = [NSString stringWithFormat:@"%@ %@",
         identifier ?: @"", [receiver description] ?: @""];
-    if (!YTKACEIsCommentTextToken(token)) {
+    if (!YTzoomIsCommentTextToken(token)) {
         return;
     }
-    id attributedText = YTKACEObjectMessage(receiver, @"attributedText");
-    NSString *text = YTKACECleanCommentText(
-        YTKACEObjectMessage(attributedText, @"string")
+    id attributedText = YTzoomObjectMessage(receiver, @"attributedText");
+    NSString *text = YTzoomCleanCommentText(
+        YTzoomObjectMessage(attributedText, @"string")
     );
     if (text.length == 0) {
         return;
     }
-    objc_setAssociatedObject(receiver, YTKACECommentTextAssociation,
+    objc_setAssociatedObject(receiver, YTzoomCommentTextAssociation,
                              text, OBJC_ASSOCIATION_COPY_NONATOMIC);
-    UIView *renderedView = YTKACEObjectMessage(receiver, @"view");
+    UIView *renderedView = YTzoomObjectMessage(receiver, @"view");
     if ([renderedView isKindOfClass:UIView.class]) {
-        objc_setAssociatedObject(renderedView, YTKACECommentTextAssociation,
+        objc_setAssociatedObject(renderedView, YTzoomCommentTextAssociation,
                                  text, OBJC_ASSOCIATION_COPY_NONATOMIC);
-        YTKACEAttachCommentGesture(renderedView, receiver);
+        YTzoomAttachCommentGesture(renderedView, receiver);
     }
-    id parent = YTKACEObjectMessage(receiver, @"yogaParent");
+    id parent = YTzoomObjectMessage(receiver, @"yogaParent");
     for (NSUInteger depth = 0; parent != nil && depth < 16; depth++) {
-        if (YTKACEIsCommentToken([parent description])) {
-            objc_setAssociatedObject(parent, YTKACECommentTextAssociation,
+        if (YTzoomIsCommentToken([parent description])) {
+            objc_setAssociatedObject(parent, YTzoomCommentTextAssociation,
                                      text, OBJC_ASSOCIATION_COPY_NONATOMIC);
         }
-        parent = YTKACEObjectMessage(parent, @"yogaParent");
+        parent = YTzoomObjectMessage(parent, @"yogaParent");
     }
 }
 
-static void YTKACECommentViewSetNode(UIView *receiver, SEL selector, id node) {
+static void YTzoomCommentViewSetNode(UIView *receiver, SEL selector, id node) {
     if (OriginalCommentViewSetNode != NULL) {
         ((void (*)(id, SEL, id))OriginalCommentViewSetNode)(receiver, selector, node);
     }
-    YTKACEProfileConsiderDisplayView(receiver, node);
+    YTzoomProfileConsiderDisplayView(receiver, node);
     NSString *token = [NSString stringWithFormat:@"%@ %@ %@",
         NSStringFromClass(receiver.class) ?: @"",
         [receiver description] ?: @"", [node description] ?: @""];
-    NSString *text = YTKACECommentTextInNode(node, 0);
-    BOOL tokenMatch = YTKACEIsCommentToken(token);
+    NSString *text = YTzoomCommentTextInNode(node, 0);
+    BOOL tokenMatch = YTzoomIsCommentToken(token);
     if (tokenMatch || text.length != 0) {
-        YTKACEAttachCommentGesture(receiver, node);
+        YTzoomAttachCommentGesture(receiver, node);
     }
 }
 
-static void YTKACECommentUIViewDidMove(UIView *receiver, SEL selector) {
+static void YTzoomCommentUIViewDidMove(UIView *receiver, SEL selector) {
     if (OriginalCommentUIViewDidMove != NULL) {
         ((void (*)(id, SEL))OriginalCommentUIViewDidMove)(receiver, selector);
     }
@@ -371,19 +371,19 @@ static void YTKACECommentUIViewDidMove(UIView *receiver, SEL selector) {
         NSStringFromClass(receiver.class) ?: @"",
         receiver.accessibilityIdentifier ?: @"",
         [receiver description] ?: @""];
-    if (YTKACEIsCommentToken(token)) {
-        YTKACEAttachCommentGesture(receiver,
-            YTKACEObjectMessage(receiver, @"keepalive_node"));
+    if (YTzoomIsCommentToken(token)) {
+        YTzoomAttachCommentGesture(receiver,
+            YTzoomObjectMessage(receiver, @"keepalive_node"));
     }
 }
 
-void YTKACEInstallCopyCommentHooks(void) {
-    YTKACEInstallInstanceHook(@"ASDisplayNode", @"didLoad",
-        (IMP)YTKACECommentNodeDidLoad, &OriginalCommentNodeDidLoad);
-    YTKACEInstallInstanceHook(@"_ASDisplayView", @"setKeepalive_node:",
-        (IMP)YTKACECommentViewSetNode, &OriginalCommentViewSetNode);
-    YTKACEInstallInstanceHook(@"UIView", @"didMoveToWindow",
-        (IMP)YTKACECommentUIViewDidMove, &OriginalCommentUIViewDidMove);
-    YTKACEInstallInstanceHook(@"ASDisplayNode", @"setFrame:",
-        (IMP)YTKACECommentNodeSetFrame, &OriginalCommentNodeSetFrame);
+void YTzoomInstallCopyCommentHooks(void) {
+    YTzoomInstallInstanceHook(@"ASDisplayNode", @"didLoad",
+        (IMP)YTzoomCommentNodeDidLoad, &OriginalCommentNodeDidLoad);
+    YTzoomInstallInstanceHook(@"_ASDisplayView", @"setKeepalive_node:",
+        (IMP)YTzoomCommentViewSetNode, &OriginalCommentViewSetNode);
+    YTzoomInstallInstanceHook(@"UIView", @"didMoveToWindow",
+        (IMP)YTzoomCommentUIViewDidMove, &OriginalCommentUIViewDidMove);
+    YTzoomInstallInstanceHook(@"ASDisplayNode", @"setFrame:",
+        (IMP)YTzoomCommentNodeSetFrame, &OriginalCommentNodeSetFrame);
 }

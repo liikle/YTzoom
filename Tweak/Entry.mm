@@ -1,4 +1,4 @@
-#import "YTKACE.h"
+#import "YTzoom.h"
 #import "Features/Downloads/SABRDownloader.h"
 #import "Features/Downloads/DownloadLog.h"
 #import "Features/SponsorBlock/DeArrow.h"
@@ -6,69 +6,69 @@
 
 #import <UIKit/UIKit.h>
 
-#ifndef YTKACE_COMBINED_SABR
-#define YTKACE_COMBINED_SABR 0
+#ifndef YTzoom_COMBINED_SABR
+#define YTzoom_COMBINED_SABR 0
 #endif
 
-NSString * const YTKACEVersion = @YTKACE_VERSION_STRING;
+NSString * const YTzoomVersion = @YTzoom_VERSION_STRING;
 
-static void YTKACEInstallModules(void) {
-    YTKACEInstallSideloadCompatibilityHooks();
-    YTKACEInstallCastCompatibilityHooks();
-    YTKACEInstallAdsHooks();
-    YTKACEInstallPromoHooks();
-    YTKACEInstallSponsorBlockHooks();
-    YTKACEInstallDeArrow();
-    YTKACEInstallOLEDHooks();
-    YTKACEInstallStartupHooks();
-    YTKACEInstallPremiumLogoHooks();
-    YTKACEInstallBackgroundPlaybackHooks();
-    YTKACEInstallSpeedHooks();
-    YTKACEInstallLoopHooks();
-    YTKACEInstallAutoplayHooks();
-    YTKACEInstallCaptionHooks();
-    YTKACEInstallTranscriptHooks();
-    YTKACEInstallSleepTimerHooks();
-    YTKACEInstallPiPHooks();
-    YTKACEInstallPlaybackFixHooks();
-    YTKACEInstallDownloadHooks();
-    YTKACESABRRestoreSeed();
-    YTKACERestorePlayerRequest();
-    YTKACEInstallPlaylistDownloaderHooks();
-    YTKACEInstallFeedDownloadHooks();
-    YTKACEInstallQueueHooks();
-    YTKACEInstallGlobalDownloadMiniPlayer();
-    YTKACEInstallDoubleTapHooks();
-    YTKACEInstallVideoZoomHooks();
-    YTKACEInstallShortsLimitHooks();
-    YTKACEInstallShortsStartupHooks();
-    YTKACEInstallShortsPinchHooks();
-    YTKACEInstallShortsPiPHooks();
-    YTKACEInstallProgressBarHooks();
-    YTKACEInstallStreamingHooks();
-    YTKACEInstallHLSPlaybackHooks();
-    YTKACEInstallShortsHooks();
-    YTKACEInstallTabBarHooks();
-    YTKACEInstallNavigationBehaviorHooks();
-    YTKACEInstallPlayerGestureHooks();
-    YTKACEInstallOverlayVisibilityHooks();
-    YTKACEInstallContentVisibilityHooks();
-    YTKACEInstallNavigationVisibilityHooks();
-    YTKACEInstallMiscellaneousHooks();
-    YTKACEInstallCopyCommentHooks();
-    YTKACEInstallProfilePictureHooks();
-    YTKACEInstallPostImageSaverHooks();
-    YTKACEInstallNativeShareHooks();
-    YTKACEInstallSettingsEntryHooks();
-    YTKACEInstallNativeSettingsHooks();
+static void YTzoomInstallModules(void) {
+    YTzoomInstallSideloadCompatibilityHooks();
+    YTzoomInstallCastCompatibilityHooks();
+    YTzoomInstallAdsHooks();
+    YTzoomInstallPromoHooks();
+    YTzoomInstallSponsorBlockHooks();
+    YTzoomInstallDeArrow();
+    YTzoomInstallOLEDHooks();
+    YTzoomInstallStartupHooks();
+    YTzoomInstallPremiumLogoHooks();
+    YTzoomInstallBackgroundPlaybackHooks();
+    YTzoomInstallSpeedHooks();
+    YTzoomInstallLoopHooks();
+    YTzoomInstallAutoplayHooks();
+    YTzoomInstallCaptionHooks();
+    YTzoomInstallTranscriptHooks();
+    YTzoomInstallSleepTimerHooks();
+    YTzoomInstallPiPHooks();
+    YTzoomInstallPlaybackFixHooks();
+    YTzoomInstallDownloadHooks();
+    YTzoomSABRRestoreSeed();
+    YTzoomRestorePlayerRequest();
+    YTzoomInstallPlaylistDownloaderHooks();
+    YTzoomInstallFeedDownloadHooks();
+    YTzoomInstallQueueHooks();
+    YTzoomInstallGlobalDownloadMiniPlayer();
+    YTzoomInstallDoubleTapHooks();
+    YTzoomInstallVideoZoomHooks();
+    YTzoomInstallShortsLimitHooks();
+    YTzoomInstallShortsStartupHooks();
+    YTzoomInstallShortsPinchHooks();
+    YTzoomInstallShortsPiPHooks();
+    YTzoomInstallProgressBarHooks();
+    YTzoomInstallStreamingHooks();
+    YTzoomInstallHLSPlaybackHooks();
+    YTzoomInstallShortsHooks();
+    YTzoomInstallTabBarHooks();
+    YTzoomInstallNavigationBehaviorHooks();
+    YTzoomInstallPlayerGestureHooks();
+    YTzoomInstallOverlayVisibilityHooks();
+    YTzoomInstallContentVisibilityHooks();
+    YTzoomInstallNavigationVisibilityHooks();
+    YTzoomInstallMiscellaneousHooks();
+    YTzoomInstallCopyCommentHooks();
+    YTzoomInstallProfilePictureHooks();
+    YTzoomInstallPostImageSaverHooks();
+    YTzoomInstallNativeShareHooks();
+    YTzoomInstallSettingsEntryHooks();
+    YTzoomInstallNativeSettingsHooks();
 }
 
 __attribute__((constructor))
-static void YTKACEEntryPoint(void) {
+static void YTzoomEntryPoint(void) {
     @autoreleasepool {
-        YTKACEClearDownloadLog();
-        YTKACERegisterDefaults();
-        YTKACEScheduleFirstLaunch();
-        YTKACEInstallModules();
+        YTzoomClearDownloadLog();
+        YTzoomRegisterDefaults();
+        YTzoomScheduleFirstLaunch();
+        YTzoomInstallModules();
     }
 }

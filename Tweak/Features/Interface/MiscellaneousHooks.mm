@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../Downloads/DownloadLog.h"
@@ -17,16 +17,16 @@ static IMP OriginalSemanticContent;
 static IMP OriginalSetSemanticContent;
 static IMP OriginalCaptionTracks;
 static IMP OriginalCaptionControllerAlloc;
-static NSMutableDictionary<NSString *, NSValue *> *YTKACEMiscOriginals;
-static const void *YTKACECaptionTracksAssociation =
-    &YTKACECaptionTracksAssociation;
-static const void *YTKACELastCaptionTrackAssociation =
-    &YTKACELastCaptionTrackAssociation;
-static const void *YTKACEAppliedCaptionAssociation =
-    &YTKACEAppliedCaptionAssociation;
-static NSHashTable *YTKACECaptionControllers;
+static NSMutableDictionary<NSString *, NSValue *> *YTzoomMiscOriginals;
+static const void *YTzoomCaptionTracksAssociation =
+    &YTzoomCaptionTracksAssociation;
+static const void *YTzoomLastCaptionTrackAssociation =
+    &YTzoomLastCaptionTrackAssociation;
+static const void *YTzoomAppliedCaptionAssociation =
+    &YTzoomAppliedCaptionAssociation;
+static NSHashTable *YTzoomCaptionControllers;
 
-static NSString *YTKACECaptionTrackKey(id track) {
+static NSString *YTzoomCaptionTrackKey(id track) {
     if (track == nil) {
         return nil;
     }
@@ -45,7 +45,7 @@ static NSString *YTKACECaptionTrackKey(id track) {
         [NSString stringWithFormat:@"%p", (__bridge void *)track];
 }
 
-static BOOL YTKACECaptionRequestReceiver(id receiver, SEL selector) {
+static BOOL YTzoomCaptionRequestReceiver(id receiver, SEL selector) {
     NSString *className = NSStringFromClass([receiver class]).lowercaseString;
     NSString *name = NSStringFromSelector(selector).lowercaseString;
     return [className containsString:@"request"] ||
@@ -58,15 +58,15 @@ static BOOL YTKACECaptionRequestReceiver(id receiver, SEL selector) {
         [name containsString:@"hiddenonstart"];
 }
 
-static NSString *YTKACEMiscKey(Class cls, SEL selector) {
+static NSString *YTzoomMiscKey(Class cls, SEL selector) {
     return [NSString stringWithFormat:@"%@|%@", NSStringFromClass(cls),
                                       NSStringFromSelector(selector)];
 }
 
-static IMP YTKACEMiscOriginal(id receiver, SEL selector) {
+static IMP YTzoomMiscOriginal(id receiver, SEL selector) {
     for (Class cls = object_getClass(receiver); cls != Nil; cls = class_getSuperclass(cls)) {
-        IMP original = (IMP)[YTKACEMiscOriginals[
-            YTKACEMiscKey(cls, selector)] pointerValue];
+        IMP original = (IMP)[YTzoomMiscOriginals[
+            YTzoomMiscKey(cls, selector)] pointerValue];
         if (original != NULL) {
             return original;
         }
@@ -74,85 +74,85 @@ static IMP YTKACEMiscOriginal(id receiver, SEL selector) {
     return NULL;
 }
 
-static BOOL YTKACEMiniPlayerEnabled(void) {
-    return YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.KidsMiniPlayer");
+static BOOL YTzoomMiniPlayerEnabled(void) {
+    return YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.KidsMiniPlayer");
 }
 
-static NSString *const YTKACELayoutIdiomKey = @"YTKACE.Preference.App.LayoutIdiom";
+static NSString *const YTzoomLayoutIdiomKey = @"YTzoom.Preference.App.LayoutIdiom";
 
-static BOOL YTKACEIdiomForced;
-static UIUserInterfaceIdiom YTKACEForcedIdiom;
-static UIUserInterfaceIdiom YTKACERealIdiom;
+static BOOL YTzoomIdiomForced;
+static UIUserInterfaceIdiom YTzoomForcedIdiom;
+static UIUserInterfaceIdiom YTzoomRealIdiom;
 static IMP OriginalDeviceIdiom;
 
 typedef struct {
     uintptr_t start;
     uintptr_t end;
-} YTKACETextRange;
+} YTzoomTextRange;
 
-static YTKACETextRange YTKACEIdiomRanges[2];
-static NSUInteger YTKACEIdiomRangeCount;
+static YTzoomTextRange YTzoomIdiomRanges[2];
+static NSUInteger YTzoomIdiomRangeCount;
 
-static void YTKACEAddTextRange(const struct mach_header *header) {
-    if (header == NULL || YTKACEIdiomRangeCount >= 2) return;
+static void YTzoomAddTextRange(const struct mach_header *header) {
+    if (header == NULL || YTzoomIdiomRangeCount >= 2) return;
     unsigned long size = 0;
     const uint8_t *text = getsectiondata(
         (const struct mach_header_64 *)header, "__TEXT", "__text", &size);
     if (text == NULL || size == 0) return;
-    YTKACEIdiomRanges[YTKACEIdiomRangeCount].start = (uintptr_t)text;
-    YTKACEIdiomRanges[YTKACEIdiomRangeCount].end = (uintptr_t)text + size;
-    YTKACEIdiomRangeCount++;
+    YTzoomIdiomRanges[YTzoomIdiomRangeCount].start = (uintptr_t)text;
+    YTzoomIdiomRanges[YTzoomIdiomRangeCount].end = (uintptr_t)text + size;
+    YTzoomIdiomRangeCount++;
 }
 
-static void YTKACEComputeIdiomRanges(void) {
+static void YTzoomComputeIdiomRanges(void) {
     for (uint32_t index = 0; index < _dyld_image_count(); index++) {
         const struct mach_header *header = _dyld_get_image_header(index);
         if (header == NULL) continue;
         if (header->filetype != MH_EXECUTE) continue;
-        YTKACEAddTextRange(header);
+        YTzoomAddTextRange(header);
         break;
     }
     Dl_info info;
-    if (dladdr((const void *)&YTKACEComputeIdiomRanges, &info) != 0) {
-        YTKACEAddTextRange((const struct mach_header *)info.dli_fbase);
+    if (dladdr((const void *)&YTzoomComputeIdiomRanges, &info) != 0) {
+        YTzoomAddTextRange((const struct mach_header *)info.dli_fbase);
     }
 }
 
-static inline BOOL YTKACECallerIsApp(uintptr_t caller) {
-    for (NSUInteger index = 0; index < YTKACEIdiomRangeCount; index++) {
-        if (caller >= YTKACEIdiomRanges[index].start &&
-            caller < YTKACEIdiomRanges[index].end) {
+static inline BOOL YTzoomCallerIsApp(uintptr_t caller) {
+    for (NSUInteger index = 0; index < YTzoomIdiomRangeCount; index++) {
+        if (caller >= YTzoomIdiomRanges[index].start &&
+            caller < YTzoomIdiomRanges[index].end) {
             return YES;
         }
     }
     return NO;
 }
 
-NSInteger YTKACERealUserInterfaceIdiom(void) {
-    if (YTKACEIdiomForced) {
-        return (NSInteger)YTKACERealIdiom;
+NSInteger YTzoomRealUserInterfaceIdiom(void) {
+    if (YTzoomIdiomForced) {
+        return (NSInteger)YTzoomRealIdiom;
     }
     return (NSInteger)UIDevice.currentDevice.userInterfaceIdiom;
 }
 
-static UIUserInterfaceIdiom YTKACEUserInterfaceIdiom(id receiver, SEL selector) {
-    if (YTKACEIdiomForced &&
-        YTKACECallerIsApp((uintptr_t)__builtin_return_address(0))) {
-        return YTKACEForcedIdiom;
+static UIUserInterfaceIdiom YTzoomUserInterfaceIdiom(id receiver, SEL selector) {
+    if (YTzoomIdiomForced &&
+        YTzoomCallerIsApp((uintptr_t)__builtin_return_address(0))) {
+        return YTzoomForcedIdiom;
     }
     return OriginalDeviceIdiom != NULL
         ? ((UIUserInterfaceIdiom (*)(id, SEL))OriginalDeviceIdiom)(receiver,
                                                                    selector)
-        : YTKACERealIdiom;
+        : YTzoomRealIdiom;
 }
 
-static void YTKACEResolveForcedIdiom(void) {
+static void YTzoomResolveForcedIdiom(void) {
     UIUserInterfaceIdiom actual = UIDevice.currentDevice.userInterfaceIdiom;
-    id stored = YTKACEPreferenceObject(YTKACELayoutIdiomKey);
+    id stored = YTzoomPreferenceObject(YTzoomLayoutIdiomKey);
     NSInteger choice = [stored respondsToSelector:@selector(integerValue)]
         ? [stored integerValue] : 0;
     if (choice == 0 &&
-        YTKACEFeatureEnabled(@"YTKACE.Preference.App.iPadLayout")) {
+        YTzoomFeatureEnabled(@"YTzoom.Preference.App.iPadLayout")) {
         choice = 2;
     }
     UIUserInterfaceIdiom desired;
@@ -164,17 +164,17 @@ static void YTKACEResolveForcedIdiom(void) {
         return;
     }
     if (desired == actual) return;
-    YTKACERealIdiom = actual;
-    YTKACEForcedIdiom = desired;
-    YTKACEIdiomForced = YES;
+    YTzoomRealIdiom = actual;
+    YTzoomForcedIdiom = desired;
+    YTzoomIdiomForced = YES;
 }
 
-static BOOL YTKACEForcedIsIPad(__unused id receiver, __unused SEL selector) {
-    return YTKACEForcedIdiom == UIUserInterfaceIdiomPad;
+static BOOL YTzoomForcedIsIPad(__unused id receiver, __unused SEL selector) {
+    return YTzoomForcedIdiom == UIUserInterfaceIdiomPad;
 }
 
-static void YTKACEAddInteraction(UIView *receiver, SEL selector, id interaction) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.App.DragDropDisabled") &&
+static void YTzoomAddInteraction(UIView *receiver, SEL selector, id interaction) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.App.DragDropDisabled") &&
         ([interaction isKindOfClass:UIDragInteraction.class] ||
          [interaction isKindOfClass:UIDropInteraction.class])) {
         return;
@@ -184,8 +184,8 @@ static void YTKACEAddInteraction(UIView *receiver, SEL selector, id interaction)
     }
 }
 
-static UISemanticContentAttribute YTKACESemanticContent(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.App.RTLDisabled")) {
+static UISemanticContentAttribute YTzoomSemanticContent(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.App.RTLDisabled")) {
         return UISemanticContentAttributeForceLeftToRight;
     }
     return OriginalSemanticContent != NULL
@@ -193,22 +193,22 @@ static UISemanticContentAttribute YTKACESemanticContent(id receiver, SEL selecto
         : UISemanticContentAttributeUnspecified;
 }
 
-static void YTKACESetSemanticContent(id receiver,
+static void YTzoomSetSemanticContent(id receiver,
                                      SEL selector,
                                      UISemanticContentAttribute value) {
     if (OriginalSetSemanticContent != NULL) {
         ((void (*)(id, SEL, UISemanticContentAttribute))OriginalSetSemanticContent)(
             receiver,
             selector,
-            YTKACEFeatureEnabled(@"YTKACE.Preference.App.RTLDisabled")
+            YTzoomFeatureEnabled(@"YTzoom.Preference.App.RTLDisabled")
                 ? UISemanticContentAttributeForceLeftToRight
                 : value
         );
     }
 }
 
-static BOOL YTKACEMiniPlayerValue(id receiver, SEL selector) {
-    if (YTKACEMiniPlayerEnabled()) {
+static BOOL YTzoomMiniPlayerValue(id receiver, SEL selector) {
+    if (YTzoomMiniPlayerEnabled()) {
         NSString *name = NSStringFromSelector(selector).lowercaseString;
         return !([name containsString:@"disable"] ||
                  [name containsString:@"unavailable"] ||
@@ -217,47 +217,47 @@ static BOOL YTKACEMiniPlayerValue(id receiver, SEL selector) {
                  [name containsString:@"hide"] ||
                  [name containsString:@"onlywhenplaying"]);
     }
-    IMP original = YTKACEMiscOriginal(receiver, selector);
+    IMP original = YTzoomMiscOriginal(receiver, selector);
     return original != NULL ? ((BOOL (*)(id, SEL))original)(receiver, selector) : NO;
 }
 
-static BOOL YTKACEMiniPlayerPauseOnlyValue(id receiver, SEL selector) {
-    if (YTKACEMiniPlayerEnabled()) {
+static BOOL YTzoomMiniPlayerPauseOnlyValue(id receiver, SEL selector) {
+    if (YTzoomMiniPlayerEnabled()) {
         return NO;
     }
-    IMP original = YTKACEMiscOriginal(receiver, selector);
+    IMP original = YTzoomMiscOriginal(receiver, selector);
     return original != NULL ? ((BOOL (*)(id, SEL))original)(receiver, selector) : NO;
 }
 
-static BOOL YTKACEAgeValue(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Content.AgeGateBypass")) {
+static BOOL YTzoomAgeValue(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Content.AgeGateBypass")) {
         NSString *name = NSStringFromSelector(selector).lowercaseString;
         return [name containsString:@"verified"] ||
             [name containsString:@"allowed"];
     }
-    IMP original = YTKACEMiscOriginal(receiver, selector);
+    IMP original = YTzoomMiscOriginal(receiver, selector);
     return original != NULL ? ((BOOL (*)(id, SEL))original)(receiver, selector) : NO;
 }
 
-static NSInteger YTKACECaptionsMode(void) {
-    if (!YTKACEMasterEnabled()) return 0;
-    id stored = [NSUserDefaults.standardUserDefaults objectForKey:@"YTKACE.Preference.Playback.CaptionsMode"];
+static NSInteger YTzoomCaptionsMode(void) {
+    if (!YTzoomMasterEnabled()) return 0;
+    id stored = [NSUserDefaults.standardUserDefaults objectForKey:@"YTzoom.Preference.Playback.CaptionsMode"];
     if ([stored respondsToSelector:@selector(integerValue)]) return MAX(0, MIN(2, [stored integerValue]));
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.CaptionsDisabled")) return 2;
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.CaptionsAlwaysOn")) return 1;
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.CaptionsDisabled")) return 2;
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.CaptionsAlwaysOn")) return 1;
     return 0;
 }
 
-static BOOL YTKACECaptionValue(id receiver, SEL selector) {
+static BOOL YTzoomCaptionValue(id receiver, SEL selector) {
     NSString *name = NSStringFromSelector(selector).lowercaseString;
     BOOL negative = [name containsString:@"disabled"] ||
         [name containsString:@"hidden"];
-    if ((YTKACECaptionsMode() == 2)) {
+    if ((YTzoomCaptionsMode() == 2)) {
         return negative;
     }
-    if ((YTKACECaptionsMode() == 1)) {
-        if (!YTKACECaptionRequestReceiver(receiver, selector)) {
-            IMP original = YTKACEMiscOriginal(receiver, selector);
+    if ((YTzoomCaptionsMode() == 1)) {
+        if (!YTzoomCaptionRequestReceiver(receiver, selector)) {
+            IMP original = YTzoomMiscOriginal(receiver, selector);
             return original != NULL
                 ? ((BOOL (*)(id, SEL))original)(receiver, selector) : NO;
         }
@@ -267,12 +267,12 @@ static BOOL YTKACECaptionValue(id receiver, SEL selector) {
         }
         return !negative;
     }
-    IMP original = YTKACEMiscOriginal(receiver, selector);
+    IMP original = YTzoomMiscOriginal(receiver, selector);
     return original != NULL ? ((BOOL (*)(id, SEL))original)(receiver, selector) : NO;
 }
 
-static void YTKACECaptionSetter(id receiver, SEL selector, BOOL enabled) {
-    IMP original = YTKACEMiscOriginal(receiver, selector);
+static void YTzoomCaptionSetter(id receiver, SEL selector, BOOL enabled) {
+    IMP original = YTzoomMiscOriginal(receiver, selector);
     if (original == NULL) {
         return;
     }
@@ -280,16 +280,16 @@ static void YTKACECaptionSetter(id receiver, SEL selector, BOOL enabled) {
     BOOL negative = [name containsString:@"disabled"] ||
         [name containsString:@"hidden"];
     BOOL value = enabled;
-    if ((YTKACECaptionsMode() == 2)) {
+    if ((YTzoomCaptionsMode() == 2)) {
         value = negative;
-    } else if ((YTKACECaptionsMode() == 1) &&
-               YTKACECaptionRequestReceiver(receiver, selector)) {
+    } else if ((YTzoomCaptionsMode() == 1) &&
+               YTzoomCaptionRequestReceiver(receiver, selector)) {
         value = !negative;
     }
     ((void (*)(id, SEL, BOOL))original)(receiver, selector, value);
 }
 
-static id YTKACEFirstCaptionTrack(id tracks) {
+static id YTzoomFirstCaptionTrack(id tracks) {
     if ([tracks isKindOfClass:NSArray.class]) {
         return [tracks firstObject];
     }
@@ -301,26 +301,26 @@ static id YTKACEFirstCaptionTrack(id tracks) {
     return nil;
 }
 
-static NSString *YTKACETrackText(id track, NSString *name) {
+static NSString *YTzoomTrackText(id track, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     if (![track respondsToSelector:selector]) return nil;
     id value = ((id (*)(id, SEL))objc_msgSend)(track, selector);
     return [value isKindOfClass:NSString.class] ? value : nil;
 }
 
-static id YTKACEBestCaptionTrackForLanguage(NSArray *tracks, NSString *language) {
+static id YTzoomBestCaptionTrackForLanguage(NSArray *tracks, NSString *language) {
     if (language.length == 0) return nil;
     NSString *base = [[language.lowercaseString componentsSeparatedByCharactersInSet:
         [NSCharacterSet characterSetWithCharactersInString:@"-_"]] firstObject];
     id best = nil;
     NSInteger bestRank = NSIntegerMax;
     for (id track in tracks) {
-        NSString *code = YTKACETrackText(track, @"languageCode").lowercaseString;
+        NSString *code = YTzoomTrackText(track, @"languageCode").lowercaseString;
         if (code.length == 0) continue;
         NSString *codeBase = [[code componentsSeparatedByCharactersInSet:
             [NSCharacterSet characterSetWithCharactersInString:@"-_"]] firstObject];
         if (![code isEqualToString:language.lowercaseString] && ![codeBase isEqualToString:base]) continue;
-        NSString *vss = YTKACETrackText(track, @"VSSID") ?: @"";
+        NSString *vss = YTzoomTrackText(track, @"VSSID") ?: @"";
         NSInteger rank = [vss hasPrefix:@"."] ? 0 : ([vss hasPrefix:@"a."] ? 1 : 2);
         if (rank < bestRank) {
             bestRank = rank;
@@ -330,42 +330,42 @@ static id YTKACEBestCaptionTrackForLanguage(NSArray *tracks, NSString *language)
     return best;
 }
 
-static id YTKACEPreferredCaptionTrack(id tracks) {
-    id first = YTKACEFirstCaptionTrack(tracks);
+static id YTzoomPreferredCaptionTrack(id tracks) {
+    id first = YTzoomFirstCaptionTrack(tracks);
     if (first == nil) return nil;
     NSArray *list = [tracks isKindOfClass:NSArray.class] ? tracks
         : ([tracks respondsToSelector:@selector(allObjects)]
             ? ((id (*)(id, SEL))objc_msgSend)(tracks, @selector(allObjects)) : nil);
     if (![list isKindOfClass:NSArray.class]) return first;
     NSString *preferred = [NSUserDefaults.standardUserDefaults
-        stringForKey:@"YTKACE.Preference.Playback.CaptionLanguage"];
-    id match = YTKACEBestCaptionTrackForLanguage(list, preferred);
+        stringForKey:@"YTzoom.Preference.Playback.CaptionLanguage"];
+    id match = YTzoomBestCaptionTrackForLanguage(list, preferred);
     for (NSString *language in NSLocale.preferredLanguages) {
         if (match != nil) break;
-        match = YTKACEBestCaptionTrackForLanguage(list, language);
+        match = YTzoomBestCaptionTrackForLanguage(list, language);
     }
     if (match != nil) return match;
     for (id track in list) {
-        if (![[YTKACETrackText(track, @"VSSID") ?: @"" lowercaseString] hasPrefix:@"t"]) return track;
+        if (![[YTzoomTrackText(track, @"VSSID") ?: @"" lowercaseString] hasPrefix:@"t"]) return track;
     }
     return first;
 }
 
-static void YTKACEScheduleCaptionSelection(id track) {
-    if (track == nil || !(YTKACECaptionsMode() == 1)) {
+static void YTzoomScheduleCaptionSelection(id track) {
+    if (track == nil || !(YTzoomCaptionsMode() == 1)) {
         return;
     }
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                                   (int64_t)(0.45 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        NSString *key = YTKACECaptionTrackKey(track);
+        NSString *key = YTzoomCaptionTrackKey(track);
         NSArray *controllers = nil;
-        @synchronized (YTKACECaptionControllers) {
-            controllers = YTKACECaptionControllers.allObjects;
+        @synchronized (YTzoomCaptionControllers) {
+            controllers = YTzoomCaptionControllers.allObjects;
         }
         for (id controller in controllers) {
             NSString *applied = objc_getAssociatedObject(
-                controller, YTKACEAppliedCaptionAssociation);
+                controller, YTzoomAppliedCaptionAssociation);
             if ([applied isEqualToString:key]) {
                 continue;
             }
@@ -375,7 +375,7 @@ static void YTKACEScheduleCaptionSelection(id track) {
                 continue;
             }
             objc_setAssociatedObject(controller,
-                YTKACEAppliedCaptionAssociation, key,
+                YTzoomAppliedCaptionAssociation, key,
                 OBJC_ASSOCIATION_COPY_NONATOMIC);
             ((void (*)(id, SEL, id, NSInteger))objc_msgSend)(
                 controller, selector, track, 1);
@@ -383,64 +383,64 @@ static void YTKACEScheduleCaptionSelection(id track) {
     });
 }
 
-static id YTKACECaptionControllerAlloc(id receiver, SEL selector, NSZone *zone) {
+static id YTzoomCaptionControllerAlloc(id receiver, SEL selector, NSZone *zone) {
     id result = OriginalCaptionControllerAlloc != NULL
         ? ((id (*)(id, SEL, NSZone *))OriginalCaptionControllerAlloc)(
             receiver, selector, zone) : nil;
     if (result != nil) {
-        @synchronized (YTKACECaptionControllers) {
-            [YTKACECaptionControllers addObject:result];
+        @synchronized (YTzoomCaptionControllers) {
+            [YTzoomCaptionControllers addObject:result];
         }
     }
     return result;
 }
 
-static id YTKACECaptionControllerInit(id receiver, SEL selector) {
-    IMP original = YTKACEMiscOriginal(receiver, selector);
+static id YTzoomCaptionControllerInit(id receiver, SEL selector) {
+    IMP original = YTzoomMiscOriginal(receiver, selector);
     id result = original != NULL
         ? ((id (*)(id, SEL))original)(receiver, selector) : receiver;
     if (result != nil) {
-        @synchronized (YTKACECaptionControllers) {
-            [YTKACECaptionControllers addObject:result];
+        @synchronized (YTzoomCaptionControllers) {
+            [YTzoomCaptionControllers addObject:result];
         }
     }
     return result;
 }
 
-static void YTKACECaptionTracksSetter(id receiver, SEL selector, id tracks) {
-    IMP original = YTKACEMiscOriginal(receiver, selector);
+static void YTzoomCaptionTracksSetter(id receiver, SEL selector, id tracks) {
+    IMP original = YTzoomMiscOriginal(receiver, selector);
     if (original != NULL) {
         ((void (*)(id, SEL, id))original)(receiver, selector, tracks);
     }
-    id track = YTKACEPreferredCaptionTrack(tracks);
+    id track = YTzoomPreferredCaptionTrack(tracks);
     id previousTrack = objc_getAssociatedObject(
-        receiver, YTKACELastCaptionTrackAssociation);
+        receiver, YTzoomLastCaptionTrackAssociation);
     if (previousTrack != track) {
-        objc_setAssociatedObject(receiver, YTKACELastCaptionTrackAssociation,
+        objc_setAssociatedObject(receiver, YTzoomLastCaptionTrackAssociation,
                                  track, OBJC_ASSOCIATION_ASSIGN);
-        YTKACEScheduleCaptionSelection(track);
+        YTzoomScheduleCaptionSelection(track);
     }
     if (track == nil) {
         return;
     }
     objc_setAssociatedObject(receiver,
-                             YTKACECaptionTracksAssociation,
+                             YTzoomCaptionTracksAssociation,
                              tracks,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-static void YTKACECaptionTrackSetter(id receiver, SEL selector, id track) {
-    IMP original = YTKACEMiscOriginal(receiver, selector);
+static void YTzoomCaptionTrackSetter(id receiver, SEL selector, id track) {
+    IMP original = YTzoomMiscOriginal(receiver, selector);
     if (original != NULL) {
         ((void (*)(id, SEL, id))original)(receiver, selector, track);
     }
 }
 
-static void YTKACECaptionSelectedTrackSetter(id receiver,
+static void YTzoomCaptionSelectedTrackSetter(id receiver,
                                              SEL selector,
                                              id track,
                                              NSInteger reason) {
-    IMP original = YTKACEMiscOriginal(receiver, selector);
+    IMP original = YTzoomMiscOriginal(receiver, selector);
     if (original != NULL) {
         ((void (*)(id, SEL, id, NSInteger))original)(receiver,
                                                       selector,
@@ -449,8 +449,8 @@ static void YTKACECaptionSelectedTrackSetter(id receiver,
     }
 }
 
-static id YTKACECaptionTracks(id receiver, SEL selector) {
-    if ((YTKACECaptionsMode() == 2)) {
+static id YTzoomCaptionTracks(id receiver, SEL selector) {
+    if ((YTzoomCaptionsMode() == 2)) {
         return @[];
     }
     id tracks = OriginalCaptionTracks != NULL
@@ -459,8 +459,8 @@ static id YTKACECaptionTracks(id receiver, SEL selector) {
     return tracks;
 }
 
-static void YTKACEHUDMessage(id receiver, SEL selector, id message) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.App.HUDAlertsHidden")) {
+static void YTzoomHUDMessage(id receiver, SEL selector, id message) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.App.HUDAlertsHidden")) {
         return;
     }
     NSString *text = nil;
@@ -487,30 +487,30 @@ static void YTKACEHUDMessage(id receiver, SEL selector, id message) {
         }
     }
     NSString *lower = text.lowercaseString;
-    if (YTKACEMiniPlayerEnabled() &&
+    if (YTzoomMiniPlayerEnabled() &&
         [lower containsString:@"miniplayer"] &&
         [lower containsString:@"kids"]) {
         return;
     }
-    IMP original = YTKACEMiscOriginal(receiver, selector);
+    IMP original = YTzoomMiscOriginal(receiver, selector);
     if (original != NULL) {
         ((void (*)(id, SEL, id))original)(receiver, selector, message);
     }
 }
 
-static void YTKACEStoreMiscOriginal(NSString *className,
+static void YTzoomStoreMiscOriginal(NSString *className,
                                     NSString *selectorName,
                                     IMP original) {
     Class cls = NSClassFromString(className);
     if (cls != Nil && original != NULL) {
-        YTKACEMiscOriginals[YTKACEMiscKey(
+        YTzoomMiscOriginals[YTzoomMiscKey(
             cls,
             NSSelectorFromString(selectorName)
         )] = [NSValue valueWithPointer:(const void *)original];
     }
 }
 
-static void YTKACEInstallMiscBool(NSString *className,
+static void YTzoomInstallMiscBool(NSString *className,
                                   NSString *selectorName,
                                   IMP replacement) {
     Class cls = NSClassFromString(className);
@@ -527,12 +527,12 @@ static void YTKACEInstallMiscBool(NSString *className,
         return;
     }
     IMP original = NULL;
-    if (YTKACEInstallInstanceHook(className, selectorName, replacement, &original)) {
-        YTKACEStoreMiscOriginal(className, selectorName, original);
+    if (YTzoomInstallInstanceHook(className, selectorName, replacement, &original)) {
+        YTzoomStoreMiscOriginal(className, selectorName, original);
     }
 }
 
-static void YTKACEInstallMiscSetter(NSString *className,
+static void YTzoomInstallMiscSetter(NSString *className,
                                     NSString *selectorName,
                                     IMP replacement) {
     Class cls = NSClassFromString(className);
@@ -544,12 +544,12 @@ static void YTKACEInstallMiscSetter(NSString *className,
         return;
     }
     IMP original = NULL;
-    if (YTKACEInstallInstanceHook(className, selectorName, replacement, &original)) {
-        YTKACEStoreMiscOriginal(className, selectorName, original);
+    if (YTzoomInstallInstanceHook(className, selectorName, replacement, &original)) {
+        YTzoomStoreMiscOriginal(className, selectorName, original);
     }
 }
 
-static void YTKACEInstallMiscObjectSetter(NSString *className,
+static void YTzoomInstallMiscObjectSetter(NSString *className,
                                           NSString *selectorName,
                                           IMP replacement) {
     Class cls = NSClassFromString(className);
@@ -564,13 +564,13 @@ static void YTKACEInstallMiscObjectSetter(NSString *className,
         return;
     }
     IMP original = NULL;
-    if (YTKACEInstallInstanceHook(className, selectorName,
+    if (YTzoomInstallInstanceHook(className, selectorName,
                                   replacement, &original)) {
-        YTKACEStoreMiscOriginal(className, selectorName, original);
+        YTzoomStoreMiscOriginal(className, selectorName, original);
     }
 }
 
-static void YTKACEInstallCaptionSelectedSetter(NSString *className) {
+static void YTzoomInstallCaptionSelectedSetter(NSString *className) {
     NSString *selectorName = @"setSelectedCaptionTrack:selectionReason:";
     Class cls = NSClassFromString(className);
     SEL selector = NSSelectorFromString(selectorName);
@@ -584,14 +584,14 @@ static void YTKACEInstallCaptionSelectedSetter(NSString *className) {
         return;
     }
     IMP original = NULL;
-    if (YTKACEInstallInstanceHook(className, selectorName,
-                                  (IMP)YTKACECaptionSelectedTrackSetter,
+    if (YTzoomInstallInstanceHook(className, selectorName,
+                                  (IMP)YTzoomCaptionSelectedTrackSetter,
                                   &original)) {
-        YTKACEStoreMiscOriginal(className, selectorName, original);
+        YTzoomStoreMiscOriginal(className, selectorName, original);
     }
 }
 
-static BOOL YTKACEClassNameMatches(NSString *className,
+static BOOL YTzoomClassNameMatches(NSString *className,
                                    NSArray<NSString *> *tokens) {
     NSString *lower = className.lowercaseString;
     for (NSString *token in tokens) {
@@ -602,50 +602,50 @@ static BOOL YTKACEClassNameMatches(NSString *className,
     return NO;
 }
 
-static NSString *YTKACEMiscDiscoveryCacheKey(void) {
+static NSString *YTzoomMiscDiscoveryCacheKey(void) {
     NSString *version = NSBundle.mainBundle
         .infoDictionary[@"CFBundleShortVersionString"] ?: @"unknown";
-    return [@"YTKACEMiscHookTargets." stringByAppendingString:version];
+    return [@"YTzoomMiscHookTargets." stringByAppendingString:version];
 }
 
-static void YTKACEApplyMiscDiscoveryTarget(NSString *target) {
+static void YTzoomApplyMiscDiscoveryTarget(NSString *target) {
     NSArray<NSString *> *parts = [target componentsSeparatedByString:@"|"];
     if (parts.count != 3) return;
     NSString *kind = parts[0];
     NSString *className = parts[1];
     NSString *selectorName = parts[2];
     if ([kind isEqualToString:@"mini"]) {
-        YTKACEInstallMiscBool(className, selectorName,
-                              (IMP)YTKACEMiniPlayerValue);
+        YTzoomInstallMiscBool(className, selectorName,
+                              (IMP)YTzoomMiniPlayerValue);
     } else if ([kind isEqualToString:@"miniPause"]) {
-        YTKACEInstallMiscBool(className, selectorName,
-                              (IMP)YTKACEMiniPlayerPauseOnlyValue);
+        YTzoomInstallMiscBool(className, selectorName,
+                              (IMP)YTzoomMiniPlayerPauseOnlyValue);
     } else if ([kind isEqualToString:@"captionBool"]) {
-        YTKACEInstallMiscBool(className, selectorName,
-                              (IMP)YTKACECaptionValue);
+        YTzoomInstallMiscBool(className, selectorName,
+                              (IMP)YTzoomCaptionValue);
     } else if ([kind isEqualToString:@"captionSetter"]) {
-        YTKACEInstallMiscSetter(className, selectorName,
-                                (IMP)YTKACECaptionSetter);
+        YTzoomInstallMiscSetter(className, selectorName,
+                                (IMP)YTzoomCaptionSetter);
     } else if ([kind isEqualToString:@"captionTracks"]) {
-        YTKACEInstallMiscObjectSetter(className, selectorName,
-                                      (IMP)YTKACECaptionTracksSetter);
+        YTzoomInstallMiscObjectSetter(className, selectorName,
+                                      (IMP)YTzoomCaptionTracksSetter);
     } else if ([kind isEqualToString:@"captionTrack"]) {
-        YTKACEInstallMiscObjectSetter(className, selectorName,
-                                      (IMP)YTKACECaptionTrackSetter);
+        YTzoomInstallMiscObjectSetter(className, selectorName,
+                                      (IMP)YTzoomCaptionTrackSetter);
     } else if ([kind isEqualToString:@"captionSelected"]) {
-        YTKACEInstallCaptionSelectedSetter(className);
+        YTzoomInstallCaptionSelectedSetter(className);
     }
 }
 
-static void YTKACEApplyCachedMiscDiscovery(void) {
+static void YTzoomApplyCachedMiscDiscovery(void) {
     NSArray<NSString *> *targets = [NSUserDefaults.standardUserDefaults
-        arrayForKey:YTKACEMiscDiscoveryCacheKey()];
+        arrayForKey:YTzoomMiscDiscoveryCacheKey()];
     for (NSString *target in targets) {
-        YTKACEApplyMiscDiscoveryTarget(target);
+        YTzoomApplyMiscDiscoveryTarget(target);
     }
 }
 
-static void YTKACEDiscoverMiscHooks(void) {
+static void YTzoomDiscoverMiscHooks(void) {
     NSSet<NSString *> *miniSelectors = [NSSet setWithArray:@[
         @"isPlayableInMiniPlayer", @"isPlayableInMiniplayer",
         @"miniplayerEnabled", @"isMiniplayerDisabled",
@@ -694,9 +694,9 @@ static void YTKACEDiscoverMiscHooks(void) {
         @"caption", @"player", @"playback", @"watch", @"globalconfig"
     ];
     NSMutableOrderedSet<NSString *> *targets = [NSMutableOrderedSet orderedSet];
-    for (NSString *className in YTKACEAppClassNames()) {
-        BOOL mini = YTKACEClassNameMatches(className, miniTokens);
-        BOOL caption = YTKACEClassNameMatches(className, captionTokens);
+    for (NSString *className in YTzoomAppClassNames()) {
+        BOOL mini = YTzoomClassNameMatches(className, miniTokens);
+        BOOL caption = YTzoomClassNameMatches(className, captionTokens);
         if (!mini && !caption) continue;
         Class cls = NSClassFromString(className);
         if (cls == Nil) continue;
@@ -740,44 +740,44 @@ static void YTKACEDiscoverMiscHooks(void) {
 
     NSArray<NSString *> *result = targets.array;
     [NSUserDefaults.standardUserDefaults setObject:result
-                                    forKey:YTKACEMiscDiscoveryCacheKey()];
+                                    forKey:YTzoomMiscDiscoveryCacheKey()];
     dispatch_async(dispatch_get_main_queue(), ^{
         for (NSString *target in result) {
-            YTKACEApplyMiscDiscoveryTarget(target);
+            YTzoomApplyMiscDiscoveryTarget(target);
         }
     });
 }
 
-void YTKACEInstallMiscellaneousHooks(void) {
+void YTzoomInstallMiscellaneousHooks(void) {
     NSUserDefaults *defaults = NSUserDefaults.standardUserDefaults;
-    if ([defaults objectForKey:@"YTKACE.Preference.Playback.CaptionsMode"] == nil) {
-        NSInteger legacy = [defaults boolForKey:@"YTKACE.Preference.Playback.CaptionsDisabled"] ? 2
-            : ([defaults boolForKey:@"YTKACE.Preference.Playback.CaptionsAlwaysOn"] ? 1 : 0);
-        if (legacy != 0) [defaults setInteger:legacy forKey:@"YTKACE.Preference.Playback.CaptionsMode"];
+    if ([defaults objectForKey:@"YTzoom.Preference.Playback.CaptionsMode"] == nil) {
+        NSInteger legacy = [defaults boolForKey:@"YTzoom.Preference.Playback.CaptionsDisabled"] ? 2
+            : ([defaults boolForKey:@"YTzoom.Preference.Playback.CaptionsAlwaysOn"] ? 1 : 0);
+        if (legacy != 0) [defaults setInteger:legacy forKey:@"YTzoom.Preference.Playback.CaptionsMode"];
     }
-    if (YTKACEMiscOriginals == nil) {
-        YTKACEMiscOriginals = [NSMutableDictionary dictionary];
-        YTKACECaptionControllers = [NSHashTable weakObjectsHashTable];
+    if (YTzoomMiscOriginals == nil) {
+        YTzoomMiscOriginals = [NSMutableDictionary dictionary];
+        YTzoomCaptionControllers = [NSHashTable weakObjectsHashTable];
     }
-    YTKACEResolveForcedIdiom();
-    if (YTKACEIdiomForced) {
-        YTKACEComputeIdiomRanges();
+    YTzoomResolveForcedIdiom();
+    if (YTzoomIdiomForced) {
+        YTzoomComputeIdiomRanges();
         for (NSString *name in @[@"YTCommonUtils", @"OGLMetrics"]) {
-            YTKACEInstallClassHook(name, @"isIPad",
-                                   (IMP)YTKACEForcedIsIPad, NULL);
+            YTzoomInstallClassHook(name, @"isIPad",
+                                   (IMP)YTzoomForcedIsIPad, NULL);
         }
-        YTKACEInstallInstanceHook(@"UIDevice", @"userInterfaceIdiom",
-                                  (IMP)YTKACEUserInterfaceIdiom,
+        YTzoomInstallInstanceHook(@"UIDevice", @"userInterfaceIdiom",
+                                  (IMP)YTzoomUserInterfaceIdiom,
                                   &OriginalDeviceIdiom);
     }
-    YTKACEInstallInstanceHook(@"UIView", @"addInteraction:",
-                              (IMP)YTKACEAddInteraction,
+    YTzoomInstallInstanceHook(@"UIView", @"addInteraction:",
+                              (IMP)YTzoomAddInteraction,
                               &OriginalAddInteraction);
-    YTKACEInstallInstanceHook(@"UIView", @"semanticContentAttribute",
-                              (IMP)YTKACESemanticContent,
+    YTzoomInstallInstanceHook(@"UIView", @"semanticContentAttribute",
+                              (IMP)YTzoomSemanticContent,
                               &OriginalSemanticContent);
-    YTKACEInstallInstanceHook(@"UIView", @"setSemanticContentAttribute:",
-                              (IMP)YTKACESetSemanticContent,
+    YTzoomInstallInstanceHook(@"UIView", @"setSemanticContentAttribute:",
+                              (IMP)YTzoomSetSemanticContent,
                               &OriginalSetSemanticContent);
     NSArray<NSString *> *miniClasses = @[
         @"YTIPlayabilityStatus",
@@ -794,11 +794,11 @@ void YTKACEInstallMiscellaneousHooks(void) {
         @"isMiniplayerUnavailable"
     ];
     for (NSString *className in miniClasses) {
-        YTKACEInstallMiscBool(className,
+        YTzoomInstallMiscBool(className,
             @"isMiniplayerRendererPlaybackModePauseOnly",
-            (IMP)YTKACEMiniPlayerPauseOnlyValue);
+            (IMP)YTzoomMiniPlayerPauseOnlyValue);
         for (NSString *selectorName in miniSelectors) {
-            YTKACEInstallMiscBool(className, selectorName, (IMP)YTKACEMiniPlayerValue);
+            YTzoomInstallMiscBool(className, selectorName, (IMP)YTzoomMiniPlayerValue);
         }
     }
 
@@ -811,7 +811,7 @@ void YTKACEInstallMiscellaneousHooks(void) {
             @"isAgeVerified",
             @"isAgeAllowed"
         ]) {
-            YTKACEInstallMiscBool(className, selectorName, (IMP)YTKACEAgeValue);
+            YTzoomInstallMiscBool(className, selectorName, (IMP)YTzoomAgeValue);
         }
     }
 
@@ -829,32 +829,32 @@ void YTKACEInstallMiscellaneousHooks(void) {
             @"closedCaptionsEnabled",
             @"captionsDisabled"
         ]) {
-            YTKACEInstallMiscBool(className, selectorName, (IMP)YTKACECaptionValue);
+            YTzoomInstallMiscBool(className, selectorName, (IMP)YTzoomCaptionValue);
         }
         for (NSString *selectorName in @[
             @"setCaptionsEnabled:",
             @"setClosedCaptionsEnabled:"
         ]) {
-            YTKACEInstallMiscSetter(className, selectorName, (IMP)YTKACECaptionSetter);
+            YTzoomInstallMiscSetter(className, selectorName, (IMP)YTzoomCaptionSetter);
         }
     }
 
-    YTKACEInstallInstanceHook(@"YTIPlayerResponse",
+    YTzoomInstallInstanceHook(@"YTIPlayerResponse",
                               @"captionTracksArray",
-                              (IMP)YTKACECaptionTracks,
+                              (IMP)YTzoomCaptionTracks,
                               &OriginalCaptionTracks);
     NSString *controllerClass = @"MLInnerTubeCaptionController";
-    YTKACEInstallClassHook(controllerClass, @"allocWithZone:",
-                          (IMP)YTKACECaptionControllerAlloc,
+    YTzoomInstallClassHook(controllerClass, @"allocWithZone:",
+                          (IMP)YTzoomCaptionControllerAlloc,
                           &OriginalCaptionControllerAlloc);
     IMP controllerOriginal = NULL;
-    if (YTKACEInstallInstanceHook(controllerClass, @"init",
-                                  (IMP)YTKACECaptionControllerInit,
+    if (YTzoomInstallInstanceHook(controllerClass, @"init",
+                                  (IMP)YTzoomCaptionControllerInit,
                                   &controllerOriginal)) {
-        YTKACEStoreMiscOriginal(controllerClass, @"init",
+        YTzoomStoreMiscOriginal(controllerClass, @"init",
                                 controllerOriginal);
     }
-    YTKACEApplyCachedMiscDiscovery();
+    YTzoomApplyCachedMiscDiscovery();
     static dispatch_once_t discoveryObserverToken;
     dispatch_once(&discoveryObserverToken, ^{
         [NSNotificationCenter.defaultCenter
@@ -863,7 +863,7 @@ void YTKACEInstallMiscellaneousHooks(void) {
                          queue:nil
                     usingBlock:^(__unused NSNotification *notification) {
             if ([NSUserDefaults.standardUserDefaults
-                    arrayForKey:YTKACEMiscDiscoveryCacheKey()].count != 0) {
+                    arrayForKey:YTzoomMiscDiscoveryCacheKey()].count != 0) {
                 return;
             }
             static dispatch_once_t discoveryToken;
@@ -873,7 +873,7 @@ void YTKACEInstallMiscellaneousHooks(void) {
                         dispatch_time(DISPATCH_TIME_NOW,
                           (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
                         dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
-                            YTKACEDiscoverMiscHooks();
+                            YTzoomDiscoverMiscHooks();
                         }
                     );
                 }
@@ -883,11 +883,11 @@ void YTKACEInstallMiscellaneousHooks(void) {
 
     for (NSString *selectorName in @[@"showMessageMainThread:", @"showMessage:"]) {
         IMP original = NULL;
-        if (YTKACEInstallInstanceHook(@"GOOHUDManagerInternal",
+        if (YTzoomInstallInstanceHook(@"GOOHUDManagerInternal",
                                       selectorName,
-                                      (IMP)YTKACEHUDMessage,
+                                      (IMP)YTzoomHUDMessage,
                                       &original)) {
-            YTKACEStoreMiscOriginal(@"GOOHUDManagerInternal", selectorName, original);
+            YTzoomStoreMiscOriginal(@"GOOHUDManagerInternal", selectorName, original);
         }
     }
 }

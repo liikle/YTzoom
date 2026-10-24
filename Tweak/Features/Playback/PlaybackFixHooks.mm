@@ -23,7 +23,7 @@
  * SOFTWARE.
  */
 
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../Downloads/DownloadLog.h"
@@ -33,11 +33,11 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static NSString *const YTKACEPlaybackFixKey = @"YTKACE.Preference.Playback.Fix";
-static const NSTimeInterval YTKACEStallGrace = 0.8;
-static const double YTKACEProgressEpsilon = 0.15;
+static NSString *const YTzoomPlaybackFixKey = @"YTzoom.Preference.Playback.Fix";
+static const NSTimeInterval YTzoomStallGrace = 0.8;
+static const double YTzoomProgressEpsilon = 0.15;
 
-static NSString *const YTKACEPlaybackErrorDomain =
+static NSString *const YTzoomPlaybackErrorDomain =
     @"com.google.ios.youtube.ErrorDomain.playback";
 
 static double gLatestTime = 0.0;
@@ -48,55 +48,55 @@ static IMP OriginalCurrentVideoMediaTime;
 static IMP OriginalSeekToTime;
 static IMP OriginalHandleError;
 
-NSInteger YTKACEPlaybackFixMode(void) {
-    if (!YTKACEMasterEnabled()) return 0;
-    id stored = YTKACEPreferenceObject(@"YTKACE.Preference.Playback.FixMode");
+NSInteger YTzoomPlaybackFixMode(void) {
+    if (!YTzoomMasterEnabled()) return 0;
+    id stored = YTzoomPreferenceObject(@"YTzoom.Preference.Playback.FixMode");
     if ([stored respondsToSelector:@selector(integerValue)]) {
         const NSInteger mode = [stored integerValue];
         return mode >= 0 && mode <= 2 ? mode : 0;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.HLSMode")) return 2;
-    return YTKACEFeatureEnabled(YTKACEPlaybackFixKey) ? 1 : 0;
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.HLSMode")) return 2;
+    return YTzoomFeatureEnabled(YTzoomPlaybackFixKey) ? 1 : 0;
 }
 
-static BOOL YTKACEPlaybackFixEnabled(void) {
-    return YTKACEPlaybackFixMode() == 1;
+static BOOL YTzoomPlaybackFixEnabled(void) {
+    return YTzoomPlaybackFixMode() == 1;
 }
 
-static id YTKACEParentResponder(id overlay) {
+static id YTzoomParentResponder(id overlay) {
     SEL responderGetter = NSSelectorFromString(@"parentResponder");
     if (![overlay respondsToSelector:responderGetter]) {
-        YTKACEDownloadLog(@"fix", @"parentResponder unavailable");
+        YTzoomDownloadLog(@"fix", @"parentResponder unavailable");
         return nil;
     }
     return ((id (*)(id, SEL))objc_msgSend)(overlay, responderGetter);
 }
 
-static void YTKACESendRetryEvent(id overlay, NSString *stage) {
-    id responder = YTKACEParentResponder(overlay);
+static void YTzoomSendRetryEvent(id overlay, NSString *stage) {
+    id responder = YTzoomParentResponder(overlay);
     if (responder == nil) {
-        YTKACEDownloadLog(@"fix", @"%@ no responder", stage);
+        YTzoomDownloadLog(@"fix", @"%@ no responder", stage);
         return;
     }
     Class eventClass = NSClassFromString(@"YTPlayerTapToRetryResponderEvent");
     SEL factory = NSSelectorFromString(@"eventWithFirstResponder:");
     if (eventClass == Nil || ![eventClass respondsToSelector:factory]) {
-        YTKACEDownloadLog(@"fix", @"%@ event class missing", stage);
+        YTzoomDownloadLog(@"fix", @"%@ event class missing", stage);
         return;
     }
     id event = ((id (*)(Class, SEL, id))objc_msgSend)(eventClass, factory,
                                                       responder);
     SEL send = NSSelectorFromString(@"send");
     if (event == nil || ![event respondsToSelector:send]) {
-        YTKACEDownloadLog(@"fix", @"%@ event not created", stage);
+        YTzoomDownloadLog(@"fix", @"%@ event not created", stage);
         return;
     }
     ((void (*)(id, SEL))objc_msgSend)(event, send);
-    YTKACEDownloadLog(@"fix", @"%@ retry event sent to %@", stage,
+    YTzoomDownloadLog(@"fix", @"%@ retry event sent to %@", stage,
                       NSStringFromClass([responder class]));
 }
 
-static BOOL YTKACEReloadPlayer(id pvc, NSString *stage) {
+static BOOL YTzoomReloadPlayer(id pvc, NSString *stage) {
     SEL activeGetter = NSSelectorFromString(@"activeVideo");
     if (pvc == nil || ![pvc respondsToSelector:activeGetter]) return NO;
     id video = ((id (*)(id, SEL))objc_msgSend)(pvc, activeGetter);
@@ -108,7 +108,7 @@ static BOOL YTKACEReloadPlayer(id pvc, NSString *stage) {
     if (video == nil || contextClass == Nil ||
         ![video respondsToSelector:reloadSel] ||
         ![video respondsToSelector:mediaGetter]) {
-        YTKACEDownloadLog(@"fix", @"%@ player reload unavailable on %@", stage,
+        YTzoomDownloadLog(@"fix", @"%@ player reload unavailable on %@", stage,
                           video == nil ? @"nil" : NSStringFromClass([video class]));
         return NO;
     }
@@ -119,41 +119,41 @@ static BOOL YTKACEReloadPlayer(id pvc, NSString *stage) {
     if (context == nil) return NO;
     id media = ((id (*)(id, SEL))objc_msgSend)(video, mediaGetter);
     ((void (*)(id, SEL, id, id))objc_msgSend)(video, reloadSel, media, context);
-    YTKACEDownloadLog(@"fix", @"%@ player reload on %@", stage,
+    YTzoomDownloadLog(@"fix", @"%@ player reload on %@", stage,
                       NSStringFromClass([video class]));
     return YES;
 }
 
-static void YTKACESeek(id player, double position, NSString *stage) {
+static void YTzoomSeek(id player, double position, NSString *stage) {
     SEL seek = NSSelectorFromString(@"seekToTime:");
     if (![player respondsToSelector:seek]) {
-        YTKACEDownloadLog(@"fix", @"%@ seek unavailable", stage);
+        YTzoomDownloadLog(@"fix", @"%@ seek unavailable", stage);
         return;
     }
     ((void (*)(id, SEL, double))objc_msgSend)(player, seek, position);
-    YTKACEDownloadLog(@"fix", @"%@ seek %.2f", stage, position);
+    YTzoomDownloadLog(@"fix", @"%@ seek %.2f", stage, position);
 }
 
 
-static void YTKACEScheduleCaptionRestore(id player) {
+static void YTzoomScheduleCaptionRestore(id player) {
     __weak id weakPlayer = player;
     const double delays[] = { 0.6, 1.5, 3.0 };
     for (size_t index = 0; index < sizeof(delays) / sizeof(delays[0]); index++) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                                      (int64_t)(delays[index] * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
-            YTKACECaptionsRestore(weakPlayer);
+            YTzoomCaptionsRestore(weakPlayer);
         });
     }
 }
 
-static double YTKACEPosition(id player) {
+static double YTzoomPosition(id player) {
     SEL time = NSSelectorFromString(@"currentVideoMediaTime");
     if (![player respondsToSelector:time]) return -1.0;
     return ((double (*)(id, SEL))objc_msgSend)(player, time);
 }
 
-static double YTKACECurrentVideoMediaTime(id receiver, SEL selector) {
+static double YTzoomCurrentVideoMediaTime(id receiver, SEL selector) {
     const double value = OriginalCurrentVideoMediaTime == NULL
         ? 0.0
         : ((double (*)(id, SEL))OriginalCurrentVideoMediaTime)(receiver, selector);
@@ -161,23 +161,23 @@ static double YTKACECurrentVideoMediaTime(id receiver, SEL selector) {
     return value;
 }
 
-static void YTKACESeekToTime(id receiver, SEL selector, double time) {
+static void YTzoomSeekToTime(id receiver, SEL selector, double time) {
     gLatestTime = time;
     if (OriginalSeekToTime != NULL) {
         ((void (*)(id, SEL, double))OriginalSeekToTime)(receiver, selector, time);
     }
 }
 
-static void YTKACECallOriginalHandleError(id receiver, SEL selector, id error) {
+static void YTzoomCallOriginalHandleError(id receiver, SEL selector, id error) {
     if (OriginalHandleError != NULL) {
         ((void (*)(id, SEL, id))OriginalHandleError)(receiver, selector, error);
     }
 }
 
-static void YTKACEHandleError(id receiver, SEL selector, id error) {
-    if (YTKACEPlaybackFixMode() == 2) {
+static void YTzoomHandleError(id receiver, SEL selector, id error) {
+    if (YTzoomPlaybackFixMode() == 2) {
         NSError *hlsError = [error isKindOfClass:NSError.class] ? error : nil;
-        YTKACEDownloadLog(@"hls", @"player error domain=%@ code=%ld", hlsError.domain ?: @"-",
+        YTzoomDownloadLog(@"hls", @"player error domain=%@ code=%ld", hlsError.domain ?: @"-",
                           (long)hlsError.code);
         SEL parentGetter = NSSelectorFromString(@"parentViewController");
         id pvc = [receiver respondsToSelector:parentGetter]
@@ -188,42 +188,42 @@ static void YTKACEHandleError(id receiver, SEL selector, id error) {
         __weak id weakReceiver = receiver;
         __weak id weakPlayer = pvc;
         const BOOL started = [videoID isKindOfClass:NSString.class] &&
-            YTKACEHLSBeginFallback(videoID, ^(BOOL available) {
+            YTzoomHLSBeginFallback(videoID, ^(BOOL available) {
                 id strongReceiver = weakReceiver;
                 id strongPlayer = weakPlayer;
-                if (available && strongPlayer != nil && YTKACEReloadPlayer(strongPlayer, @"hls fallback")) {
-                    YTKACEDownloadLog(@"hls", @"fallback to vision video=%@", videoID);
+                if (available && strongPlayer != nil && YTzoomReloadPlayer(strongPlayer, @"hls fallback")) {
+                    YTzoomDownloadLog(@"hls", @"fallback to vision video=%@", videoID);
                     return;
                 }
-                YTKACEDownloadLog(@"hls", @"fallback unavailable video=%@", videoID);
-                if (strongReceiver != nil) YTKACECallOriginalHandleError(strongReceiver, selector, error);
+                YTzoomDownloadLog(@"hls", @"fallback unavailable video=%@", videoID);
+                if (strongReceiver != nil) YTzoomCallOriginalHandleError(strongReceiver, selector, error);
             });
         if (started) return;
-        YTKACECallOriginalHandleError(receiver, selector, error);
+        YTzoomCallOriginalHandleError(receiver, selector, error);
         return;
     }
-    if (!YTKACEPlaybackFixEnabled()) {
-        YTKACECallOriginalHandleError(receiver, selector, error);
+    if (!YTzoomPlaybackFixEnabled()) {
+        YTzoomCallOriginalHandleError(receiver, selector, error);
         return;
     }
 
     if (gIsTimeToRetry) {
-        YTKACEDownloadLog(@"fix", @"retry already in flight, passing through");
-        YTKACECallOriginalHandleError(receiver, selector, error);
+        YTzoomDownloadLog(@"fix", @"retry already in flight, passing through");
+        YTzoomCallOriginalHandleError(receiver, selector, error);
         return;
     }
 
     NSError *failure = [error isKindOfClass:NSError.class] ? (NSError *)error : nil;
     if (failure != nil) {
-        YTKACEDownloadLog(@"fix", @"handleError domain=%@ code=%ld",
+        YTzoomDownloadLog(@"fix", @"handleError domain=%@ code=%ld",
                           failure.domain, (long)failure.code);
     } else {
-        YTKACEDownloadLog(@"fix", @"handleError non-NSError %@",
+        YTzoomDownloadLog(@"fix", @"handleError non-NSError %@",
                           NSStringFromClass([error class]));
     }
 
     if (failure != nil &&
-        [failure.domain isEqualToString:YTKACEPlaybackErrorDomain] &&
+        [failure.domain isEqualToString:YTzoomPlaybackErrorDomain] &&
         (failure.code == 14 || failure.code == 0)) {
         gIsTimeToRetry = YES;
 
@@ -232,36 +232,36 @@ static void YTKACEHandleError(id receiver, SEL selector, id error) {
             ? ((id (*)(id, SEL))objc_msgSend)(receiver, parentGetter)
             : nil;
         const double savedTime = gLatestTime;
-        YTKACEDownloadLog(@"fix", @"intercepted code=%ld at %.2f parent=%@",
+        YTzoomDownloadLog(@"fix", @"intercepted code=%ld at %.2f parent=%@",
                           (long)failure.code, savedTime,
                           pvc == nil ? @"nil" : NSStringFromClass([pvc class]));
 
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
-                                     (int64_t)(YTKACEStallGrace * NSEC_PER_SEC)),
+                                     (int64_t)(YTzoomStallGrace * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
-            const double moved = YTKACEPosition(pvc);
-            if (moved > savedTime + YTKACEProgressEpsilon) {
+            const double moved = YTzoomPosition(pvc);
+            if (moved > savedTime + YTzoomProgressEpsilon) {
                 gIsTimeToRetry = NO;
-                YTKACEDownloadLog(@"fix", @"still playing %.2f -> %.2f, no retry",
+                YTzoomDownloadLog(@"fix", @"still playing %.2f -> %.2f, no retry",
                                   savedTime, moved);
                 return;
             }
-            YTKACEDownloadLog(@"fix", @"stalled at %.2f, retrying", savedTime);
-            YTKACECaptionsSnapshot(pvc);
-            if (!YTKACEReloadPlayer(pvc, @"primary")) {
-                YTKACESendRetryEvent(receiver, @"primary");
+            YTzoomDownloadLog(@"fix", @"stalled at %.2f, retrying", savedTime);
+            YTzoomCaptionsSnapshot(pvc);
+            if (!YTzoomReloadPlayer(pvc, @"primary")) {
+                YTzoomSendRetryEvent(receiver, @"primary");
             }
 
             if (pvc) {
                 dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                                              (int64_t)(0.20 * NSEC_PER_SEC)),
                                dispatch_get_main_queue(), ^{
-                    YTKACESeek(pvc, savedTime, @"primary");
+                    YTzoomSeek(pvc, savedTime, @"primary");
 
                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                                                  (int64_t)(0.10 * NSEC_PER_SEC)),
                                    dispatch_get_main_queue(), ^{
-                        YTKACEScheduleCaptionRestore(pvc);
+                        YTzoomScheduleCaptionRestore(pvc);
 
                         if (!gEmergencyCheckRunning) {
                             gEmergencyCheckRunning = true;
@@ -269,59 +269,59 @@ static void YTKACEHandleError(id receiver, SEL selector, id error) {
                             dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                                                          (int64_t)(3.00 * NSEC_PER_SEC)),
                                            dispatch_get_main_queue(), ^{
-                                const double currentTime = YTKACEPosition(pvc);
-                                YTKACEDownloadLog(@"fix",
+                                const double currentTime = YTzoomPosition(pvc);
+                                YTzoomDownloadLog(@"fix",
                                     @"verify saved=%.2f now=%.2f", savedTime,
                                     currentTime);
 
                                 if (currentTime <= savedTime + 0.05) {
-                                    YTKACEDownloadLog(@"fix", @"still stalled");
-                                    if (!YTKACEReloadPlayer(pvc, @"emergency")) {
-                                        YTKACESendRetryEvent(receiver, @"emergency");
+                                    YTzoomDownloadLog(@"fix", @"still stalled");
+                                    if (!YTzoomReloadPlayer(pvc, @"emergency")) {
+                                        YTzoomSendRetryEvent(receiver, @"emergency");
                                     }
-                                    YTKACESeek(pvc, savedTime, @"emergency");
+                                    YTzoomSeek(pvc, savedTime, @"emergency");
 
                                     dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                                                                  (int64_t)(0.20 * NSEC_PER_SEC)),
                                                    dispatch_get_main_queue(), ^{
-                                        YTKACEScheduleCaptionRestore(pvc);
+                                        YTzoomScheduleCaptionRestore(pvc);
                                         gIsTimeToRetry = NO;
-                                        YTKACEDownloadLog(@"fix", @"emergency done");
+                                        YTzoomDownloadLog(@"fix", @"emergency done");
                                     });
                                 } else {
                                     gIsTimeToRetry = NO;
-                                    YTKACEDownloadLog(@"fix", @"recovered");
+                                    YTzoomDownloadLog(@"fix", @"recovered");
                                 }
 
                                 gEmergencyCheckRunning = false;
                             });
                         } else {
-                            YTKACEDownloadLog(@"fix", @"emergency check busy");
+                            YTzoomDownloadLog(@"fix", @"emergency check busy");
                         }
                     });
                 });
             } else {
                 gIsTimeToRetry = NO;
-                YTKACEDownloadLog(@"fix", @"no parent view controller");
+                YTzoomDownloadLog(@"fix", @"no parent view controller");
             }
         });
 
         return;
     }
 
-    YTKACECallOriginalHandleError(receiver, selector, error);
+    YTzoomCallOriginalHandleError(receiver, selector, error);
 }
 
-void YTKACEInstallPlaybackFixHooks(void) {
-    const BOOL time = YTKACEInstallInstanceHook(
+void YTzoomInstallPlaybackFixHooks(void) {
+    const BOOL time = YTzoomInstallInstanceHook(
         @"YTPlayerViewController", @"currentVideoMediaTime",
-        (IMP)YTKACECurrentVideoMediaTime, &OriginalCurrentVideoMediaTime);
-    const BOOL seek = YTKACEInstallInstanceHook(
+        (IMP)YTzoomCurrentVideoMediaTime, &OriginalCurrentVideoMediaTime);
+    const BOOL seek = YTzoomInstallInstanceHook(
         @"YTPlayerViewController", @"seekToTime:",
-        (IMP)YTKACESeekToTime, &OriginalSeekToTime);
-    const BOOL handle = YTKACEInstallInstanceHook(
+        (IMP)YTzoomSeekToTime, &OriginalSeekToTime);
+    const BOOL handle = YTzoomInstallInstanceHook(
         @"YTMainAppVideoPlayerOverlayViewController", @"handleError:",
-        (IMP)YTKACEHandleError, &OriginalHandleError);
-    YTKACEDownloadLog(@"fix", @"hooks time=%d seek=%d handle=%d enabled=%d",
-                      time, seek, handle, YTKACEPlaybackFixEnabled());
+        (IMP)YTzoomHandleError, &OriginalHandleError);
+    YTzoomDownloadLog(@"fix", @"hooks time=%d seek=%d handle=%d enabled=%d",
+                      time, seek, handle, YTzoomPlaybackFixEnabled());
 }

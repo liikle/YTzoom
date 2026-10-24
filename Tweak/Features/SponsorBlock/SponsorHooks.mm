@@ -1,6 +1,6 @@
 #import "SponsorClient.h"
 #import "SponsorPreferences.h"
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../../UI/Notice.h"
@@ -21,39 +21,39 @@ static IMP OriginalMutatedVideoTimeChanged;
 static IMP OriginalPlayerBarLayout;
 static IMP OriginalMiniplayerBarLayout;
 
-static const void *YTKACESponsorSegmentsAssociation = &YTKACESponsorSegmentsAssociation;
-static const void *YTKACESponsorVideoAssociation = &YTKACESponsorVideoAssociation;
-static const void *YTKACESponsorSkippedAssociation = &YTKACESponsorSkippedAssociation;
-static const void *YTKACESponsorMarkerAssociation = &YTKACESponsorMarkerAssociation;
-static const void *YTKACESponsorRenderedSegmentsAssociation = &YTKACESponsorRenderedSegmentsAssociation;
-static const void *YTKACESponsorMarkerBoundsAssociation = &YTKACESponsorMarkerBoundsAssociation;
-static const void *YTKACESponsorMarkerDurationAssociation = &YTKACESponsorMarkerDurationAssociation;
-static __weak id YTKACECurrentSponsorController;
-static NSHashTable<UIView *> *YTKACESponsorBars;
-static BOOL YTKACESponsorTimeUpdatesEnabled;
-static BOOL YTKACEPlaybackTimeNotificationsNeeded;
-static id YTKACEPlaybackPreferenceObserver;
+static const void *YTzoomSponsorSegmentsAssociation = &YTzoomSponsorSegmentsAssociation;
+static const void *YTzoomSponsorVideoAssociation = &YTzoomSponsorVideoAssociation;
+static const void *YTzoomSponsorSkippedAssociation = &YTzoomSponsorSkippedAssociation;
+static const void *YTzoomSponsorMarkerAssociation = &YTzoomSponsorMarkerAssociation;
+static const void *YTzoomSponsorRenderedSegmentsAssociation = &YTzoomSponsorRenderedSegmentsAssociation;
+static const void *YTzoomSponsorMarkerBoundsAssociation = &YTzoomSponsorMarkerBoundsAssociation;
+static const void *YTzoomSponsorMarkerDurationAssociation = &YTzoomSponsorMarkerDurationAssociation;
+static __weak id YTzoomCurrentSponsorController;
+static NSHashTable<UIView *> *YTzoomSponsorBars;
+static BOOL YTzoomSponsorTimeUpdatesEnabled;
+static BOOL YTzoomPlaybackTimeNotificationsNeeded;
+static id YTzoomPlaybackPreferenceObserver;
 
-static void YTKACERefreshPlaybackTimePreferenceState(void) {
-    YTKACESponsorTimeUpdatesEnabled =
-        YTKACEFeatureEnabled(YTKACESponsorBlockKey);
-    YTKACEPlaybackTimeNotificationsNeeded =
-        YTKACEFeatureEnabled(@"shortsProgress") ||
-        YTKACEFeatureEnabled(@"autoSkipShorts") ||
-        YTKACEFeatureEnabled(YTKACESpeedKey) ||
-        YTKACEFeatureEnabled(YTKACESleepTimerKey) ||
-        YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.LocalQueue");
+static void YTzoomRefreshPlaybackTimePreferenceState(void) {
+    YTzoomSponsorTimeUpdatesEnabled =
+        YTzoomFeatureEnabled(YTzoomSponsorBlockKey);
+    YTzoomPlaybackTimeNotificationsNeeded =
+        YTzoomFeatureEnabled(@"shortsProgress") ||
+        YTzoomFeatureEnabled(@"autoSkipShorts") ||
+        YTzoomFeatureEnabled(YTzoomSpeedKey) ||
+        YTzoomFeatureEnabled(YTzoomSleepTimerKey) ||
+        YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.LocalQueue");
 }
 
-static void YTKACEPublishPlaybackTime(id receiver, double time) {
-    if (!YTKACEPlaybackTimeNotificationsNeeded) return;
+static void YTzoomPublishPlaybackTime(id receiver, double time) {
+    if (!YTzoomPlaybackTimeNotificationsNeeded) return;
     [NSNotificationCenter.defaultCenter
-        postNotificationName:@"YTKACEPlaybackTimeDidChange"
+        postNotificationName:@"YTzoomPlaybackTimeDidChange"
         object:receiver
         userInfo:@{@"time": @(time)}];
 }
 
-static id YTKACEObjectMessage(id receiver, NSString *selectorName) {
+static id YTzoomObjectMessage(id receiver, NSString *selectorName) {
     SEL selector = NSSelectorFromString(selectorName);
     if (receiver == nil || ![receiver respondsToSelector:selector]) {
         return nil;
@@ -61,7 +61,7 @@ static id YTKACEObjectMessage(id receiver, NSString *selectorName) {
     return ((id (*)(id, SEL))objc_msgSend)(receiver, selector);
 }
 
-static double YTKACEDoubleMessage(id receiver, NSArray<NSString *> *selectorNames) {
+static double YTzoomDoubleMessage(id receiver, NSArray<NSString *> *selectorNames) {
     for (NSString *selectorName in selectorNames) {
         SEL selector = NSSelectorFromString(selectorName);
         if ([receiver respondsToSelector:selector]) {
@@ -71,35 +71,35 @@ static double YTKACEDoubleMessage(id receiver, NSArray<NSString *> *selectorName
     return 0.0;
 }
 
-static NSString *YTKACEVideoIDFromObject(id object) {
+static NSString *YTzoomVideoIDFromObject(id object) {
     if ([object isKindOfClass:NSString.class]) {
         return object;
     }
     for (NSString *selector in @[@"videoID", @"videoId", @"currentVideoID", @"identifier"]) {
-        id value = YTKACEObjectMessage(object, selector);
+        id value = YTzoomObjectMessage(object, selector);
         if ([value isKindOfClass:NSString.class] && [value length] != 0) {
             return value;
         }
     }
-    id details = YTKACEObjectMessage(object, @"videoDetails");
+    id details = YTzoomObjectMessage(object, @"videoDetails");
     if (details != nil && details != object) {
-        return YTKACEVideoIDFromObject(details);
+        return YTzoomVideoIDFromObject(details);
     }
     return nil;
 }
 
-static BOOL YTKACESponsorFeedbackEnabled(void) {
-    return YTKACEFeatureEnabled(@"YTKACE.Preference.SponsorBlock.AudioFeedback");
+static BOOL YTzoomSponsorFeedbackEnabled(void) {
+    return YTzoomFeatureEnabled(@"YTzoom.Preference.SponsorBlock.AudioFeedback");
 }
 
-static NSString *YTKACESponsorCategoryTitle(NSString *category) {
-    for (NSDictionary *definition in YTKACESponsorCategoryDefinitions()) {
+static NSString *YTzoomSponsorCategoryTitle(NSString *category) {
+    for (NSDictionary *definition in YTzoomSponsorCategoryDefinitions()) {
         if ([definition[@"id"] isEqualToString:category]) return definition[@"title"];
     }
-    return YTKACELocalized(@"Sponsor");
+    return YTzoomLocalized(@"Sponsor");
 }
 
-static UIViewController *YTKACETopController(void) {
+static UIViewController *YTzoomTopController(void) {
     UIWindow *window = nil;
     for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
         if (![scene isKindOfClass:UIWindowScene.class] ||
@@ -125,14 +125,14 @@ static UIViewController *YTKACETopController(void) {
     return controller;
 }
 
-static void YTKACESeekToTime(id controller, double time) {
+static void YTzoomSeekToTime(id controller, double time) {
     SEL selector = NSSelectorFromString(@"seekToTime:");
     if ([controller respondsToSelector:selector]) {
         ((void (*)(id, SEL, double))objc_msgSend)(controller, selector, time);
     }
 }
 
-static void YTKACEFadeOutSponsorBanner(UIView *banner) {
+static void YTzoomFadeOutSponsorBanner(UIView *banner) {
     if (banner == nil || banner.superview == nil) return;
     [UIView animateWithDuration:0.25 delay:0.0
                         options:UIViewAnimationOptionBeginFromCurrentState | UIViewAnimationOptionCurveEaseIn
@@ -144,7 +144,7 @@ static void YTKACEFadeOutSponsorBanner(UIView *banner) {
     }];
 }
 
-@interface YTKACESponsorUndoTarget : NSObject
+@interface YTzoomSponsorUndoTarget : NSObject
 + (instancetype)sharedTarget;
 @property(nonatomic, weak) id controller;
 @property(nonatomic, assign) double startTime;
@@ -152,47 +152,47 @@ static void YTKACEFadeOutSponsorBanner(UIView *banner) {
 - (void)unskip;
 @end
 
-@implementation YTKACESponsorUndoTarget
+@implementation YTzoomSponsorUndoTarget
 + (instancetype)sharedTarget {
-    static YTKACESponsorUndoTarget *target;
+    static YTzoomSponsorUndoTarget *target;
     static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{ target = [YTKACESponsorUndoTarget new]; });
+    dispatch_once(&onceToken, ^{ target = [YTzoomSponsorUndoTarget new]; });
     return target;
 }
 - (void)unskip {
     id controller = self.controller;
     if (controller != nil) {
-        YTKACESeekToTime(controller, self.startTime);
+        YTzoomSeekToTime(controller, self.startTime);
     }
-    YTKACEFadeOutSponsorBanner(self.banner);
+    YTzoomFadeOutSponsorBanner(self.banner);
 }
 @end
 
-static void YTKACEShowSponsorSkippedHUD(id controller, double start, NSString *category) {
-    NSInteger notificationMode = YTKACESponsorNotificationMode();
+static void YTzoomShowSponsorSkippedHUD(id controller, double start, NSString *category) {
+    NSInteger notificationMode = YTzoomSponsorNotificationMode();
     if (notificationMode == 2) {
         return;
     }
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIViewController *presenter = YTKACETopController();
+        UIViewController *presenter = YTzoomTopController();
         if (presenter.view.window == nil) {
             return;
         }
-        YTKACESponsorUndoTarget *target = YTKACESponsorUndoTarget.sharedTarget;
-        YTKACEFadeOutSponsorBanner(target.banner);
+        YTzoomSponsorUndoTarget *target = YTzoomSponsorUndoTarget.sharedTarget;
+        YTzoomFadeOutSponsorBanner(target.banner);
         UIView *banner = [UIView new];
         banner.backgroundColor = [UIColor colorWithWhite:0.08 alpha:0.94];
         banner.layer.cornerRadius = 12.0;
         banner.translatesAutoresizingMaskIntoConstraints = NO;
         UILabel *label = [UILabel new];
         label.text = [NSString stringWithFormat:@"%@ %@",
-                      YTKACESponsorCategoryTitle(category),
-                      YTKACELocalized(@"segment skipped")];
+                      YTzoomSponsorCategoryTitle(category),
+                      YTzoomLocalized(@"segment skipped")];
         label.textColor = UIColor.whiteColor;
         label.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightSemibold];
         UIButton *undo = [UIButton buttonWithType:UIButtonTypeSystem];
-        [undo setTitle:YTKACELocalized(@"Unskip") forState:UIControlStateNormal];
-        [undo setTitleColor:YTKACEAccentColor() forState:UIControlStateNormal];
+        [undo setTitle:YTzoomLocalized(@"Unskip") forState:UIControlStateNormal];
+        [undo setTitleColor:YTzoomAccentColor() forState:UIControlStateNormal];
         undo.titleLabel.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightSemibold];
         [undo addTarget:target action:@selector(unskip)
             forControlEvents:UIControlEventTouchUpInside];
@@ -203,7 +203,7 @@ static void YTKACEShowSponsorSkippedHUD(id controller, double start, NSString *c
         content.spacing = 18.0;
         content.translatesAutoresizingMaskIntoConstraints = NO;
         [banner addSubview:content];
-        YTKACEApplyGlassBackground(banner, YES);
+        YTzoomApplyGlassBackground(banner, YES);
         [presenter.view addSubview:banner];
         UILayoutGuide *safe = presenter.view.safeAreaLayoutGuide;
         [NSLayoutConstraint activateConstraints:@[
@@ -227,23 +227,23 @@ static void YTKACEShowSponsorSkippedHUD(id controller, double start, NSString *c
             banner.transform = CGAffineTransformIdentity;
         } completion:nil];
         NSTimeInterval duration = notificationMode == 0
-            ? YTKACESponsorUnskipAlertDuration()
-            : YTKACESponsorSkipAlertDuration();
+            ? YTzoomSponsorUnskipAlertDuration()
+            : YTzoomSponsorSkipAlertDuration();
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
             (int64_t)(duration * NSEC_PER_SEC)),
             dispatch_get_main_queue(), ^{
                 if (target.banner == banner) {
-                    YTKACEFadeOutSponsorBanner(banner);
+                    YTzoomFadeOutSponsorBanner(banner);
                 }
             });
     });
 }
 
-static void YTKACEPerformSponsorSkip(id controller, double start, double end,
+static void YTzoomPerformSponsorSkip(id controller, double start, double end,
                                      NSString *category) {
-    YTKACESeekToTime(controller, end);
-    YTKACEShowSponsorSkippedHUD(controller, start, category);
-    if (YTKACESponsorFeedbackEnabled()) {
+    YTzoomSeekToTime(controller, end);
+    YTzoomShowSponsorSkippedHUD(controller, start, category);
+    if (YTzoomSponsorFeedbackEnabled()) {
         AudioServicesPlaySystemSound(1057);
         UINotificationFeedbackGenerator *feedback =
             [UINotificationFeedbackGenerator new];
@@ -251,7 +251,7 @@ static void YTKACEPerformSponsorSkip(id controller, double start, double end,
     }
 }
 
-@interface YTKACESponsorSkipTarget : NSObject
+@interface YTzoomSponsorSkipTarget : NSObject
 + (instancetype)sharedTarget;
 @property(nonatomic, weak) id controller;
 @property(nonatomic, assign) double startTime;
@@ -261,30 +261,30 @@ static void YTKACEPerformSponsorSkip(id controller, double start, double end,
 - (void)skip;
 @end
 
-@implementation YTKACESponsorSkipTarget
+@implementation YTzoomSponsorSkipTarget
 + (instancetype)sharedTarget {
-    static YTKACESponsorSkipTarget *target;
+    static YTzoomSponsorSkipTarget *target;
     static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{ target = [YTKACESponsorSkipTarget new]; });
+    dispatch_once(&onceToken, ^{ target = [YTzoomSponsorSkipTarget new]; });
     return target;
 }
 - (void)skip {
     id controller = self.controller;
     [self.banner removeFromSuperview];
     if (controller != nil) {
-        YTKACEPerformSponsorSkip(controller, self.startTime, self.endTime, self.category);
+        YTzoomPerformSponsorSkip(controller, self.startTime, self.endTime, self.category);
     }
 }
 @end
 
-static void YTKACEAskToSkipSponsor(id controller, double start, double end,
+static void YTzoomAskToSkipSponsor(id controller, double start, double end,
                                    NSString *category) {
     dispatch_async(dispatch_get_main_queue(), ^{
-        UIViewController *presenter = YTKACETopController();
+        UIViewController *presenter = YTzoomTopController();
         if (presenter.view.window == nil) {
             return;
         }
-        YTKACESponsorSkipTarget *target = YTKACESponsorSkipTarget.sharedTarget;
+        YTzoomSponsorSkipTarget *target = YTzoomSponsorSkipTarget.sharedTarget;
         [target.banner removeFromSuperview];
         UIView *banner = [UIView new];
         banner.backgroundColor = [UIColor colorWithWhite:0.08 alpha:0.94];
@@ -292,12 +292,12 @@ static void YTKACEAskToSkipSponsor(id controller, double start, double end,
         banner.translatesAutoresizingMaskIntoConstraints = NO;
         UILabel *label = [UILabel new];
         label.text = [NSString stringWithFormat:@"%@ segment detected",
-                      YTKACESponsorCategoryTitle(category)];
+                      YTzoomSponsorCategoryTitle(category)];
         label.textColor = UIColor.whiteColor;
         label.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightSemibold];
         UIButton *skip = [UIButton buttonWithType:UIButtonTypeSystem];
-        [skip setTitle:YTKACELocalized(@"Skip") forState:UIControlStateNormal];
-        [skip setTitleColor:YTKACEAccentColor() forState:UIControlStateNormal];
+        [skip setTitle:YTzoomLocalized(@"Skip") forState:UIControlStateNormal];
+        [skip setTitleColor:YTzoomAccentColor() forState:UIControlStateNormal];
         skip.titleLabel.font = [UIFont systemFontOfSize:14.0 weight:UIFontWeightSemibold];
         [skip addTarget:target action:@selector(skip)
             forControlEvents:UIControlEventTouchUpInside];
@@ -309,7 +309,7 @@ static void YTKACEAskToSkipSponsor(id controller, double start, double end,
         content.spacing = 18.0;
         content.translatesAutoresizingMaskIntoConstraints = NO;
         [banner addSubview:content];
-        YTKACEApplyGlassBackground(banner, YES);
+        YTzoomApplyGlassBackground(banner, YES);
         [presenter.view addSubview:banner];
         UILayoutGuide *safe = presenter.view.safeAreaLayoutGuide;
         [NSLayoutConstraint activateConstraints:@[
@@ -327,7 +327,7 @@ static void YTKACEAskToSkipSponsor(id controller, double start, double end,
         target.category = category;
         target.banner = banner;
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
-            (int64_t)(YTKACESponsorSkipAlertDuration() * NSEC_PER_SEC)),
+            (int64_t)(YTzoomSponsorSkipAlertDuration() * NSEC_PER_SEC)),
             dispatch_get_main_queue(), ^{
                 if (target.banner == banner) {
                     [banner removeFromSuperview];
@@ -336,19 +336,19 @@ static void YTKACEAskToSkipSponsor(id controller, double start, double end,
     });
 }
 
-static void YTKACEEvaluateSponsorTime(id controller, double time) {
-    if (!YTKACESponsorBlockEnabled()) {
+static void YTzoomEvaluateSponsorTime(id controller, double time) {
+    if (!YTzoomSponsorBlockEnabled()) {
         return;
     }
 
     NSArray<NSDictionary<NSString *, id> *> *segments =
-        objc_getAssociatedObject(controller, YTKACESponsorSegmentsAssociation);
+        objc_getAssociatedObject(controller, YTzoomSponsorSegmentsAssociation);
     NSMutableSet<NSNumber *> *skipped =
-        objc_getAssociatedObject(controller, YTKACESponsorSkippedAssociation);
+        objc_getAssociatedObject(controller, YTzoomSponsorSkippedAssociation);
     if (skipped == nil) {
         skipped = [NSMutableSet set];
         objc_setAssociatedObject(controller,
-                                 YTKACESponsorSkippedAssociation,
+                                 YTzoomSponsorSkippedAssociation,
                                  skipped,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
@@ -359,7 +359,7 @@ static void YTKACEEvaluateSponsorTime(id controller, double time) {
             double end = [segment[@"end"] doubleValue];
             NSString *category = [segment[@"category"] isKindOfClass:NSString.class]
                 ? segment[@"category"] : @"sponsor";
-            NSInteger behavior = YTKACESponsorCategoryBehavior(category);
+            NSInteger behavior = YTzoomSponsorCategoryBehavior(category);
             if (behavior == 2 || behavior == 3) return;
             NSNumber *token = @(index);
             if (time < start - 1.0) {
@@ -368,26 +368,26 @@ static void YTKACEEvaluateSponsorTime(id controller, double time) {
             if (time >= start && time < end - 0.25 && ![skipped containsObject:token]) {
                 [skipped addObject:token];
                 if (behavior == 1) {
-                    YTKACEAskToSkipSponsor(controller, start, end, category);
+                    YTzoomAskToSkipSponsor(controller, start, end, category);
                 } else {
-                    YTKACEPerformSponsorSkip(controller, start, end, category);
+                    YTzoomPerformSponsorSkip(controller, start, end, category);
                 }
                 *stop = YES;
             }
         }];
 }
 
-static __weak id YTKACELastPlayerController;
+static __weak id YTzoomLastPlayerController;
 
-void YTKACEPauseYouTubePlayer(void) {
-    id controller = YTKACELastPlayerController;
+void YTzoomPauseYouTubePlayer(void) {
+    id controller = YTzoomLastPlayerController;
     SEL pause = NSSelectorFromString(@"pause");
     if ([controller respondsToSelector:pause]) {
         ((void (*)(id, SEL))objc_msgSend)(controller, pause);
     }
 }
 
-static void YTKACEDidActivateVideo(id receiver,
+static void YTzoomDidActivateVideo(id receiver,
                                    SEL selector,
                                    id playbackController,
                                    id video,
@@ -398,60 +398,60 @@ static void YTKACEDidActivateVideo(id receiver,
         );
     }
 
-    YTKACEOpenPausedVideoActivated(receiver);
-    YTKACELastPlayerController = receiver;
+    YTzoomOpenPausedVideoActivated(receiver);
+    YTzoomLastPlayerController = receiver;
 
-    if (!YTKACESponsorBlockEnabled()) {
+    if (!YTzoomSponsorBlockEnabled()) {
         objc_setAssociatedObject(receiver,
-                                 YTKACESponsorSegmentsAssociation,
+                                 YTzoomSponsorSegmentsAssociation,
                                  nil,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         return;
     }
 
     NSString *videoID =
-        YTKACEVideoIDFromObject(receiver) ?:
-        YTKACEVideoIDFromObject(video) ?:
-        YTKACEVideoIDFromObject(playbackData);
+        YTzoomVideoIDFromObject(receiver) ?:
+        YTzoomVideoIDFromObject(video) ?:
+        YTzoomVideoIDFromObject(playbackData);
     if (videoID.length == 0) {
         return;
     }
 
     objc_setAssociatedObject(receiver,
-                             YTKACESponsorVideoAssociation,
+                             YTzoomSponsorVideoAssociation,
                              videoID,
                              OBJC_ASSOCIATION_COPY_NONATOMIC);
     objc_setAssociatedObject(receiver,
-                             YTKACESponsorSegmentsAssociation,
+                             YTzoomSponsorSegmentsAssociation,
                              @[],
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(receiver,
-                             YTKACESponsorSkippedAssociation,
+                             YTzoomSponsorSkippedAssociation,
                              [NSMutableSet set],
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    YTKACECurrentSponsorController = receiver;
+    YTzoomCurrentSponsorController = receiver;
 
     __weak id weakReceiver = receiver;
-    [YTKACESponsorClient.sharedClient segmentsForVideoID:videoID
+    [YTzoomSponsorClient.sharedClient segmentsForVideoID:videoID
                                              completion:^(NSArray *segments) {
         id strongReceiver = weakReceiver;
         NSString *current =
-            objc_getAssociatedObject(strongReceiver, YTKACESponsorVideoAssociation);
+            objc_getAssociatedObject(strongReceiver, YTzoomSponsorVideoAssociation);
         if (strongReceiver == nil || ![current isEqualToString:videoID]) {
             return;
         }
         objc_setAssociatedObject(strongReceiver,
-                                 YTKACESponsorSegmentsAssociation,
+                                 YTzoomSponsorSegmentsAssociation,
                                  segments,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        for (UIView *bar in YTKACESponsorBars.allObjects) {
+        for (UIView *bar in YTzoomSponsorBars.allObjects) {
             [bar setNeedsLayout];
             [bar layoutIfNeeded];
         }
     }];
 }
 
-static void YTKACESingleVideoTimeChanged(id receiver,
+static void YTzoomSingleVideoTimeChanged(id receiver,
                                          SEL selector,
                                          id video,
                                          double time) {
@@ -460,15 +460,15 @@ static void YTKACESingleVideoTimeChanged(id receiver,
             receiver, selector, video, time
         );
     }
-    double current = YTKACEDoubleMessage(receiver, @[@"currentVideoMediaTime"]);
+    double current = YTzoomDoubleMessage(receiver, @[@"currentVideoMediaTime"]);
     double resolved = current > 0.0 ? current : time;
-    if (YTKACESponsorTimeUpdatesEnabled) {
-        YTKACEEvaluateSponsorTime(receiver, resolved);
+    if (YTzoomSponsorTimeUpdatesEnabled) {
+        YTzoomEvaluateSponsorTime(receiver, resolved);
     }
-    YTKACEPublishPlaybackTime(receiver, resolved);
+    YTzoomPublishPlaybackTime(receiver, resolved);
 }
 
-static void YTKACEMutatedVideoTimeChanged(id receiver,
+static void YTzoomMutatedVideoTimeChanged(id receiver,
                                           SEL selector,
                                           id video,
                                           double time) {
@@ -477,15 +477,15 @@ static void YTKACEMutatedVideoTimeChanged(id receiver,
             receiver, selector, video, time
         );
     }
-    double current = YTKACEDoubleMessage(receiver, @[@"currentVideoMediaTime"]);
+    double current = YTzoomDoubleMessage(receiver, @[@"currentVideoMediaTime"]);
     double resolved = current > 0.0 ? current : time;
-    if (YTKACESponsorTimeUpdatesEnabled) {
-        YTKACEEvaluateSponsorTime(receiver, resolved);
+    if (YTzoomSponsorTimeUpdatesEnabled) {
+        YTzoomEvaluateSponsorTime(receiver, resolved);
     }
-    YTKACEPublishPlaybackTime(receiver, resolved);
+    YTzoomPublishPlaybackTime(receiver, resolved);
 }
 
-static BOOL YTKACETrackGeometry(UIView *target, CGFloat *thickness,
+static BOOL YTzoomTrackGeometry(UIView *target, CGFloat *thickness,
                                 CGFloat *offset) {
     CGFloat width = CGRectGetWidth(target.bounds);
     if (width <= 0.0) return NO;
@@ -527,15 +527,15 @@ static BOOL YTKACETrackGeometry(UIView *target, CGFloat *thickness,
     return YES;
 }
 
-static void YTKACERenderSponsorMarkers(UIView *receiver, UIView *target,
+static void YTzoomRenderSponsorMarkers(UIView *receiver, UIView *target,
                                        BOOL fullHeight) {
     CAShapeLayer *container =
-        objc_getAssociatedObject(receiver, YTKACESponsorMarkerAssociation);
+        objc_getAssociatedObject(receiver, YTzoomSponsorMarkerAssociation);
     if (container == nil) {
         container = [CAShapeLayer layer];
-        container.name = @"YTKACESponsorMarkers";
+        container.name = @"YTzoomSponsorMarkers";
         objc_setAssociatedObject(receiver,
-                                 YTKACESponsorMarkerAssociation,
+                                 YTzoomSponsorMarkerAssociation,
                                  container,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
@@ -548,22 +548,22 @@ static void YTKACERenderSponsorMarkers(UIView *receiver, UIView *target,
     container.frame = target.bounds;
     container.zPosition = 10000.0;
 
-    id controller = YTKACECurrentSponsorController;
+    id controller = YTzoomCurrentSponsorController;
     NSArray<NSDictionary<NSString *, id> *> *segments =
-        objc_getAssociatedObject(controller, YTKACESponsorSegmentsAssociation);
-    double duration = YTKACEDoubleMessage(
+        objc_getAssociatedObject(controller, YTzoomSponsorSegmentsAssociation);
+    double duration = YTzoomDoubleMessage(
         controller,
         @[@"currentVideoTotalMediaTime", @"currentVideoTotalTime",
           @"currentVideoDuration", @"totalMediaTime"]
     );
-    BOOL enabled = YTKACESponsorBlockEnabled() && duration > 0.0 && segments.count != 0;
+    BOOL enabled = YTzoomSponsorBlockEnabled() && duration > 0.0 && segments.count != 0;
     container.hidden = !enabled;
     if (!enabled) return;
 
     CGFloat width = CGRectGetWidth(target.bounds);
     CGFloat height = CGRectGetHeight(target.bounds);
     NSArray *renderedSegments = objc_getAssociatedObject(
-        receiver, YTKACESponsorRenderedSegmentsAssociation);
+        receiver, YTzoomSponsorRenderedSegmentsAssociation);
     BOOL rebuild = renderedSegments != segments || container.sublayers.count != segments.count;
     if (rebuild) {
         [container.sublayers makeObjectsPerformSelector:@selector(removeFromSuperlayer)];
@@ -571,12 +571,12 @@ static void YTKACERenderSponsorMarkers(UIView *receiver, UIView *target,
             CALayer *marker = [CALayer layer];
             NSString *category = [segment[@"category"] isKindOfClass:NSString.class]
                 ? segment[@"category"] : @"sponsor";
-            marker.backgroundColor = YTKACESponsorCategoryColor(category).CGColor;
+            marker.backgroundColor = YTzoomSponsorCategoryColor(category).CGColor;
             marker.zPosition = 1.0;
             [container addSublayer:marker];
         }
         objc_setAssociatedObject(receiver,
-                                 YTKACESponsorRenderedSegmentsAssociation,
+                                 YTzoomSponsorRenderedSegmentsAssociation,
                                  segments,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
@@ -586,26 +586,26 @@ static void YTKACERenderSponsorMarkers(UIView *receiver, UIView *target,
     if (!fullHeight) {
         CGFloat measured = 0.0;
         CGFloat measuredOffset = 0.0;
-        if (YTKACETrackGeometry(target, &measured, &measuredOffset)) {
+        if (YTzoomTrackGeometry(target, &measured, &measuredOffset)) {
             trackThickness = measured;
             trackOffset = measuredOffset;
         }
     }
     CGRect previousBounds = [objc_getAssociatedObject(
-        receiver, YTKACESponsorMarkerBoundsAssociation) CGRectValue];
+        receiver, YTzoomSponsorMarkerBoundsAssociation) CGRectValue];
     double previousDuration = [objc_getAssociatedObject(
-        receiver, YTKACESponsorMarkerDurationAssociation) doubleValue];
+        receiver, YTzoomSponsorMarkerDurationAssociation) doubleValue];
     CGRect signature = CGRectMake(CGRectGetWidth(target.bounds),
                                   CGRectGetHeight(target.bounds),
                                   trackThickness, trackOffset);
     if (!rebuild && !reattached && CGRectEqualToRect(previousBounds, signature) &&
         fabs(previousDuration - duration) < 0.001) return;
     objc_setAssociatedObject(receiver,
-                             YTKACESponsorMarkerBoundsAssociation,
+                             YTzoomSponsorMarkerBoundsAssociation,
                              [NSValue valueWithCGRect:signature],
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     objc_setAssociatedObject(receiver,
-                             YTKACESponsorMarkerDurationAssociation,
+                             YTzoomSponsorMarkerDurationAssociation,
                              @(duration),
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
@@ -627,14 +627,14 @@ static void YTKACERenderSponsorMarkers(UIView *receiver, UIView *target,
     [CATransaction commit];
 }
 
-static void YTKACEPlayerBarLayout(UIView *receiver, SEL selector) {
+static void YTzoomPlayerBarLayout(UIView *receiver, SEL selector) {
     if (OriginalPlayerBarLayout != NULL) {
         ((void (*)(id, SEL))OriginalPlayerBarLayout)(receiver, selector);
     }
 
-    YTKACEConfigureTapToSeek(receiver);
+    YTzoomConfigureTapToSeek(receiver);
 
-    [YTKACESponsorBars addObject:receiver];
+    [YTzoomSponsorBars addObject:receiver];
     UIView *target = receiver;
     for (UIView *subview in receiver.subviews) {
         if ([NSStringFromClass(subview.class) isEqualToString:@"YTModularPlayerBarView"]) {
@@ -642,50 +642,50 @@ static void YTKACEPlayerBarLayout(UIView *receiver, SEL selector) {
             break;
         }
     }
-    YTKACERenderSponsorMarkers(receiver, target, NO);
+    YTzoomRenderSponsorMarkers(receiver, target, NO);
 }
 
-static void YTKACEMiniplayerBarLayout(UIView *receiver, SEL selector) {
+static void YTzoomMiniplayerBarLayout(UIView *receiver, SEL selector) {
     if (OriginalMiniplayerBarLayout != NULL) {
         ((void (*)(id, SEL))OriginalMiniplayerBarLayout)(receiver, selector);
     }
-    [YTKACESponsorBars addObject:receiver];
-    YTKACEApplyProgressStyleToBar(receiver);
-    YTKACERenderSponsorMarkers(receiver, receiver, YES);
+    [YTzoomSponsorBars addObject:receiver];
+    YTzoomApplyProgressStyleToBar(receiver);
+    YTzoomRenderSponsorMarkers(receiver, receiver, YES);
 }
 
-void YTKACEInstallSponsorBlockHooks(void) {
-    if (YTKACESponsorBars == nil) {
-        YTKACESponsorBars = [NSHashTable weakObjectsHashTable];
+void YTzoomInstallSponsorBlockHooks(void) {
+    if (YTzoomSponsorBars == nil) {
+        YTzoomSponsorBars = [NSHashTable weakObjectsHashTable];
     }
-    YTKACERefreshPlaybackTimePreferenceState();
-    if (YTKACEPlaybackPreferenceObserver == nil) {
-        YTKACEPlaybackPreferenceObserver = [NSNotificationCenter.defaultCenter
-            addObserverForName:YTKACEPreferencesDidChangeNotification
+    YTzoomRefreshPlaybackTimePreferenceState();
+    if (YTzoomPlaybackPreferenceObserver == nil) {
+        YTzoomPlaybackPreferenceObserver = [NSNotificationCenter.defaultCenter
+            addObserverForName:YTzoomPreferencesDidChangeNotification
             object:nil
             queue:NSOperationQueue.mainQueue
             usingBlock:^(__unused NSNotification *notification) {
-                YTKACERefreshPlaybackTimePreferenceState();
+                YTzoomRefreshPlaybackTimePreferenceState();
             }];
     }
-    YTKACEInstallInstanceHook(@"YTPlayerViewController",
+    YTzoomInstallInstanceHook(@"YTPlayerViewController",
                               @"playbackController:didActivateVideo:withPlaybackData:",
-                              (IMP)YTKACEDidActivateVideo,
+                              (IMP)YTzoomDidActivateVideo,
                               &OriginalDidActivateVideo);
-    YTKACEInstallInstanceHook(@"YTPlayerViewController",
+    YTzoomInstallInstanceHook(@"YTPlayerViewController",
                               @"singleVideo:currentVideoTimeDidChange:",
-                              (IMP)YTKACESingleVideoTimeChanged,
+                              (IMP)YTzoomSingleVideoTimeChanged,
                               &OriginalSingleVideoTimeChanged);
-    YTKACEInstallInstanceHook(@"YTPlayerViewController",
+    YTzoomInstallInstanceHook(@"YTPlayerViewController",
                               @"potentiallyMutatedSingleVideo:currentVideoTimeDidChange:",
-                              (IMP)YTKACEMutatedVideoTimeChanged,
+                              (IMP)YTzoomMutatedVideoTimeChanged,
                               &OriginalMutatedVideoTimeChanged);
-    YTKACEInstallInstanceHook(@"YTInlinePlayerBarContainerView",
+    YTzoomInstallInstanceHook(@"YTInlinePlayerBarContainerView",
                               @"layoutSubviews",
-                              (IMP)YTKACEPlayerBarLayout,
+                              (IMP)YTzoomPlayerBarLayout,
                               &OriginalPlayerBarLayout);
-    YTKACEInstallInstanceHook(@"YTWatchFloatingMiniplayerProgressBarView",
+    YTzoomInstallInstanceHook(@"YTWatchFloatingMiniplayerProgressBarView",
                               @"layoutSubviews",
-                              (IMP)YTKACEMiniplayerBarLayout,
+                              (IMP)YTzoomMiniplayerBarLayout,
                               &OriginalMiniplayerBarLayout);
 }

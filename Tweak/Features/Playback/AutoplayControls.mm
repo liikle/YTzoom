@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../Downloads/DownloadLog.h"
@@ -9,10 +9,10 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static NSString *const YTKACEOpenPausedKey =
-    @"YTKACE.Preference.Playback.OpenPaused";
-static NSString *const YTKACEAutoplayOffKey =
-    @"YTKACE.Preference.Playback.AutoplayDisabled";
+static NSString *const YTzoomOpenPausedKey =
+    @"YTzoom.Preference.Playback.OpenPaused";
+static NSString *const YTzoomAutoplayOffKey =
+    @"YTzoom.Preference.Playback.AutoplayDisabled";
 
 static IMP OriginalPlayAutoplay;
 static IMP OriginalTriggerPendingAutoplay;
@@ -23,26 +23,26 @@ static IMP OriginalInsertOrUpdateSingle;
 static IMP OriginalSetSingleWatchTransition;
 
 
-static NSString *YTKACELastPausedVideo;
+static NSString *YTzoomLastPausedVideo;
 
-static NSTimeInterval YTKACELastTouchTime;
-static NSTimeInterval YTKACEUserNextTime;
-static NSString *YTKACEUserNextOrigin;
+static NSTimeInterval YTzoomLastTouchTime;
+static NSTimeInterval YTzoomUserNextTime;
+static NSString *YTzoomUserNextOrigin;
 static IMP OriginalSendEvent;
 
 
-static int YTKACETransitionInt(id transition, NSString *name);
+static int YTzoomTransitionInt(id transition, NSString *name);
 
-static void YTKACEPauseNow(id player) {
+static void YTzoomPauseNow(id player) {
     if (player == nil) return;
     SEL pause = NSSelectorFromString(@"pause");
     if (![player respondsToSelector:pause]) return;
     ((void (*)(id, SEL))objc_msgSend)(player, pause);
 }
 
-void YTKACEOpenPausedVideoActivated(id player) {
-    YTKACEApplyPreferredCaptionLanguage(player);
-    if (!YTKACEFeatureEnabled(YTKACEOpenPausedKey)) return;
+void YTzoomOpenPausedVideoActivated(id player) {
+    YTzoomApplyPreferredCaptionLanguage(player);
+    if (!YTzoomFeatureEnabled(YTzoomOpenPausedKey)) return;
     NSString *videoID = nil;
     SEL getter = NSSelectorFromString(@"currentVideoID");
     if ([player respondsToSelector:getter]) {
@@ -50,44 +50,44 @@ void YTKACEOpenPausedVideoActivated(id player) {
         if ([value isKindOfClass:NSString.class]) videoID = value;
     }
     if (videoID.length != 0 &&
-        [videoID isEqualToString:YTKACELastPausedVideo]) {
+        [videoID isEqualToString:YTzoomLastPausedVideo]) {
         return;
     }
-    YTKACELastPausedVideo = [videoID copy];
+    YTzoomLastPausedVideo = [videoID copy];
 
     __weak id weakPlayer = player;
-    YTKACEPauseNow(player);
+    YTzoomPauseNow(player);
     const double delays[] = { 0.0, 0.15, 0.4, 0.8, 1.4 };
     for (size_t index = 0; index < sizeof(delays) / sizeof(delays[0]); index++) {
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                                      (int64_t)(delays[index] * NSEC_PER_SEC)),
                        dispatch_get_main_queue(), ^{
-            YTKACEPauseNow(weakPlayer);
+            YTzoomPauseNow(weakPlayer);
         });
     }
 }
 
-static BOOL YTKACEAutoplaySuppressed(void) {
-    return YTKACEFeatureEnabled(YTKACEAutoplayOffKey);
+static BOOL YTzoomAutoplaySuppressed(void) {
+    return YTzoomFeatureEnabled(YTzoomAutoplayOffKey);
 }
 
-static void YTKACEPlayAutoplay(id receiver, SEL selector) {
-    if (YTKACEAutoplaySuppressed()) return;
+static void YTzoomPlayAutoplay(id receiver, SEL selector) {
+    if (YTzoomAutoplaySuppressed()) return;
     if (OriginalPlayAutoplay != NULL) {
         ((void (*)(id, SEL))OriginalPlayAutoplay)(receiver, selector);
     }
 }
 
-static void YTKACETriggerPendingAutoplay(id receiver, SEL selector) {
-    if (YTKACEAutoplaySuppressed()) return;
+static void YTzoomTriggerPendingAutoplay(id receiver, SEL selector) {
+    if (YTzoomAutoplaySuppressed()) return;
     if (OriginalTriggerPendingAutoplay != NULL) {
         ((void (*)(id, SEL))OriginalTriggerPendingAutoplay)(receiver, selector);
     }
 }
 
-static void YTKACEAdvanceToNext(id receiver, SEL selector, BOOL autoplay,
+static void YTzoomAdvanceToNext(id receiver, SEL selector, BOOL autoplay,
                                 BOOL internalTransition, id unplayableVideoID) {
-    if (YTKACEAutoplaySuppressed() && autoplay) return;
+    if (YTzoomAutoplaySuppressed() && autoplay) return;
     if (OriginalAdvanceToNext != NULL) {
         ((void (*)(id, SEL, BOOL, BOOL, id))OriginalAdvanceToNext)(
             receiver, selector, autoplay, internalTransition, unplayableVideoID);
@@ -101,14 +101,14 @@ static void YTKACEAdvanceToNext(id receiver, SEL selector, BOOL autoplay,
 
 
 
-static BOOL YTKACEShouldAutonav(id receiver, SEL selector) {
-    if (YTKACEAutoplaySuppressed()) return NO;
+static BOOL YTzoomShouldAutonav(id receiver, SEL selector) {
+    if (YTzoomAutoplaySuppressed()) return NO;
     return OriginalShouldAutonav != NULL
         ? ((BOOL (*)(id, SEL))OriginalShouldAutonav)(receiver, selector) : NO;
 }
 
 
-static int YTKACETransitionInt(id transition, NSString *name) {
+static int YTzoomTransitionInt(id transition, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     if (![transition respondsToSelector:selector]) return -999;
     return ((int (*)(id, SEL))objc_msgSend)(transition, selector);
@@ -118,54 +118,54 @@ static int YTKACETransitionInt(id transition, NSString *name) {
 
 
 
-static void YTKACESendEvent(id receiver, SEL selector, UIEvent *event) {
+static void YTzoomSendEvent(id receiver, SEL selector, UIEvent *event) {
     if (event.type == UIEventTypeTouches) {
-        YTKACELastTouchTime = CACurrentMediaTime();
+        YTzoomLastTouchTime = CACurrentMediaTime();
     }
     if (OriginalSendEvent != NULL) {
         ((void (*)(id, SEL, id))OriginalSendEvent)(receiver, selector, event);
     }
 }
 
-static const int YTKACEAutoAdvanceSource = 6;
-static const NSTimeInterval YTKACEUserNextWindow = 2.0;
-static const NSTimeInterval YTKACETouchGraceWindow = 0.6;
+static const int YTzoomAutoAdvanceSource = 6;
+static const NSTimeInterval YTzoomUserNextWindow = 2.0;
+static const NSTimeInterval YTzoomTouchGraceWindow = 0.6;
 
-static void YTKACENoteUserNextRequiringTouch(NSString *origin,
+static void YTzoomNoteUserNextRequiringTouch(NSString *origin,
                                             BOOL requiresTouch) {
     const NSTimeInterval now = CACurrentMediaTime();
     if (requiresTouch &&
-        (YTKACELastTouchTime == 0 || now - YTKACELastTouchTime > 1.5)) {
+        (YTzoomLastTouchTime == 0 || now - YTzoomLastTouchTime > 1.5)) {
         return;
     }
-    YTKACEUserNextTime = now;
-    YTKACEUserNextOrigin = origin;
+    YTzoomUserNextTime = now;
+    YTzoomUserNextOrigin = origin;
 }
 
-static void YTKACENoteUserNext(NSString *origin) {
-    YTKACENoteUserNextRequiringTouch(origin, NO);
+static void YTzoomNoteUserNext(NSString *origin) {
+    YTzoomNoteUserNextRequiringTouch(origin, NO);
 }
 
-static BOOL YTKACEShouldDropTransition(id transition) {
+static BOOL YTzoomShouldDropTransition(id transition) {
     if (transition == nil) return NO;
-    const int source = YTKACETransitionInt(transition, @"watchEndpointSource");
+    const int source = YTzoomTransitionInt(transition, @"watchEndpointSource");
     const NSTimeInterval now = CACurrentMediaTime();
     const NSTimeInterval sinceTouch =
-        YTKACELastTouchTime != 0 ? now - YTKACELastTouchTime : -1;
+        YTzoomLastTouchTime != 0 ? now - YTzoomLastTouchTime : -1;
     const NSTimeInterval sinceUserNext =
-        YTKACEUserNextTime != 0 ? now - YTKACEUserNextTime : -1;
+        YTzoomUserNextTime != 0 ? now - YTzoomUserNextTime : -1;
 
     const BOOL userAsked =
-        (sinceUserNext >= 0 && sinceUserNext <= YTKACEUserNextWindow) ||
-        (sinceTouch >= 0 && sinceTouch <= YTKACETouchGraceWindow);
-    return YTKACEAutoplaySuppressed() &&
-        source == YTKACEAutoAdvanceSource && !userAsked;
+        (sinceUserNext >= 0 && sinceUserNext <= YTzoomUserNextWindow) ||
+        (sinceTouch >= 0 && sinceTouch <= YTzoomTouchGraceWindow);
+    return YTzoomAutoplaySuppressed() &&
+        source == YTzoomAutoAdvanceSource && !userAsked;
 }
 
-static void YTKACESetWatchTransitionStartup(id receiver, SEL selector,
+static void YTzoomSetWatchTransitionStartup(id receiver, SEL selector,
                                             id transition, BOOL onAppStartup) {
     if (!onAppStartup &&
-        YTKACEShouldDropTransition(transition)) {
+        YTzoomShouldDropTransition(transition)) {
         return;
     }
     if (OriginalSetWatchTransitionStartup != NULL) {
@@ -174,18 +174,18 @@ static void YTKACESetWatchTransitionStartup(id receiver, SEL selector,
     }
 }
 
-static void YTKACEInsertOrUpdateSingle(id receiver, SEL selector,
+static void YTzoomInsertOrUpdateSingle(id receiver, SEL selector,
                                        id transition) {
-    if (YTKACEShouldDropTransition(transition)) return;
+    if (YTzoomShouldDropTransition(transition)) return;
     if (OriginalInsertOrUpdateSingle != NULL) {
         ((void (*)(id, SEL, id))OriginalInsertOrUpdateSingle)(
             receiver, selector, transition);
     }
 }
 
-static void YTKACESetSingleWatchTransition(id receiver, SEL selector,
+static void YTzoomSetSingleWatchTransition(id receiver, SEL selector,
                                            id transition) {
-    if (YTKACEShouldDropTransition(transition)) return;
+    if (YTzoomShouldDropTransition(transition)) return;
     if (OriginalSetSingleWatchTransition != NULL) {
         ((void (*)(id, SEL, id))OriginalSetSingleWatchTransition)(
             receiver, selector, transition);
@@ -194,117 +194,117 @@ static void YTKACESetSingleWatchTransition(id receiver, SEL selector,
 
 static IMP OriginalUserNext[8];
 
-static long long YTKACEUserNextRemote(id receiver, SEL selector, id command) {
-    YTKACENoteUserNext(@"remoteNextTrack");
+static long long YTzoomUserNextRemote(id receiver, SEL selector, id command) {
+    YTzoomNoteUserNext(@"remoteNextTrack");
     return OriginalUserNext[7] != NULL
         ? ((long long (*)(id, SEL, id))OriginalUserNext[7])(receiver, selector,
                                                             command)
         : 0;
 }
 
-static void YTKACEUserNextSender0(id receiver, SEL selector, id sender) {
-    YTKACENoteUserNext(@"overlayNext");
+static void YTzoomUserNextSender0(id receiver, SEL selector, id sender) {
+    YTzoomNoteUserNext(@"overlayNext");
     if (OriginalUserNext[0] != NULL) {
         ((void (*)(id, SEL, id))OriginalUserNext[0])(receiver, selector, sender);
     }
 }
 
-static void YTKACEUserNextSender1(id receiver, SEL selector, id sender) {
-    YTKACENoteUserNext(@"controlsNext");
+static void YTzoomUserNextSender1(id receiver, SEL selector, id sender) {
+    YTzoomNoteUserNext(@"controlsNext");
     if (OriginalUserNext[1] != NULL) {
         ((void (*)(id, SEL, id))OriginalUserNext[1])(receiver, selector, sender);
     }
 }
 
-static void YTKACEUserNextVoid5(id receiver, SEL selector) {
-    YTKACENoteUserNext(@"playerBarNext");
+static void YTzoomUserNextVoid5(id receiver, SEL selector) {
+    YTzoomNoteUserNext(@"playerBarNext");
     if (OriginalUserNext[5] != NULL) {
         ((void (*)(id, SEL))OriginalUserNext[5])(receiver, selector);
     }
 }
 
-static void YTKACEUserNextVoid6(id receiver, SEL selector) {
-    YTKACENoteUserNext(@"lockscreenNext");
+static void YTzoomUserNextVoid6(id receiver, SEL selector) {
+    YTzoomNoteUserNext(@"lockscreenNext");
     if (OriginalUserNext[6] != NULL) {
         ((void (*)(id, SEL))OriginalUserNext[6])(receiver, selector);
     }
 }
 
-static void YTKACEUserNextVoid2(id receiver, SEL selector) {
-    YTKACENoteUserNext(@"miniplayerNext");
+static void YTzoomUserNextVoid2(id receiver, SEL selector) {
+    YTzoomNoteUserNext(@"miniplayerNext");
     if (OriginalUserNext[2] != NULL) {
         ((void (*)(id, SEL))OriginalUserNext[2])(receiver, selector);
     }
 }
 
-static void YTKACEUserNextPanel(id receiver, SEL selector,
+static void YTzoomUserNextPanel(id receiver, SEL selector,
                                 unsigned long long index) {
-    YTKACENoteUserNextRequiringTouch(@"panelSelect", YES);
+    YTzoomNoteUserNextRequiringTouch(@"panelSelect", YES);
     if (OriginalUserNext[3] != NULL) {
         ((void (*)(id, SEL, unsigned long long))OriginalUserNext[3])(
             receiver, selector, index);
     }
 }
 
-static void YTKACEUserNextEndpoint(id receiver, SEL selector, id endpoint) {
-    YTKACENoteUserNext(@"nextFromEndpoint");
+static void YTzoomUserNextEndpoint(id receiver, SEL selector, id endpoint) {
+    YTzoomNoteUserNext(@"nextFromEndpoint");
     if (OriginalUserNext[4] != NULL) {
         ((void (*)(id, SEL, id))OriginalUserNext[4])(receiver, selector,
                                                      endpoint);
     }
 }
 
-void YTKACEInstallAutoplayHooks(void) {
-    YTKACEInstallInstanceHook(@"YTWatchFlowController", @"playAutoplay",
-                              (IMP)YTKACEPlayAutoplay, &OriginalPlayAutoplay);
-    YTKACEInstallInstanceHook(@"YTQueueController", @"triggerPendingAutoplay",
-                              (IMP)YTKACETriggerPendingAutoplay,
+void YTzoomInstallAutoplayHooks(void) {
+    YTzoomInstallInstanceHook(@"YTWatchFlowController", @"playAutoplay",
+                              (IMP)YTzoomPlayAutoplay, &OriginalPlayAutoplay);
+    YTzoomInstallInstanceHook(@"YTQueueController", @"triggerPendingAutoplay",
+                              (IMP)YTzoomTriggerPendingAutoplay,
                               &OriginalTriggerPendingAutoplay);
-    YTKACEInstallInstanceHook(
+    YTzoomInstallInstanceHook(
         @"YTQueueController",
         @"advanceToNextWithAutoplay:isPlaybackControllerInternalTransition:"
          "unplayableVideoID:",
-        (IMP)YTKACEAdvanceToNext, &OriginalAdvanceToNext);
-    YTKACEInstallInstanceHook(@"YTWatchPlaybackController",
+        (IMP)YTzoomAdvanceToNext, &OriginalAdvanceToNext);
+    YTzoomInstallInstanceHook(@"YTWatchPlaybackController",
                               @"shouldAutonavToNextVideo",
-                              (IMP)YTKACEShouldAutonav, &OriginalShouldAutonav);
+                              (IMP)YTzoomShouldAutonav, &OriginalShouldAutonav);
 
     NSString *const layer = @"YTWatchLayerViewController";
-    YTKACEInstallInstanceHook(layer, @"setWatchTransition:onAppStartup:",
-                              (IMP)YTKACESetWatchTransitionStartup,
+    YTzoomInstallInstanceHook(layer, @"setWatchTransition:onAppStartup:",
+                              (IMP)YTzoomSetWatchTransitionStartup,
                               &OriginalSetWatchTransitionStartup);
-    YTKACEInstallInstanceHook(layer, @"insertOrUpdateSingleWatchTransition:",
-                              (IMP)YTKACEInsertOrUpdateSingle,
+    YTzoomInstallInstanceHook(layer, @"insertOrUpdateSingleWatchTransition:",
+                              (IMP)YTzoomInsertOrUpdateSingle,
                               &OriginalInsertOrUpdateSingle);
-    YTKACEInstallInstanceHook(layer, @"setSingleWatchTransition:",
-                              (IMP)YTKACESetSingleWatchTransition,
+    YTzoomInstallInstanceHook(layer, @"setSingleWatchTransition:",
+                              (IMP)YTzoomSetSingleWatchTransition,
                               &OriginalSetSingleWatchTransition);
-    YTKACEInstallInstanceHook(@"UIApplication", @"sendEvent:",
-                              (IMP)YTKACESendEvent, &OriginalSendEvent);
+    YTzoomInstallInstanceHook(@"UIApplication", @"sendEvent:",
+                              (IMP)YTzoomSendEvent, &OriginalSendEvent);
 
-    YTKACEInstallInstanceHook(
+    YTzoomInstallInstanceHook(
         @"YTMainAppVideoPlayerOverlayViewController", @"didPressNext:",
-        (IMP)YTKACEUserNextSender0, &OriginalUserNext[0]);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomUserNextSender0, &OriginalUserNext[0]);
+    YTzoomInstallInstanceHook(
         @"YTMainAppControlsOverlayView", @"didPressNext:",
-        (IMP)YTKACEUserNextSender1, &OriginalUserNext[1]);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomUserNextSender1, &OriginalUserNext[1]);
+    YTzoomInstallInstanceHook(
         @"YTWatchFloatingMiniplayerViewController", @"didTapNext",
-        (IMP)YTKACEUserNextVoid2, &OriginalUserNext[2]);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomUserNextVoid2, &OriginalUserNext[2]);
+    YTzoomInstallInstanceHook(
         @"YTPlaylistPanelController", @"didSelectEntryAtIndex:",
-        (IMP)YTKACEUserNextPanel, &OriginalUserNext[3]);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomUserNextPanel, &OriginalUserNext[3]);
+    YTzoomInstallInstanceHook(
         @"YTWatchPreviousController",
         @"handleNextButtonWithFromNavigationEndpoint:",
-        (IMP)YTKACEUserNextEndpoint, &OriginalUserNext[4]);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomUserNextEndpoint, &OriginalUserNext[4]);
+    YTzoomInstallInstanceHook(
         @"YTMainAppVideoPlayerOverlayViewController", @"didPressPlayerBarNext",
-        (IMP)YTKACEUserNextVoid5, &OriginalUserNext[5]);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomUserNextVoid5, &OriginalUserNext[5]);
+    YTzoomInstallInstanceHook(
         @"YTWatchController", @"didPressNextTrackLockscreenButton",
-        (IMP)YTKACEUserNextVoid6, &OriginalUserNext[6]);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomUserNextVoid6, &OriginalUserNext[6]);
+    YTzoomInstallInstanceHook(
         @"YTRemoteCommandHandler", @"handleNextTrackCommand:",
-        (IMP)YTKACEUserNextRemote, &OriginalUserNext[7]);
+        (IMP)YTzoomUserNextRemote, &OriginalUserNext[7]);
 }

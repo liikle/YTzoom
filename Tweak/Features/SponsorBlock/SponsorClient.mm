@@ -2,18 +2,18 @@
 #import "SponsorPreferences.h"
 #import <math.h>
 
-@interface YTKACESponsorClient ()
+@interface YTzoomSponsorClient ()
 @property(nonatomic, strong) NSCache<NSString *, NSArray *> *cache;
 @property(nonatomic, strong) NSURLSession *session;
 @end
 
-@implementation YTKACESponsorClient
+@implementation YTzoomSponsorClient
 
 + (instancetype)sharedClient {
-    static YTKACESponsorClient *client;
+    static YTzoomSponsorClient *client;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        client = [YTKACESponsorClient new];
+        client = [YTzoomSponsorClient new];
     });
     return client;
 }
@@ -35,19 +35,19 @@
 }
 
 - (void)segmentsForVideoID:(NSString *)videoID
-                completion:(YTKACESponsorCompletion)completion {
+                completion:(YTzoomSponsorCompletion)completion {
     if (videoID.length == 0) {
         completion(@[]);
         return;
     }
 
-    [self segmentsForVideoID:videoID categories:YTKACESponsorEnabledCategories()
+    [self segmentsForVideoID:videoID categories:YTzoomSponsorEnabledCategories()
                   completion:completion];
 }
 
 - (void)segmentsForVideoID:(NSString *)videoID
                 categories:(NSArray<NSString *> *)categories
-                completion:(YTKACESponsorCompletion)completion {
+                completion:(YTzoomSponsorCompletion)completion {
     if (videoID.length == 0 || categories.count == 0) {
         completion(@[]);
         return;
@@ -81,7 +81,7 @@
     request.HTTPMethod = @"GET";
     [request setValue:@"application/json" forHTTPHeaderField:@"Accept"];
 
-    __weak YTKACESponsorClient *weakSelf = self;
+    __weak YTzoomSponsorClient *weakSelf = self;
     NSURLSessionDataTask *task =
         [self.session dataTaskWithRequest:request
                        completionHandler:^(NSData *data, NSURLResponse *response, NSError *error) {

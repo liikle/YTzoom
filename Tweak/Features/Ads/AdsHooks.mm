@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import <Foundation/Foundation.h>
@@ -37,62 +37,62 @@ static IMP OriginalElementContentsArray;
 static IMP OriginalItemSectionContentsArray;
 static IMP OriginalAdCellLayout;
 static IMP OriginalAdCellReuse;
-static NSMutableDictionary<NSString *, NSValue *> *YTKACEPromotedSizeOriginals;
+static NSMutableDictionary<NSString *, NSValue *> *YTzoomPromotedSizeOriginals;
 static IMP OriginalVideoNodeSetEntry;
 static IMP OriginalVideoNodeHeight;
 static IMP OriginalVideoNodeSize;
 static IMP OriginalVideoNodeShrink;
-static const void *YTKACEAdNodeAssociation = &YTKACEAdNodeAssociation;
-static const void *YTKACEAdMatchAssociation = &YTKACEAdMatchAssociation;
-static const void *YTKACEAdEmptyAssociation = &YTKACEAdEmptyAssociation;
+static const void *YTzoomAdNodeAssociation = &YTzoomAdNodeAssociation;
+static const void *YTzoomAdMatchAssociation = &YTzoomAdMatchAssociation;
+static const void *YTzoomAdEmptyAssociation = &YTzoomAdEmptyAssociation;
 
-static id YTKACECallObjectGetter(IMP implementation, id receiver, SEL selector) {
+static id YTzoomCallObjectGetter(IMP implementation, id receiver, SEL selector) {
     return implementation == NULL
         ? nil
         : ((id (*)(id, SEL))implementation)(receiver, selector);
 }
 
-static BOOL YTKACECallBooleanGetter(IMP implementation, id receiver, SEL selector) {
+static BOOL YTzoomCallBooleanGetter(IMP implementation, id receiver, SEL selector) {
     return implementation != NULL &&
         ((BOOL (*)(id, SEL))implementation)(receiver, selector);
 }
 
-static BOOL YTKACEShouldBlockUpgradeDialog(id receiver, SEL selector) {
-    return YTKACEFeatureEnabled(YTKACENoAdsKey)
+static BOOL YTzoomShouldBlockUpgradeDialog(id receiver, SEL selector) {
+    return YTzoomFeatureEnabled(YTzoomNoAdsKey)
         ? YES
-        : YTKACECallBooleanGetter(OriginalShouldBlockUpgradeDialog, receiver, selector);
+        : YTzoomCallBooleanGetter(OriginalShouldBlockUpgradeDialog, receiver, selector);
 }
 
-static id YTKACEEmptyDictionary(IMP original, id receiver, SEL selector) {
-    return YTKACEFeatureEnabled(YTKACENoAdsKey)
+static id YTzoomEmptyDictionary(IMP original, id receiver, SEL selector) {
+    return YTzoomFeatureEnabled(YTzoomNoAdsKey)
         ? @{}
-        : YTKACECallObjectGetter(original, receiver, selector);
+        : YTzoomCallObjectGetter(original, receiver, selector);
 }
 
-static id YTKACEAdShieldSignals(id receiver, SEL selector) {
-    return YTKACEEmptyDictionary(OriginalAdShieldSignals, receiver, selector);
+static id YTzoomAdShieldSignals(id receiver, SEL selector) {
+    return YTzoomEmptyDictionary(OriginalAdShieldSignals, receiver, selector);
 }
 
-static id YTKACEAdShieldSignalsWithoutIDFA(id receiver, SEL selector) {
-    return YTKACEEmptyDictionary(OriginalAdShieldSignalsWithoutIDFA, receiver, selector);
+static id YTzoomAdShieldSignalsWithoutIDFA(id receiver, SEL selector) {
+    return YTzoomEmptyDictionary(OriginalAdShieldSignalsWithoutIDFA, receiver, selector);
 }
 
-static id YTKACEDataSignals(id receiver, SEL selector) {
-    return YTKACEEmptyDictionary(OriginalDataSignals, receiver, selector);
+static id YTzoomDataSignals(id receiver, SEL selector) {
+    return YTzoomEmptyDictionary(OriginalDataSignals, receiver, selector);
 }
 
-static id YTKACEDataSignalsWithoutIDFA(id receiver, SEL selector) {
-    return YTKACEEmptyDictionary(OriginalDataSignalsWithoutIDFA, receiver, selector);
+static id YTzoomDataSignalsWithoutIDFA(id receiver, SEL selector) {
+    return YTzoomEmptyDictionary(OriginalDataSignalsWithoutIDFA, receiver, selector);
 }
 
-static void YTKACEAdsDecorateContext(id receiver, SEL selector, id context) {
-    if (!YTKACEFeatureEnabled(YTKACENoAdsKey) && OriginalAdsDecorateContext != NULL) {
+static void YTzoomAdsDecorateContext(id receiver, SEL selector, id context) {
+    if (!YTzoomFeatureEnabled(YTzoomNoAdsKey) && OriginalAdsDecorateContext != NULL) {
         ((void (*)(id, SEL, id))OriginalAdsDecorateContext)(receiver, selector, context);
     }
 }
 
-static void YTKACEAccountAdsDecorateContext(id receiver, SEL selector, id context) {
-    if (!YTKACEFeatureEnabled(YTKACENoAdsKey) &&
+static void YTzoomAccountAdsDecorateContext(id receiver, SEL selector, id context) {
+    if (!YTzoomFeatureEnabled(YTzoomNoAdsKey) &&
         OriginalAccountAdsDecorateContext != NULL) {
         ((void (*)(id, SEL, id))OriginalAccountAdsDecorateContext)(
             receiver,
@@ -102,52 +102,52 @@ static void YTKACEAccountAdsDecorateContext(id receiver, SEL selector, id contex
     }
 }
 
-static id YTKACEPlayerAdsArray(id receiver, SEL selector) {
-    return YTKACEFeatureEnabled(YTKACENoAdsKey)
+static id YTzoomPlayerAdsArray(id receiver, SEL selector) {
+    return YTzoomFeatureEnabled(YTzoomNoAdsKey)
         ? [NSMutableArray array]
-        : YTKACECallObjectGetter(OriginalPlayerAdsArray, receiver, selector);
+        : YTzoomCallObjectGetter(OriginalPlayerAdsArray, receiver, selector);
 }
 
-static id YTKACEAdSlotsArray(id receiver, SEL selector) {
-    return YTKACEFeatureEnabled(YTKACENoAdsKey)
+static id YTzoomAdSlotsArray(id receiver, SEL selector) {
+    return YTzoomFeatureEnabled(YTzoomNoAdsKey)
         ? [NSMutableArray array]
-        : YTKACECallObjectGetter(OriginalAdSlotsArray, receiver, selector);
+        : YTzoomCallObjectGetter(OriginalAdSlotsArray, receiver, selector);
 }
 
-static id YTKACEAdPlacementsArray(id receiver, SEL selector) {
-    return YTKACEFeatureEnabled(YTKACENoAdsKey)
+static id YTzoomAdPlacementsArray(id receiver, SEL selector) {
+    return YTzoomFeatureEnabled(YTzoomNoAdsKey)
         ? [NSMutableArray array]
-        : YTKACECallObjectGetter(OriginalAdPlacementsArray, receiver, selector);
+        : YTzoomCallObjectGetter(OriginalAdPlacementsArray, receiver, selector);
 }
 
-static id YTKACENilParameter(IMP original, id receiver, SEL selector) {
-    return YTKACEFeatureEnabled(YTKACENoAdsKey)
+static id YTzoomNilParameter(IMP original, id receiver, SEL selector) {
+    return YTzoomFeatureEnabled(YTzoomNoAdsKey)
         ? nil
-        : YTKACECallObjectGetter(original, receiver, selector);
+        : YTzoomCallObjectGetter(original, receiver, selector);
 }
 
-static id YTKACEAdBreakParams(id receiver, SEL selector) {
-    return YTKACENilParameter(OriginalAdBreakParams, receiver, selector);
+static id YTzoomAdBreakParams(id receiver, SEL selector) {
+    return YTzoomNilParameter(OriginalAdBreakParams, receiver, selector);
 }
 
-static id YTKACEAdNextParams(id receiver, SEL selector) {
-    return YTKACENilParameter(OriginalAdNextParams, receiver, selector);
+static id YTzoomAdNextParams(id receiver, SEL selector) {
+    return YTzoomNilParameter(OriginalAdNextParams, receiver, selector);
 }
 
-static id YTKACEAdParams(id receiver, SEL selector) {
-    return YTKACENilParameter(OriginalAdParams, receiver, selector);
+static id YTzoomAdParams(id receiver, SEL selector) {
+    return YTzoomNilParameter(OriginalAdParams, receiver, selector);
 }
 
-static BOOL YTKACEEnableSkippableAd(id receiver, SEL selector) {
-    return YTKACEFeatureEnabled(YTKACENoAdsKey)
+static BOOL YTzoomEnableSkippableAd(id receiver, SEL selector) {
+    return YTzoomFeatureEnabled(YTzoomNoAdsKey)
         ? YES
-        : YTKACECallBooleanGetter(OriginalEnableSkippableAd, receiver, selector);
+        : YTzoomCallBooleanGetter(OriginalEnableSkippableAd, receiver, selector);
 }
 
-static void YTKACEMDXSessionImplAdPlaying(id receiver,
+static void YTzoomMDXSessionImplAdPlaying(id receiver,
                                           SEL selector,
                                           uintptr_t value) {
-    if (!YTKACEFeatureEnabled(YTKACENoAdsKey) &&
+    if (!YTzoomFeatureEnabled(YTzoomNoAdsKey) &&
         OriginalMDXSessionImplAdPlaying != NULL) {
         ((void (*)(id, SEL, uintptr_t))OriginalMDXSessionImplAdPlaying)(
             receiver,
@@ -157,10 +157,10 @@ static void YTKACEMDXSessionImplAdPlaying(id receiver,
     }
 }
 
-static void YTKACEMDXSessionAdPlaying(id receiver,
+static void YTzoomMDXSessionAdPlaying(id receiver,
                                       SEL selector,
                                       uintptr_t value) {
-    if (!YTKACEFeatureEnabled(YTKACENoAdsKey) && OriginalMDXSessionAdPlaying != NULL) {
+    if (!YTzoomFeatureEnabled(YTzoomNoAdsKey) && OriginalMDXSessionAdPlaying != NULL) {
         ((void (*)(id, SEL, uintptr_t))OriginalMDXSessionAdPlaying)(
             receiver,
             selector,
@@ -169,34 +169,34 @@ static void YTKACEMDXSessionAdPlaying(id receiver,
     }
 }
 
-static BOOL YTKACENotPlayingAd(IMP original, id receiver, SEL selector) {
-    return YTKACEFeatureEnabled(YTKACENoAdsKey)
+static BOOL YTzoomNotPlayingAd(IMP original, id receiver, SEL selector) {
+    return YTzoomFeatureEnabled(YTzoomNoAdsKey)
         ? NO
-        : YTKACECallBooleanGetter(original, receiver, selector);
+        : YTzoomCallBooleanGetter(original, receiver, selector);
 }
 
-static BOOL YTKACEIsPlayingAd(id receiver, SEL selector) {
-    return YTKACENotPlayingAd(OriginalIsPlayingAd, receiver, selector);
+static BOOL YTzoomIsPlayingAd(id receiver, SEL selector) {
+    return YTzoomNotPlayingAd(OriginalIsPlayingAd, receiver, selector);
 }
 
-static BOOL YTKACEIsPlayingAdSurvey(id receiver, SEL selector) {
-    return YTKACENotPlayingAd(OriginalIsPlayingAdSurvey, receiver, selector);
+static BOOL YTzoomIsPlayingAdSurvey(id receiver, SEL selector) {
+    return YTzoomNotPlayingAd(OriginalIsPlayingAdSurvey, receiver, selector);
 }
 
-static BOOL YTKACEIsPlayingAdIntro(id receiver, SEL selector) {
-    return YTKACENotPlayingAd(OriginalIsPlayingAdIntro, receiver, selector);
+static BOOL YTzoomIsPlayingAdIntro(id receiver, SEL selector) {
+    return YTzoomNotPlayingAd(OriginalIsPlayingAdIntro, receiver, selector);
 }
 
-static id YTKACENoAdsPlaybackCoordinator(id receiver, SEL selector) {
-    id coordinator = YTKACECallObjectGetter(
+static id YTzoomNoAdsPlaybackCoordinator(id receiver, SEL selector) {
+    id coordinator = YTzoomCallObjectGetter(
         OriginalCreateAdsPlaybackCoordinator,
         receiver,
         selector
     );
-    return YTKACEFeatureEnabled(YTKACENoAdsKey) ? nil : coordinator;
+    return YTzoomFeatureEnabled(YTzoomNoAdsKey) ? nil : coordinator;
 }
 
-static id YTKACEFilterReelModel(IMP original,
+static id YTzoomFilterReelModel(IMP original,
                                 id receiver,
                                 SEL selector,
                                 id entry) {
@@ -204,7 +204,7 @@ static id YTKACEFilterReelModel(IMP original,
         return nil;
     }
     id model = ((id (*)(id, SEL, id))original)(receiver, selector, entry);
-    if (!YTKACEFeatureEnabled(YTKACENoAdsKey) || model == nil) {
+    if (!YTzoomFeatureEnabled(YTzoomNoAdsKey) || model == nil) {
         return model;
     }
     SEL videoTypeSelector = NSSelectorFromString(@"videoType");
@@ -218,8 +218,8 @@ static id YTKACEFilterReelModel(IMP original,
     return videoType == 3 ? nil : model;
 }
 
-static id YTKACEReelContentModel(id receiver, SEL selector, id entry) {
-    return YTKACEFilterReelModel(
+static id YTzoomReelContentModel(id receiver, SEL selector, id entry) {
+    return YTzoomFilterReelModel(
         OriginalReelContentModel,
         receiver,
         selector,
@@ -227,8 +227,8 @@ static id YTKACEReelContentModel(id receiver, SEL selector, id entry) {
     );
 }
 
-static id YTKACEInfiniteReelContentModel(id receiver, SEL selector, id entry) {
-    return YTKACEFilterReelModel(
+static id YTzoomInfiniteReelContentModel(id receiver, SEL selector, id entry) {
+    return YTzoomFilterReelModel(
         OriginalInfiniteReelContentModel,
         receiver,
         selector,
@@ -236,7 +236,7 @@ static id YTKACEInfiniteReelContentModel(id receiver, SEL selector, id entry) {
     );
 }
 
-static id YTKACEObjectValue(id object, NSString *selectorName) {
+static id YTzoomObjectValue(id object, NSString *selectorName) {
     if (object == nil) return nil;
     SEL selector = NSSelectorFromString(selectorName);
     if (![object respondsToSelector:selector]) return nil;
@@ -247,7 +247,7 @@ static id YTKACEObjectValue(id object, NSString *selectorName) {
     }
 }
 
-static BOOL YTKACEObjectBool(id object, NSString *selectorName) {
+static BOOL YTzoomObjectBool(id object, NSString *selectorName) {
     if (object == nil) return NO;
     SEL selector = NSSelectorFromString(selectorName);
     if (![object respondsToSelector:selector]) return NO;
@@ -258,7 +258,7 @@ static BOOL YTKACEObjectBool(id object, NSString *selectorName) {
     }
 }
 
-static BOOL YTKACEReelObjectLooksLikeAd(id object, NSUInteger depth) {
+static BOOL YTzoomReelObjectLooksLikeAd(id object, NSUInteger depth) {
     if (object == nil || depth > 3) return NO;
 
     NSString *className = NSStringFromClass([object class]).lowercaseString;
@@ -272,7 +272,7 @@ static BOOL YTKACEReelObjectLooksLikeAd(id object, NSUInteger depth) {
     for (NSString *selectorName in @[
         @"isAd", @"isAdVideo", @"isVideoAd", @"hasAdLoggingData"
     ]) {
-        if (YTKACEObjectBool(object, selectorName)) return YES;
+        if (YTzoomObjectBool(object, selectorName)) return YES;
     }
 
     SEL videoTypeSelector = NSSelectorFromString(@"videoType");
@@ -291,33 +291,33 @@ static BOOL YTKACEReelObjectLooksLikeAd(id object, NSUInteger depth) {
         @"nonVideoAdRenderer",
         @"sequenceItemAdSelectionRenderer"
     ]) {
-        if (YTKACEObjectValue(object, selectorName) != nil) return YES;
+        if (YTzoomObjectValue(object, selectorName) != nil) return YES;
     }
 
     for (NSString *selectorName in @[
         @"reelModel", @"command", @"watchModel", @"parentWatchModel"
     ]) {
-        id child = YTKACEObjectValue(object, selectorName);
-        if (child != object && YTKACEReelObjectLooksLikeAd(child, depth + 1)) {
+        id child = YTzoomObjectValue(object, selectorName);
+        if (child != object && YTzoomReelObjectLooksLikeAd(child, depth + 1)) {
             return YES;
         }
     }
     return NO;
 }
 
-static BOOL YTKACEReelShouldDisplay(id receiver, SEL selector) {
+static BOOL YTzoomReelShouldDisplay(id receiver, SEL selector) {
     BOOL shouldDisplay = OriginalReelShouldDisplay == NULL ||
         ((BOOL (*)(id, SEL))OriginalReelShouldDisplay)(receiver, selector);
-    if (!shouldDisplay || !YTKACEFeatureEnabled(YTKACENoAdsKey)) {
+    if (!shouldDisplay || !YTzoomFeatureEnabled(YTzoomNoAdsKey)) {
         return shouldDisplay;
     }
-    if (YTKACEObjectValue(receiver, @"nonVideoContentModel") != nil) {
+    if (YTzoomObjectValue(receiver, @"nonVideoContentModel") != nil) {
         return NO;
     }
-    return !YTKACEReelObjectLooksLikeAd(receiver, 0);
+    return !YTzoomReelObjectLooksLikeAd(receiver, 0);
 }
 
-static BOOL YTKACEIsAdLayoutIdentifier(NSString *identifier) {
+static BOOL YTzoomIsAdLayoutIdentifier(NSString *identifier) {
     if (identifier.length == 0) return NO;
     NSString *normalized = [[identifier lowercaseString]
         stringByReplacingOccurrencesOfString:@"." withString:@"_"];
@@ -326,9 +326,9 @@ static BOOL YTKACEIsAdLayoutIdentifier(NSString *identifier) {
     return [normalized hasPrefix:@"eml_ad_"];
 }
 
-static BOOL YTKACEObjectLooksLikeAd(id object) {
+static BOOL YTzoomObjectLooksLikeAd(id object) {
     if (object == nil) return NO;
-    if ([objc_getAssociatedObject(object, YTKACEAdMatchAssociation) boolValue]) {
+    if ([objc_getAssociatedObject(object, YTzoomAdMatchAssociation) boolValue]) {
         return YES;
     }
     BOOL matched = NO;
@@ -390,7 +390,7 @@ static BOOL YTKACEObjectLooksLikeAd(id object) {
             matched = YES;
         }
     }
-    if (!matched && YTKACEObjectValue(object, @"adLoggingData") != nil) {
+    if (!matched && YTzoomObjectValue(object, @"adLoggingData") != nil) {
         matched = YES;
     }
     for (NSString *selectorName in @[
@@ -398,7 +398,7 @@ static BOOL YTKACEObjectLooksLikeAd(id object) {
         @"simpleAdBadgeRenderer"
     ]) {
         if (matched) break;
-        id value = YTKACEObjectValue(object, selectorName);
+        id value = YTzoomObjectValue(object, selectorName);
         if (value != nil) {
             matched = YES;
         }
@@ -408,41 +408,41 @@ static BOOL YTKACEObjectLooksLikeAd(id object) {
         @"accessibilityIdentifier", @"templateIdentifier"
     ]) {
         if (matched) break;
-        id value = YTKACEObjectValue(object, selectorName);
+        id value = YTzoomObjectValue(object, selectorName);
         if ([value isKindOfClass:NSString.class] &&
-            YTKACEIsAdLayoutIdentifier(value)) {
+            YTzoomIsAdLayoutIdentifier(value)) {
             matched = YES;
         }
     }
     if (!matched) {
-        id options = YTKACEObjectValue(object, @"compatibilityOptions");
+        id options = YTzoomObjectValue(object, @"compatibilityOptions");
         SEL loggingSelector = NSSelectorFromString(@"hasAdLoggingData");
         matched = [options respondsToSelector:loggingSelector] &&
             ((BOOL (*)(id, SEL))objc_msgSend)(options, loggingSelector);
     }
     if (matched) {
-        objc_setAssociatedObject(object, YTKACEAdMatchAssociation, @YES,
+        objc_setAssociatedObject(object, YTzoomAdMatchAssociation, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     return matched;
 }
 
-static const void *YTKACEAdCellAssociation = &YTKACEAdCellAssociation;
+static const void *YTzoomAdCellAssociation = &YTzoomAdCellAssociation;
 
 typedef struct {
     NSUInteger unit;
     CGFloat value;
-} YTKACEASDimension;
+} YTzoomASDimension;
 
-static void YTKACECollapseCellNode(id node) {
+static void YTzoomCollapseCellNode(id node) {
     SEL styleSelector = NSSelectorFromString(@"style");
     if ([node respondsToSelector:styleSelector]) {
         id style = ((id (*)(id, SEL))objc_msgSend)(node, styleSelector);
-        YTKACEASDimension zero = {1, 0.0};
+        YTzoomASDimension zero = {1, 0.0};
         for (NSString *name in @[@"setHeight:", @"setMaxHeight:"]) {
             SEL selector = NSSelectorFromString(name);
             if (![style respondsToSelector:selector]) continue;
-            ((void (*)(id, SEL, YTKACEASDimension))objc_msgSend)(
+            ((void (*)(id, SEL, YTzoomASDimension))objc_msgSend)(
                 style, selector, zero);
         }
     }
@@ -454,7 +454,7 @@ static void YTKACECollapseCellNode(id node) {
     }
 }
 
-static void YTKACECollapseAdCell(UIView *cell) {
+static void YTzoomCollapseAdCell(UIView *cell) {
     CGRect frame = cell.frame;
     if (frame.size.height == 0.0 && cell.hidden) return;
     frame.size.height = 0.0;
@@ -470,20 +470,20 @@ static void YTKACECollapseAdCell(UIView *cell) {
     }
 }
 
-void YTKACEHandleAdCellLayout(UIView *cell) {
-    if (![objc_getAssociatedObject(cell, YTKACEAdCellAssociation) boolValue]) return;
-    YTKACECollapseAdCell(cell);
+void YTzoomHandleAdCellLayout(UIView *cell) {
+    if (![objc_getAssociatedObject(cell, YTzoomAdCellAssociation) boolValue]) return;
+    YTzoomCollapseAdCell(cell);
 }
 
-void YTKACEHandleAdCellReuse(UIView *cell) {
-    if (![objc_getAssociatedObject(cell, YTKACEAdCellAssociation) boolValue]) return;
-    objc_setAssociatedObject(cell, YTKACEAdCellAssociation, nil,
+void YTzoomHandleAdCellReuse(UIView *cell) {
+    if (![objc_getAssociatedObject(cell, YTzoomAdCellAssociation) boolValue]) return;
+    objc_setAssociatedObject(cell, YTzoomAdCellAssociation, nil,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     cell.hidden = NO;
     cell.userInteractionEnabled = YES;
 }
 
-void YTKACECollapseHostCell(UIView *view) {
+void YTzoomCollapseHostCell(UIView *view) {
     if (view == nil) return;
     UIView *cell = nil;
     for (UIView *ancestor = view; ancestor != nil;
@@ -501,43 +501,43 @@ void YTKACECollapseHostCell(UIView *view) {
         });
         return;
     }
-    objc_setAssociatedObject(cell, YTKACEAdCellAssociation, @YES,
+    objc_setAssociatedObject(cell, YTzoomAdCellAssociation, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    YTKACECollapseAdCell(cell);
+    YTzoomCollapseAdCell(cell);
     SEL nodeSelector = NSSelectorFromString(@"node");
     if ([cell respondsToSelector:nodeSelector]) {
         id node = ((id (*)(id, SEL))objc_msgSend)(cell, nodeSelector);
         if (node != nil) {
-            objc_setAssociatedObject(node, YTKACEAdNodeAssociation, @YES,
+            objc_setAssociatedObject(node, YTzoomAdNodeAssociation, @YES,
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-            YTKACECollapseCellNode(node);
+            YTzoomCollapseCellNode(node);
         }
     }
 }
 
-void YTKACEHandleAdDisplayView(UIView *view) {
-    if (!YTKACEFeatureEnabled(YTKACENoAdsKey) || view.window == nil) return;
-    if (!YTKACEIsAdLayoutIdentifier(view.accessibilityIdentifier)) return;
-    YTKACECollapseHostCell(view);
+void YTzoomHandleAdDisplayView(UIView *view) {
+    if (!YTzoomFeatureEnabled(YTzoomNoAdsKey) || view.window == nil) return;
+    if (!YTzoomIsAdLayoutIdentifier(view.accessibilityIdentifier)) return;
+    YTzoomCollapseHostCell(view);
 }
 
-static id YTKACEElementRenderer(id object) {
+static id YTzoomElementRenderer(id object) {
     SEL selector = NSSelectorFromString(@"elementRenderer");
     return [object respondsToSelector:selector]
         ? ((id (*)(id, SEL))objc_msgSend)(object, selector)
         : nil;
 }
 
-static NSArray *YTKACEFilterAdContents(NSArray *contents, id owner) {
-    if (!YTKACEFeatureEnabled(YTKACENoAdsKey) ||
+static NSArray *YTzoomFilterAdContents(NSArray *contents, id owner) {
+    if (!YTzoomFeatureEnabled(YTzoomNoAdsKey) ||
         ![contents isKindOfClass:NSArray.class] || contents.count == 0) {
         return contents;
     }
     NSMutableArray *filtered = [NSMutableArray arrayWithCapacity:contents.count];
     for (id content in contents) {
-        id renderer = YTKACEElementRenderer(content);
-        BOOL contentAd = YTKACEObjectLooksLikeAd(content);
-        BOOL rendererAd = YTKACEObjectLooksLikeAd(renderer);
+        id renderer = YTzoomElementRenderer(content);
+        BOOL contentAd = YTzoomObjectLooksLikeAd(content);
+        BOOL rendererAd = YTzoomObjectLooksLikeAd(renderer);
         if (!contentAd && !rendererAd) {
             [filtered addObject:content];
         }
@@ -545,39 +545,39 @@ static NSArray *YTKACEFilterAdContents(NSArray *contents, id owner) {
     NSUInteger removed = contents.count - filtered.count;
     if (removed == 0) return contents;
     if (filtered.count == 0 && owner != nil) {
-        objc_setAssociatedObject(owner, YTKACEAdEmptyAssociation, @YES,
+        objc_setAssociatedObject(owner, YTzoomAdEmptyAssociation, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
     return filtered;
 }
 
-static NSArray *YTKACEElementContentsArray(id receiver, SEL selector) {
+static NSArray *YTzoomElementContentsArray(id receiver, SEL selector) {
     NSArray *contents = OriginalElementContentsArray == NULL ? nil :
         ((id (*)(id, SEL))OriginalElementContentsArray)(receiver, selector);
-    return YTKACEFilterAdContents(contents, receiver);
+    return YTzoomFilterAdContents(contents, receiver);
 }
 
-static NSArray *YTKACEItemSectionContentsArray(id receiver, SEL selector) {
+static NSArray *YTzoomItemSectionContentsArray(id receiver, SEL selector) {
     NSArray *contents = OriginalItemSectionContentsArray == NULL ? nil :
         ((id (*)(id, SEL))OriginalItemSectionContentsArray)(receiver, selector);
-    return YTKACEFilterAdContents(contents, receiver);
+    return YTzoomFilterAdContents(contents, receiver);
 }
 
-NSArray *YTKACEFilterAdSections(NSArray *sections) {
-    if (!YTKACEFeatureEnabled(YTKACENoAdsKey) ||
+NSArray *YTzoomFilterAdSections(NSArray *sections) {
+    if (!YTzoomFeatureEnabled(YTzoomNoAdsKey) ||
         ![sections isKindOfClass:NSArray.class] || sections.count == 0) {
         return sections;
     }
     NSMutableArray *filtered = [NSMutableArray arrayWithCapacity:sections.count];
     for (id section in sections) {
-        if (YTKACEObjectLooksLikeAd(section) ||
-            YTKACEObjectLooksLikeAd(YTKACEElementRenderer(section))) {
+        if (YTzoomObjectLooksLikeAd(section) ||
+            YTzoomObjectLooksLikeAd(YTzoomElementRenderer(section))) {
             continue;
         }
-        NSArray *contents = YTKACEObjectValue(section, @"contentsArray");
-        if ([objc_getAssociatedObject(section, YTKACEAdEmptyAssociation) boolValue] ||
+        NSArray *contents = YTzoomObjectValue(section, @"contentsArray");
+        if ([objc_getAssociatedObject(section, YTzoomAdEmptyAssociation) boolValue] ||
             ([contents isKindOfClass:NSArray.class] && contents.count != 0 &&
-             YTKACEFilterAdContents(contents, section).count == 0)) {
+             YTzoomFilterAdContents(contents, section).count == 0)) {
             continue;
         }
         [filtered addObject:section];
@@ -585,163 +585,163 @@ NSArray *YTKACEFilterAdSections(NSArray *sections) {
     return filtered.count == sections.count ? sections : filtered;
 }
 
-static id YTKACENoCompanionAd(id receiver, SEL selector) {
-    return YTKACEFeatureEnabled(YTKACENoAdsKey)
+static id YTzoomNoCompanionAd(id receiver, SEL selector) {
+    return YTzoomFeatureEnabled(YTzoomNoAdsKey)
         ? nil
-        : YTKACECallObjectGetter(OriginalCompanionAd, receiver, selector);
+        : YTzoomCallObjectGetter(OriginalCompanionAd, receiver, selector);
 }
 
-static BOOL YTKACENoCompanionFlag(IMP original, id receiver, SEL selector) {
-    return YTKACEFeatureEnabled(YTKACENoAdsKey)
+static BOOL YTzoomNoCompanionFlag(IMP original, id receiver, SEL selector) {
+    return YTzoomFeatureEnabled(YTzoomNoAdsKey)
         ? NO
-        : YTKACECallBooleanGetter(original, receiver, selector);
+        : YTzoomCallBooleanGetter(original, receiver, selector);
 }
 
-static BOOL YTKACEHasCompanionAdRenderer(id receiver, SEL selector) {
-    return YTKACENoCompanionFlag(
+static BOOL YTzoomHasCompanionAdRenderer(id receiver, SEL selector) {
+    return YTzoomNoCompanionFlag(
         OriginalHasCompanionAdRenderer,
         receiver,
         selector
     );
 }
 
-static BOOL YTKACEHasAppPromoCompanionAdRenderer(id receiver, SEL selector) {
-    return YTKACENoCompanionFlag(
+static BOOL YTzoomHasAppPromoCompanionAdRenderer(id receiver, SEL selector) {
+    return YTzoomNoCompanionFlag(
         OriginalHasAppPromoCompanionAdRenderer,
         receiver,
         selector
     );
 }
 
-static BOOL YTKACEHasShoppingCompanionAdRenderer(id receiver, SEL selector) {
-    return YTKACENoCompanionFlag(
+static BOOL YTzoomHasShoppingCompanionAdRenderer(id receiver, SEL selector) {
+    return YTzoomNoCompanionFlag(
         OriginalHasShoppingCompanionAdRenderer,
         receiver,
         selector
     );
 }
 
-static void YTKACEInstallObjectHookOrMethod(NSString *className,
+static void YTzoomInstallObjectHookOrMethod(NSString *className,
                                             NSString *selectorName,
                                             IMP replacement,
                                             IMP *originalStorage) {
-    if (!YTKACEInstallInstanceHook(
+    if (!YTzoomInstallInstanceHook(
             className,
             selectorName,
             replacement,
             originalStorage
         )) {
-        YTKACEAddInstanceMethod(className, selectorName, replacement, "@@:");
+        YTzoomAddInstanceMethod(className, selectorName, replacement, "@@:");
     }
 }
 
-static void YTKACEInstallBooleanHookOrMethod(NSString *className,
+static void YTzoomInstallBooleanHookOrMethod(NSString *className,
                                              NSString *selectorName,
                                              IMP replacement,
                                              IMP *originalStorage) {
-    if (!YTKACEInstallInstanceHook(
+    if (!YTzoomInstallInstanceHook(
             className,
             selectorName,
             replacement,
             originalStorage
         )) {
-        YTKACEAddInstanceMethod(className, selectorName, replacement, "B@:");
+        YTzoomAddInstanceMethod(className, selectorName, replacement, "B@:");
     }
 }
 
-static void YTKACEAdCellLayoutSubviews(UIView *receiver, SEL selector) {
+static void YTzoomAdCellLayoutSubviews(UIView *receiver, SEL selector) {
     if (OriginalAdCellLayout != NULL) {
         ((void (*)(id, SEL))OriginalAdCellLayout)(receiver, selector);
     }
-    YTKACEHandleAdCellLayout(receiver);
+    YTzoomHandleAdCellLayout(receiver);
 }
 
-static void YTKACEAdCellPrepareForReuse(UIView *receiver, SEL selector) {
-    YTKACEHandleAdCellReuse(receiver);
+static void YTzoomAdCellPrepareForReuse(UIView *receiver, SEL selector) {
+    YTzoomHandleAdCellReuse(receiver);
     if (OriginalAdCellReuse != NULL) {
         ((void (*)(id, SEL))OriginalAdCellReuse)(receiver, selector);
     }
 }
 
-static IMP YTKACEPromotedSizeOriginal(id receiver, SEL selector) {
+static IMP YTzoomPromotedSizeOriginal(id receiver, SEL selector) {
     NSString *key = [NSString stringWithFormat:@"%@|%@",
         NSStringFromClass([receiver class]), NSStringFromSelector(selector)];
-    @synchronized (YTKACEPromotedSizeOriginals) {
-        return (IMP)[YTKACEPromotedSizeOriginals[key] pointerValue];
+    @synchronized (YTzoomPromotedSizeOriginals) {
+        return (IMP)[YTzoomPromotedSizeOriginals[key] pointerValue];
     }
 }
 
-static CGSize YTKACEPromotedCellSize(id receiver, SEL selector, CGSize size) {
-    IMP original = YTKACEPromotedSizeOriginal(receiver, selector);
+static CGSize YTzoomPromotedCellSize(id receiver, SEL selector, CGSize size) {
+    IMP original = YTzoomPromotedSizeOriginal(receiver, selector);
     CGSize resolved = original == NULL
         ? size
         : ((CGSize (*)(id, SEL, CGSize))original)(receiver, selector, size);
-    if (!YTKACEFeatureEnabled(YTKACENoAdsKey)) return resolved;
+    if (!YTzoomFeatureEnabled(YTzoomNoAdsKey)) return resolved;
     return CGSizeMake(resolved.width, 0.0);
 }
 
-static CGSize YTKACEPromotedCellSizeInsets(id receiver, SEL selector,
+static CGSize YTzoomPromotedCellSizeInsets(id receiver, SEL selector,
                                            CGSize size, UIEdgeInsets insets) {
-    IMP original = YTKACEPromotedSizeOriginal(receiver, selector);
+    IMP original = YTzoomPromotedSizeOriginal(receiver, selector);
     CGSize resolved = original == NULL
         ? size
         : ((CGSize (*)(id, SEL, CGSize, UIEdgeInsets))original)(
             receiver, selector, size, insets);
-    if (!YTKACEFeatureEnabled(YTKACENoAdsKey)) return resolved;
+    if (!YTzoomFeatureEnabled(YTzoomNoAdsKey)) return resolved;
     return CGSizeMake(resolved.width, 0.0);
 }
 
-static BOOL YTKACEShouldShowPromotedItems(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(YTKACENoAdsKey)) return NO;
-    IMP original = YTKACEPromotedSizeOriginal(receiver, selector);
+static BOOL YTzoomShouldShowPromotedItems(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(YTzoomNoAdsKey)) return NO;
+    IMP original = YTzoomPromotedSizeOriginal(receiver, selector);
     return original != NULL && ((BOOL (*)(id, SEL))original)(receiver, selector);
 }
 
-static void YTKACEInstallPromotedCellHooks(void) {
-    YTKACEPromotedSizeOriginals = [NSMutableDictionary dictionary];
+static void YTzoomInstallPromotedCellHooks(void) {
+    YTzoomPromotedSizeOriginals = [NSMutableDictionary dictionary];
     NSArray<NSString *> *classes = @[@"YTCompactPromotedItemCellController",
                                      @"YTCompactPromotedVideoCellController",
                                      @"YTPromotedVideoCellController"];
     NSDictionary<NSString *, NSValue *> *replacements = @{
-        @"cellSizeWithSize:": [NSValue valueWithPointer:(void *)YTKACEPromotedCellSize],
+        @"cellSizeWithSize:": [NSValue valueWithPointer:(void *)YTzoomPromotedCellSize],
         @"cellSizeWithSize:safeAreaInsets:":
-            [NSValue valueWithPointer:(void *)YTKACEPromotedCellSizeInsets],
+            [NSValue valueWithPointer:(void *)YTzoomPromotedCellSizeInsets],
         @"shouldShowPromotedItems":
-            [NSValue valueWithPointer:(void *)YTKACEShouldShowPromotedItems]
+            [NSValue valueWithPointer:(void *)YTzoomShouldShowPromotedItems]
     };
     for (NSString *className in classes) {
         for (NSString *selectorName in replacements) {
             IMP original = NULL;
-            if (!YTKACEInstallInstanceHook(className, selectorName,
+            if (!YTzoomInstallInstanceHook(className, selectorName,
                     (IMP)replacements[selectorName].pointerValue, &original)) {
                 continue;
             }
             NSString *key = [NSString stringWithFormat:@"%@|%@",
                 className, selectorName];
-            @synchronized (YTKACEPromotedSizeOriginals) {
-                YTKACEPromotedSizeOriginals[key] =
+            @synchronized (YTzoomPromotedSizeOriginals) {
+                YTzoomPromotedSizeOriginals[key] =
                     [NSValue valueWithPointer:(void *)original];
             }
         }
     }
 }
 
-static BOOL YTKACEIsAdNode(id node) {
-    return [objc_getAssociatedObject(node, YTKACEAdNodeAssociation) boolValue];
+static BOOL YTzoomIsAdNode(id node) {
+    return [objc_getAssociatedObject(node, YTzoomAdNodeAssociation) boolValue];
 }
 
-static void YTKACEVideoNodeSetEntry(id receiver, SEL selector, id entry) {
+static void YTzoomVideoNodeSetEntry(id receiver, SEL selector, id entry) {
     if (OriginalVideoNodeSetEntry != NULL) {
         ((void (*)(id, SEL, id))OriginalVideoNodeSetEntry)(receiver, selector, entry);
     }
-    if (!YTKACEFeatureEnabled(YTKACENoAdsKey)) return;
-    BOOL isAd = YTKACEObjectLooksLikeAd(entry) ||
-        YTKACEObjectLooksLikeAd(YTKACEElementRenderer(entry));
-    objc_setAssociatedObject(receiver, YTKACEAdNodeAssociation,
+    if (!YTzoomFeatureEnabled(YTzoomNoAdsKey)) return;
+    BOOL isAd = YTzoomObjectLooksLikeAd(entry) ||
+        YTzoomObjectLooksLikeAd(YTzoomElementRenderer(entry));
+    objc_setAssociatedObject(receiver, YTzoomAdNodeAssociation,
                              isAd ? @YES : nil,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     if (!isAd) return;
-    YTKACECollapseCellNode(receiver);
+    YTzoomCollapseCellNode(receiver);
     SEL overlay = NSSelectorFromString(@"dismissedCellOverlayView");
     SEL setOverlay = NSSelectorFromString(@"setDismissedCellOverlayView:");
     SEL resize = NSSelectorFromString(@"resizeDismissedView");
@@ -754,7 +754,7 @@ static void YTKACEVideoNodeSetEntry(id receiver, SEL selector, id entry) {
     }
     if (![receiver respondsToSelector:resize]) return;
     dispatch_async(dispatch_get_main_queue(), ^{
-        if (!YTKACEIsAdNode(receiver)) return;
+        if (!YTzoomIsAdNode(receiver)) return;
         ((void (*)(id, SEL))objc_msgSend)(receiver, resize);
         dispatch_after(dispatch_time(DISPATCH_TIME_NOW,
                                      (int64_t)(0.6 * NSEC_PER_SEC)),
@@ -763,170 +763,170 @@ static void YTKACEVideoNodeSetEntry(id receiver, SEL selector, id entry) {
     });
 }
 
-static BOOL YTKACEVideoNodeShouldShrink(id receiver, SEL selector) {
-    if (YTKACEIsAdNode(receiver)) {
+static BOOL YTzoomVideoNodeShouldShrink(id receiver, SEL selector) {
+    if (YTzoomIsAdNode(receiver)) {
         return YES;
     }
     return OriginalVideoNodeShrink != NULL &&
         ((BOOL (*)(id, SEL))OriginalVideoNodeShrink)(receiver, selector);
 }
 
-static double YTKACEVideoNodeHeight(id receiver, SEL selector) {
+static double YTzoomVideoNodeHeight(id receiver, SEL selector) {
     double height = OriginalVideoNodeHeight == NULL
         ? 0.0
         : ((double (*)(id, SEL))OriginalVideoNodeHeight)(receiver, selector);
-    if (!YTKACEIsAdNode(receiver)) return height;
+    if (!YTzoomIsAdNode(receiver)) return height;
     return 0.0;
 }
 
-static CGSize YTKACEVideoNodeSize(id receiver, SEL selector) {
+static CGSize YTzoomVideoNodeSize(id receiver, SEL selector) {
     CGSize size = OriginalVideoNodeSize == NULL
         ? CGSizeZero
         : ((CGSize (*)(id, SEL))OriginalVideoNodeSize)(receiver, selector);
-    if (!YTKACEIsAdNode(receiver)) return size;
+    if (!YTzoomIsAdNode(receiver)) return size;
     return CGSizeMake(size.width, 0.0);
 }
 
-void YTKACEInstallAdsHooks(void) {
-    YTKACEInstallInstanceHook(@"YTVideoWithContextNode", @"setEntry:",
-                              (IMP)YTKACEVideoNodeSetEntry,
+void YTzoomInstallAdsHooks(void) {
+    YTzoomInstallInstanceHook(@"YTVideoWithContextNode", @"setEntry:",
+                              (IMP)YTzoomVideoNodeSetEntry,
                               &OriginalVideoNodeSetEntry);
-    YTKACEInstallInstanceHook(@"YTVideoWithContextNode", @"yt_height",
-                              (IMP)YTKACEVideoNodeHeight,
+    YTzoomInstallInstanceHook(@"YTVideoWithContextNode", @"yt_height",
+                              (IMP)YTzoomVideoNodeHeight,
                               &OriginalVideoNodeHeight);
-    YTKACEInstallInstanceHook(@"YTVideoWithContextNode", @"yt_size",
-                              (IMP)YTKACEVideoNodeSize,
+    YTzoomInstallInstanceHook(@"YTVideoWithContextNode", @"yt_size",
+                              (IMP)YTzoomVideoNodeSize,
                               &OriginalVideoNodeSize);
-    YTKACEInstallInstanceHook(@"YTVideoWithContextNode",
+    YTzoomInstallInstanceHook(@"YTVideoWithContextNode",
                               @"shouldShrinkDismissalView",
-                              (IMP)YTKACEVideoNodeShouldShrink,
+                              (IMP)YTzoomVideoNodeShouldShrink,
                               &OriginalVideoNodeShrink);
-    YTKACEInstallPromotedCellHooks();
-    YTKACEInstallInstanceHook(@"_ASCollectionViewCell",
+    YTzoomInstallPromotedCellHooks();
+    YTzoomInstallInstanceHook(@"_ASCollectionViewCell",
                               @"layoutSubviews",
-                              (IMP)YTKACEAdCellLayoutSubviews,
+                              (IMP)YTzoomAdCellLayoutSubviews,
                               &OriginalAdCellLayout);
-    YTKACEInstallInstanceHook(@"_ASCollectionViewCell",
+    YTzoomInstallInstanceHook(@"_ASCollectionViewCell",
                               @"prepareForReuse",
-                              (IMP)YTKACEAdCellPrepareForReuse,
+                              (IMP)YTzoomAdCellPrepareForReuse,
                               &OriginalAdCellReuse);
-    YTKACEInstallInstanceHook(@"YTGlobalConfig",
+    YTzoomInstallInstanceHook(@"YTGlobalConfig",
                               @"shouldBlockUpgradeDialog",
-                              (IMP)YTKACEShouldBlockUpgradeDialog,
+                              (IMP)YTzoomShouldBlockUpgradeDialog,
                               &OriginalShouldBlockUpgradeDialog);
-    YTKACEInstallClassHook(@"YTAdShieldUtils",
+    YTzoomInstallClassHook(@"YTAdShieldUtils",
                            @"spamSignalsDictionary",
-                           (IMP)YTKACEAdShieldSignals,
+                           (IMP)YTzoomAdShieldSignals,
                            &OriginalAdShieldSignals);
-    YTKACEInstallClassHook(@"YTAdShieldUtils",
+    YTzoomInstallClassHook(@"YTAdShieldUtils",
                            @"spamSignalsDictionaryWithoutIDFA",
-                           (IMP)YTKACEAdShieldSignalsWithoutIDFA,
+                           (IMP)YTzoomAdShieldSignalsWithoutIDFA,
                            &OriginalAdShieldSignalsWithoutIDFA);
-    YTKACEInstallClassHook(@"YTDataUtils",
+    YTzoomInstallClassHook(@"YTDataUtils",
                            @"spamSignalsDictionary",
-                           (IMP)YTKACEDataSignals,
+                           (IMP)YTzoomDataSignals,
                            &OriginalDataSignals);
-    YTKACEInstallClassHook(@"YTDataUtils",
+    YTzoomInstallClassHook(@"YTDataUtils",
                            @"spamSignalsDictionaryWithoutIDFA",
-                           (IMP)YTKACEDataSignalsWithoutIDFA,
+                           (IMP)YTzoomDataSignalsWithoutIDFA,
                            &OriginalDataSignalsWithoutIDFA);
-    YTKACEInstallInstanceHook(@"YTAdsInnerTubeContextDecorator",
+    YTzoomInstallInstanceHook(@"YTAdsInnerTubeContextDecorator",
                               @"decorateContext:",
-                              (IMP)YTKACEAdsDecorateContext,
+                              (IMP)YTzoomAdsDecorateContext,
                               &OriginalAdsDecorateContext);
-    YTKACEInstallInstanceHook(@"YTAccountScopedAdsInnerTubeContextDecorator",
+    YTzoomInstallInstanceHook(@"YTAccountScopedAdsInnerTubeContextDecorator",
                               @"decorateContext:",
-                              (IMP)YTKACEAccountAdsDecorateContext,
+                              (IMP)YTzoomAccountAdsDecorateContext,
                               &OriginalAccountAdsDecorateContext);
 
-    YTKACEInstallObjectHookOrMethod(@"YTIPlayerResponse",
+    YTzoomInstallObjectHookOrMethod(@"YTIPlayerResponse",
                                     @"playerAdsArray",
-                                    (IMP)YTKACEPlayerAdsArray,
+                                    (IMP)YTzoomPlayerAdsArray,
                                     &OriginalPlayerAdsArray);
-    YTKACEInstallObjectHookOrMethod(@"YTIPlayerResponse",
+    YTzoomInstallObjectHookOrMethod(@"YTIPlayerResponse",
                                     @"adSlotsArray",
-                                    (IMP)YTKACEAdSlotsArray,
+                                    (IMP)YTzoomAdSlotsArray,
                                     &OriginalAdSlotsArray);
-    YTKACEInstallObjectHookOrMethod(@"YTIPlayerResponse",
+    YTzoomInstallObjectHookOrMethod(@"YTIPlayerResponse",
                                     @"adPlacementsArray",
-                                    (IMP)YTKACEAdPlacementsArray,
+                                    (IMP)YTzoomAdPlacementsArray,
                                     &OriginalAdPlacementsArray);
-    YTKACEInstallInstanceHook(@"YTIPlayerResponse",
+    YTzoomInstallInstanceHook(@"YTIPlayerResponse",
                               @"adBreakParams",
-                              (IMP)YTKACEAdBreakParams,
+                              (IMP)YTzoomAdBreakParams,
                               &OriginalAdBreakParams);
-    YTKACEInstallInstanceHook(@"YTIPlayerResponse",
+    YTzoomInstallInstanceHook(@"YTIPlayerResponse",
                               @"adNextParams",
-                              (IMP)YTKACEAdNextParams,
+                              (IMP)YTzoomAdNextParams,
                               &OriginalAdNextParams);
-    YTKACEInstallInstanceHook(@"YTIPlayerResponse",
+    YTzoomInstallInstanceHook(@"YTIPlayerResponse",
                               @"adParams",
-                              (IMP)YTKACEAdParams,
+                              (IMP)YTzoomAdParams,
                               &OriginalAdParams);
-    YTKACEInstallBooleanHookOrMethod(@"YTIClientMdxGlobalConfig",
+    YTzoomInstallBooleanHookOrMethod(@"YTIClientMdxGlobalConfig",
                                      @"enableSkippableAd",
-                                     (IMP)YTKACEEnableSkippableAd,
+                                     (IMP)YTzoomEnableSkippableAd,
                                      &OriginalEnableSkippableAd);
 
-    YTKACEInstallInstanceHook(@"MDXSessionImpl",
+    YTzoomInstallInstanceHook(@"MDXSessionImpl",
                               @"adPlaying:",
-                              (IMP)YTKACEMDXSessionImplAdPlaying,
+                              (IMP)YTzoomMDXSessionImplAdPlaying,
                               &OriginalMDXSessionImplAdPlaying);
-    YTKACEInstallInstanceHook(@"MDXSession",
+    YTzoomInstallInstanceHook(@"MDXSession",
                               @"adPlaying:",
-                              (IMP)YTKACEMDXSessionAdPlaying,
+                              (IMP)YTzoomMDXSessionAdPlaying,
                               &OriginalMDXSessionAdPlaying);
-    YTKACEInstallInstanceHook(@"YTLocalPlaybackController",
+    YTzoomInstallInstanceHook(@"YTLocalPlaybackController",
                               @"isPlayingAd",
-                              (IMP)YTKACEIsPlayingAd,
+                              (IMP)YTzoomIsPlayingAd,
                               &OriginalIsPlayingAd);
-    YTKACEInstallInstanceHook(@"YTLocalPlaybackController",
+    YTzoomInstallInstanceHook(@"YTLocalPlaybackController",
                               @"isPlayingAdSurvey",
-                              (IMP)YTKACEIsPlayingAdSurvey,
+                              (IMP)YTzoomIsPlayingAdSurvey,
                               &OriginalIsPlayingAdSurvey);
-    YTKACEInstallInstanceHook(@"YTLocalPlaybackController",
+    YTzoomInstallInstanceHook(@"YTLocalPlaybackController",
                               @"isPlayingAdIntro",
-                              (IMP)YTKACEIsPlayingAdIntro,
+                              (IMP)YTzoomIsPlayingAdIntro,
                               &OriginalIsPlayingAdIntro);
-    YTKACEInstallInstanceHook(@"YTLocalPlaybackController",
+    YTzoomInstallInstanceHook(@"YTLocalPlaybackController",
                               @"createAdsPlaybackCoordinator",
-                              (IMP)YTKACENoAdsPlaybackCoordinator,
+                              (IMP)YTzoomNoAdsPlaybackCoordinator,
                               &OriginalCreateAdsPlaybackCoordinator);
 
-    YTKACEInstallInstanceHook(@"YTReelDataSource",
+    YTzoomInstallInstanceHook(@"YTReelDataSource",
                               @"makeContentModelForEntry:",
-                              (IMP)YTKACEReelContentModel,
+                              (IMP)YTzoomReelContentModel,
                               &OriginalReelContentModel);
-    YTKACEInstallInstanceHook(@"YTReelInfinitePlaybackDataSource",
+    YTzoomInstallInstanceHook(@"YTReelInfinitePlaybackDataSource",
                               @"makeContentModelForEntry:",
-                              (IMP)YTKACEInfiniteReelContentModel,
+                              (IMP)YTzoomInfiniteReelContentModel,
                               &OriginalInfiniteReelContentModel);
-    YTKACEInstallInstanceHook(@"YTReelContentModel",
+    YTzoomInstallInstanceHook(@"YTReelContentModel",
                               @"shouldDisplay",
-                              (IMP)YTKACEReelShouldDisplay,
+                              (IMP)YTzoomReelShouldDisplay,
                               &OriginalReelShouldDisplay);
-    YTKACEInstallInstanceHook(@"YTIElementRenderer",
+    YTzoomInstallInstanceHook(@"YTIElementRenderer",
                               @"companionAd",
-                              (IMP)YTKACENoCompanionAd,
+                              (IMP)YTzoomNoCompanionAd,
                               &OriginalCompanionAd);
-    YTKACEInstallInstanceHook(@"YTIElementRenderer",
+    YTzoomInstallInstanceHook(@"YTIElementRenderer",
                               @"hasCompanionAdRenderer",
-                              (IMP)YTKACEHasCompanionAdRenderer,
+                              (IMP)YTzoomHasCompanionAdRenderer,
                               &OriginalHasCompanionAdRenderer);
-    YTKACEInstallInstanceHook(@"YTIElementRenderer",
+    YTzoomInstallInstanceHook(@"YTIElementRenderer",
                               @"hasAppPromoCompanionAdRenderer",
-                              (IMP)YTKACEHasAppPromoCompanionAdRenderer,
+                              (IMP)YTzoomHasAppPromoCompanionAdRenderer,
                               &OriginalHasAppPromoCompanionAdRenderer);
-    YTKACEInstallInstanceHook(@"YTIElementRenderer",
+    YTzoomInstallInstanceHook(@"YTIElementRenderer",
                               @"hasShoppingCompanionAdRenderer",
-                              (IMP)YTKACEHasShoppingCompanionAdRenderer,
+                              (IMP)YTzoomHasShoppingCompanionAdRenderer,
                               &OriginalHasShoppingCompanionAdRenderer);
-    YTKACEInstallInstanceHook(@"YTIElementRenderer",
+    YTzoomInstallInstanceHook(@"YTIElementRenderer",
                               @"contentsArray",
-                              (IMP)YTKACEElementContentsArray,
+                              (IMP)YTzoomElementContentsArray,
                               &OriginalElementContentsArray);
-    YTKACEInstallInstanceHook(@"YTIItemSectionRenderer",
+    YTzoomInstallInstanceHook(@"YTIItemSectionRenderer",
                               @"contentsArray",
-                              (IMP)YTKACEItemSectionContentsArray,
+                              (IMP)YTzoomItemSectionContentsArray,
                               &OriginalItemSectionContentsArray);
 }

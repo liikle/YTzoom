@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../Downloads/DownloadLog.h"
@@ -7,8 +7,8 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static NSString *const YTKACEPreventShortsOpenKey =
-    @"YTKACE.Preference.Shorts.PreventAutoOpen";
+static NSString *const YTzoomPreventShortsOpenKey =
+    @"YTzoom.Preference.Shorts.PreventAutoOpen";
 
 static IMP OriginalEligibilityModern;
 static IMP OriginalEligibilityLegacy;
@@ -18,8 +18,8 @@ static IMP OriginalResumeToShorts;
 static IMP OriginalShortsTargeted;
 static IMP OriginalLaunchToShorts;
 
-static BOOL YTKACEStartupTabIsOther(void) {
-    id stored = [NSUserDefaults.standardUserDefaults objectForKey:@"YTKACE.Preference.Tabs.Startup"];
+static BOOL YTzoomStartupTabIsOther(void) {
+    id stored = [NSUserDefaults.standardUserDefaults objectForKey:@"YTzoom.Preference.Tabs.Startup"];
     if ([stored isKindOfClass:NSString.class]) {
         NSString *token = stored;
         return token.length != 0 && ![token isEqualToString:@"shorts"];
@@ -28,16 +28,16 @@ static BOOL YTKACEStartupTabIsOther(void) {
     return index > 0 && index != 3;
 }
 
-static BOOL YTKACEPreventShortsOpen(void) {
-    return YTKACEFeatureEnabled(YTKACEPreventShortsOpenKey) || YTKACEStartupTabIsOther();
+static BOOL YTzoomPreventShortsOpen(void) {
+    return YTzoomFeatureEnabled(YTzoomPreventShortsOpenKey) || YTzoomStartupTabIsOther();
 }
 
-static BOOL YTKACEEligibilityModern(id receiver,
+static BOOL YTzoomEligibilityModern(id receiver,
                                     SEL selector,
                                     id launchOptions,
                                     id sceneOptions) {
-    if (YTKACEPreventShortsOpen()) {
-        YTKACEDownloadLog(@"shorts", @"eligibility suppressed");
+    if (YTzoomPreventShortsOpen()) {
+        YTzoomDownloadLog(@"shorts", @"eligibility suppressed");
         return NO;
     }
     return OriginalEligibilityModern == NULL ? NO
@@ -45,12 +45,12 @@ static BOOL YTKACEEligibilityModern(id receiver,
             receiver, selector, launchOptions, sceneOptions);
 }
 
-static BOOL YTKACEEligibilityLegacy(id receiver,
+static BOOL YTzoomEligibilityLegacy(id receiver,
                                     SEL selector,
                                     long long applicationState,
                                     id launchOptions) {
-    if (YTKACEPreventShortsOpen()) {
-        YTKACEDownloadLog(@"shorts", @"eligibility suppressed");
+    if (YTzoomPreventShortsOpen()) {
+        YTzoomDownloadLog(@"shorts", @"eligibility suppressed");
         return NO;
     }
     return OriginalEligibilityLegacy == NULL ? NO
@@ -58,13 +58,13 @@ static BOOL YTKACEEligibilityLegacy(id receiver,
             receiver, selector, applicationState, launchOptions);
 }
 
-static BOOL YTKACEExecuteModern(id receiver,
+static BOOL YTzoomExecuteModern(id receiver,
                                 SEL selector,
                                 id responder,
                                 id launchOptions,
                                 id sceneOptions) {
-    if (YTKACEPreventShortsOpen()) {
-        YTKACEDownloadLog(@"shorts", @"execution suppressed");
+    if (YTzoomPreventShortsOpen()) {
+        YTzoomDownloadLog(@"shorts", @"execution suppressed");
         return NO;
     }
     return OriginalExecuteModern == NULL ? NO
@@ -72,13 +72,13 @@ static BOOL YTKACEExecuteModern(id receiver,
             receiver, selector, responder, launchOptions, sceneOptions);
 }
 
-static BOOL YTKACEExecuteLegacy(id receiver,
+static BOOL YTzoomExecuteLegacy(id receiver,
                                 SEL selector,
                                 id responder,
                                 long long applicationState,
                                 id launchOptions) {
-    if (YTKACEPreventShortsOpen()) {
-        YTKACEDownloadLog(@"shorts", @"execution suppressed");
+    if (YTzoomPreventShortsOpen()) {
+        YTzoomDownloadLog(@"shorts", @"execution suppressed");
         return NO;
     }
     return OriginalExecuteLegacy == NULL ? NO
@@ -86,25 +86,25 @@ static BOOL YTKACEExecuteLegacy(id receiver,
             receiver, selector, responder, applicationState, launchOptions);
 }
 
-static id YTKACEResumeToShorts(id receiver, SEL selector) {
-    if (YTKACEPreventShortsOpen()) return nil;
+static id YTzoomResumeToShorts(id receiver, SEL selector) {
+    if (YTzoomPreventShortsOpen()) return nil;
     return OriginalResumeToShorts == NULL ? nil
         : ((id (*)(id, SEL))OriginalResumeToShorts)(receiver, selector);
 }
 
-static id YTKACEShortsTargeted(id receiver, SEL selector) {
-    if (YTKACEPreventShortsOpen()) return nil;
+static id YTzoomShortsTargeted(id receiver, SEL selector) {
+    if (YTzoomPreventShortsOpen()) return nil;
     return OriginalShortsTargeted == NULL ? nil
         : ((id (*)(id, SEL))OriginalShortsTargeted)(receiver, selector);
 }
 
-static id YTKACELaunchToShorts(id receiver, SEL selector) {
-    if (YTKACEPreventShortsOpen()) return nil;
+static id YTzoomLaunchToShorts(id receiver, SEL selector) {
+    if (YTzoomPreventShortsOpen()) return nil;
     return OriginalLaunchToShorts == NULL ? nil
         : ((id (*)(id, SEL))OriginalLaunchToShorts)(receiver, selector);
 }
 
-void YTKACEInstallShortsStartupHooks(void) {
+void YTzoomInstallShortsStartupHooks(void) {
     NSString *coordinator = nil;
     for (NSString *name in @[@"YTShortsStartupCoordinatorImpl",
                              @"YTShortsStartupCoordinator"]) {
@@ -114,39 +114,39 @@ void YTKACEInstallShortsStartupHooks(void) {
         }
     }
     if (coordinator == nil) {
-        YTKACEDownloadLog(@"shorts", @"startup coordinator not found");
+        YTzoomDownloadLog(@"shorts", @"startup coordinator not found");
         return;
     }
 
-    const BOOL eligibilityModern = YTKACEInstallInstanceHook(
+    const BOOL eligibilityModern = YTzoomInstallInstanceHook(
         coordinator,
         @"evaluateShortsStartupEligibilityWithLaunchOptions:sceneConnectionOptions:",
-        (IMP)YTKACEEligibilityModern, &OriginalEligibilityModern);
-    const BOOL eligibilityLegacy = YTKACEInstallInstanceHook(
+        (IMP)YTzoomEligibilityModern, &OriginalEligibilityModern);
+    const BOOL eligibilityLegacy = YTzoomInstallInstanceHook(
         coordinator,
         @"evaluateShortsStartupEligibilityWithApplicationState:launchOptions:",
-        (IMP)YTKACEEligibilityLegacy, &OriginalEligibilityLegacy);
-    const BOOL executeModern = YTKACEInstallInstanceHook(
+        (IMP)YTzoomEligibilityLegacy, &OriginalEligibilityLegacy);
+    const BOOL executeModern = YTzoomInstallInstanceHook(
         coordinator,
         @"executeStartupWithResponder:launchOptions:sceneConnectionOptions:",
-        (IMP)YTKACEExecuteModern, &OriginalExecuteModern);
-    const BOOL executeLegacy = YTKACEInstallInstanceHook(
+        (IMP)YTzoomExecuteModern, &OriginalExecuteModern);
+    const BOOL executeLegacy = YTzoomInstallInstanceHook(
         coordinator,
         @"executeStartupWithResponder:applicationState:launchOptions:",
-        (IMP)YTKACEExecuteLegacy, &OriginalExecuteLegacy);
-    const BOOL resume = YTKACEInstallInstanceHook(
+        (IMP)YTzoomExecuteLegacy, &OriginalExecuteLegacy);
+    const BOOL resume = YTzoomInstallInstanceHook(
         coordinator, @"evaluateResumeToShorts",
-        (IMP)YTKACEResumeToShorts, &OriginalResumeToShorts);
-    const BOOL targeted = YTKACEInstallInstanceHook(
+        (IMP)YTzoomResumeToShorts, &OriginalResumeToShorts);
+    const BOOL targeted = YTzoomInstallInstanceHook(
         coordinator, @"evaluateShortsTargeted",
-        (IMP)YTKACEShortsTargeted, &OriginalShortsTargeted);
-    const BOOL launch = YTKACEInstallInstanceHook(
+        (IMP)YTzoomShortsTargeted, &OriginalShortsTargeted);
+    const BOOL launch = YTzoomInstallInstanceHook(
         coordinator, @"launchToShorts",
-        (IMP)YTKACELaunchToShorts, &OriginalLaunchToShorts);
+        (IMP)YTzoomLaunchToShorts, &OriginalLaunchToShorts);
 
-    YTKACEDownloadLog(@"shorts",
+    YTzoomDownloadLog(@"shorts",
                       @"startup hooks on %@ em=%d el=%d xm=%d xl=%d r=%d t=%d l=%d enabled=%d",
                       coordinator, eligibilityModern, eligibilityLegacy,
                       executeModern, executeLegacy, resume, targeted, launch,
-                      YTKACEPreventShortsOpen());
+                      YTzoomPreventShortsOpen());
 }

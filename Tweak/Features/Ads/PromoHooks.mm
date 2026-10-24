@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../Downloads/DownloadLog.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
@@ -14,53 +14,53 @@ static IMP OriginalShouldShowUpgradeDialog;
 static IMP OriginalYouTherePrompt;
 static IMP OriginalThrottleInterstitial;
 
-static BOOL YTKACEHidePromos(void) {
-    return YTKACEFeatureEnabled(@"YTKACE.Preference.Ads.PremiumPromosHidden");
+static BOOL YTzoomHidePromos(void) {
+    return YTzoomFeatureEnabled(@"YTzoom.Preference.Ads.PremiumPromosHidden");
 }
 
-static void YTKACEMealbarPromo(id receiver, SEL selector, id event) {
-    if (!YTKACEHidePromos() && OriginalMealbarPromo != NULL) {
+static void YTzoomMealbarPromo(id receiver, SEL selector, id event) {
+    if (!YTzoomHidePromos() && OriginalMealbarPromo != NULL) {
         ((void (*)(id, SEL, id))OriginalMealbarPromo)(receiver, selector, event);
     }
 }
 
-static void YTKACEPromosheet(id receiver, SEL selector, id event) {
-    if (!YTKACEHidePromos() && OriginalPromosheet != NULL) {
+static void YTzoomPromosheet(id receiver, SEL selector, id event) {
+    if (!YTzoomHidePromos() && OriginalPromosheet != NULL) {
         ((void (*)(id, SEL, id))OriginalPromosheet)(receiver, selector, event);
     }
 }
 
-static void YTKACEUpgradeDialog(id receiver, SEL selector) {
-    if (!YTKACEHidePromos() && OriginalUpgradeDialog != NULL) {
+static void YTzoomUpgradeDialog(id receiver, SEL selector) {
+    if (!YTzoomHidePromos() && OriginalUpgradeDialog != NULL) {
         ((void (*)(id, SEL))OriginalUpgradeDialog)(receiver, selector);
     }
 }
 
-static void YTKACEOldUpgradeDialog(id receiver, SEL selector) {
-    if (!YTKACEHidePromos() && OriginalOldUpgradeDialog != NULL) {
+static void YTzoomOldUpgradeDialog(id receiver, SEL selector) {
+    if (!YTzoomHidePromos() && OriginalOldUpgradeDialog != NULL) {
         ((void (*)(id, SEL))OriginalOldUpgradeDialog)(receiver, selector);
     }
 }
 
-static BOOL YTKACEShouldShowUpgrade(id receiver, SEL selector) {
-    return YTKACEHidePromos() ? NO :
+static BOOL YTzoomShouldShowUpgrade(id receiver, SEL selector) {
+    return YTzoomHidePromos() ? NO :
         (OriginalShouldShowUpgrade != NULL &&
          ((BOOL (*)(id, SEL))OriginalShouldShowUpgrade)(receiver, selector));
 }
 
-static BOOL YTKACEShouldShowUpgradeDialog(id receiver, SEL selector) {
-    return YTKACEHidePromos() ? NO :
+static BOOL YTzoomShouldShowUpgradeDialog(id receiver, SEL selector) {
+    return YTzoomHidePromos() ? NO :
         (OriginalShouldShowUpgradeDialog != NULL &&
          ((BOOL (*)(id, SEL))OriginalShouldShowUpgradeDialog)(receiver, selector));
 }
 
-static BOOL YTKACEShouldShowYouThere(id receiver, SEL selector) {
-    return YTKACEHidePromos() ? NO :
+static BOOL YTzoomShouldShowYouThere(id receiver, SEL selector) {
+    return YTzoomHidePromos() ? NO :
         (OriginalYouTherePrompt != NULL &&
          ((BOOL (*)(id, SEL))OriginalYouTherePrompt)(receiver, selector));
 }
 
-static BOOL YTKACEInterstitialIsPromo(id command, NSString **outMatch) {
+static BOOL YTzoomInterstitialIsPromo(id command, NSString **outMatch) {
     if (command == nil) return NO;
     NSString *text = [[command description] lowercaseString];
     if (text.length == 0) return NO;
@@ -79,10 +79,10 @@ static BOOL YTKACEInterstitialIsPromo(id command, NSString **outMatch) {
     return NO;
 }
 
-static BOOL YTKACEShouldThrottleInterstitial(id receiver, SEL selector) {
-    if (YTKACEHidePromos()) {
+static BOOL YTzoomShouldThrottleInterstitial(id receiver, SEL selector) {
+    if (YTzoomHidePromos()) {
         NSString *match = nil;
-        BOOL promo = YTKACEInterstitialIsPromo(receiver, &match);
+        BOOL promo = YTzoomInterstitialIsPromo(receiver, &match);
         if (promo) {
             return YES;
         }
@@ -91,33 +91,33 @@ static BOOL YTKACEShouldThrottleInterstitial(id receiver, SEL selector) {
         ((BOOL (*)(id, SEL))OriginalThrottleInterstitial)(receiver, selector);
 }
 
-void YTKACEInstallPromoHooks(void) {
-    YTKACEInstallInstanceHook(@"YTMealbarPromoController",
+void YTzoomInstallPromoHooks(void) {
+    YTzoomInstallInstanceHook(@"YTMealbarPromoController",
                               @"showMealbarPromoWithEvent:",
-                              (IMP)YTKACEMealbarPromo,
+                              (IMP)YTzoomMealbarPromo,
                               &OriginalMealbarPromo);
-    YTKACEInstallInstanceHook(@"YTPromosheetController",
+    YTzoomInstallInstanceHook(@"YTPromosheetController",
                               @"presentPromosheetWithEvent:",
-                              (IMP)YTKACEPromosheet,
+                              (IMP)YTzoomPromosheet,
                               &OriginalPromosheet);
-    YTKACEInstallInstanceHook(@"YTUpgradeController", @"showUpgradeDialog",
-                              (IMP)YTKACEUpgradeDialog,
+    YTzoomInstallInstanceHook(@"YTUpgradeController", @"showUpgradeDialog",
+                              (IMP)YTzoomUpgradeDialog,
                               &OriginalUpgradeDialog);
-    YTKACEInstallInstanceHook(@"YTUpgradeController", @"showOldUpgradeDialog",
-                              (IMP)YTKACEOldUpgradeDialog,
+    YTzoomInstallInstanceHook(@"YTUpgradeController", @"showOldUpgradeDialog",
+                              (IMP)YTzoomOldUpgradeDialog,
                               &OriginalOldUpgradeDialog);
-    YTKACEInstallInstanceHook(@"YTGlobalConfig", @"shouldShowUpgrade",
-                              (IMP)YTKACEShouldShowUpgrade,
+    YTzoomInstallInstanceHook(@"YTGlobalConfig", @"shouldShowUpgrade",
+                              (IMP)YTzoomShouldShowUpgrade,
                               &OriginalShouldShowUpgrade);
-    YTKACEInstallInstanceHook(@"YTGlobalConfig", @"shouldShowUpgradeDialog",
-                              (IMP)YTKACEShouldShowUpgradeDialog,
+    YTzoomInstallInstanceHook(@"YTGlobalConfig", @"shouldShowUpgradeDialog",
+                              (IMP)YTzoomShouldShowUpgradeDialog,
                               &OriginalShouldShowUpgradeDialog);
-    YTKACEInstallInstanceHook(@"YTYouThereControllerImpl",
+    YTzoomInstallInstanceHook(@"YTYouThereControllerImpl",
                               @"shouldShowYouTherePrompt",
-                              (IMP)YTKACEShouldShowYouThere,
+                              (IMP)YTzoomShouldShowYouThere,
                               &OriginalYouTherePrompt);
-    YTKACEInstallInstanceHook(@"YTIShowFullscreenInterstitialCommand",
+    YTzoomInstallInstanceHook(@"YTIShowFullscreenInterstitialCommand",
                               @"shouldThrottleInterstitial",
-                              (IMP)YTKACEShouldThrottleInterstitial,
+                              (IMP)YTzoomShouldThrottleInterstitial,
                               &OriginalThrottleInterstitial);
 }

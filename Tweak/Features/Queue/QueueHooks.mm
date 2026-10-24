@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Localization.h"
 #import "../../Runtime/Preferences.h"
@@ -9,23 +9,23 @@
 #import <UIKit/UIKit.h>
 #import <objc/message.h>
 
-static NSString *const YTKACEQueueKey = @"YTKACE.Preference.Playback.LocalQueue";
+static NSString *const YTzoomQueueKey = @"YTzoom.Preference.Playback.LocalQueue";
 
-static NSString *YTKACEQueueClip(id object, NSUInteger limit);
-static NSUInteger YTKACEQueueIndexOfVideo(NSString *videoID);
-static NSUInteger YTKACEQueueEnsureCurrent(void);
-static id YTKACEQueueItemMenu(NSString *videoID);
-static BOOL YTKACEQueueIsActive(void);
-static NSString *YTKACEQueueCurrentVideoID(void);
-static id YTKACEQueueValue(id object, NSArray<NSString *> *keys);
-static id YTKACEQueueSentinelCommand(NSString *action, NSString *videoID);
-static void YTKACEQueueRefreshPanel(void);
-static void YTKACEQueueRebuildWatchPage(void);
-static void YTKACEQueueRestoreLoopMode(id controller);
-static long long YTKACEQueueSavedLoopMode(void);
-static void YTKACEQueueStoreLoopMode(long long mode);
-static void YTKACEQueueApplyLoopMode(id controller, long long mode);
-static void YTKACEQueueAppendToController(NSDictionary *entry,
+static NSString *YTzoomQueueClip(id object, NSUInteger limit);
+static NSUInteger YTzoomQueueIndexOfVideo(NSString *videoID);
+static NSUInteger YTzoomQueueEnsureCurrent(void);
+static id YTzoomQueueItemMenu(NSString *videoID);
+static BOOL YTzoomQueueIsActive(void);
+static NSString *YTzoomQueueCurrentVideoID(void);
+static id YTzoomQueueValue(id object, NSArray<NSString *> *keys);
+static id YTzoomQueueSentinelCommand(NSString *action, NSString *videoID);
+static void YTzoomQueueRefreshPanel(void);
+static void YTzoomQueueRebuildWatchPage(void);
+static void YTzoomQueueRestoreLoopMode(id controller);
+static long long YTzoomQueueSavedLoopMode(void);
+static void YTzoomQueueStoreLoopMode(long long mode);
+static void YTzoomQueueApplyLoopMode(id controller, long long mode);
+static void YTzoomQueueAppendToController(NSDictionary *entry,
                                           NSUInteger insertIndex);
 
 static IMP OriginalDiscoveryExecute;
@@ -57,7 +57,7 @@ static IMP OriginalCellPrepareForReuse;
 static IMP OriginalAlphaForIndex;
 static IMP OriginalUpdateCellForIndex;
 static IMP OriginalSlideLayoutSubviews;
-static NSTimeInterval YTKACEQueueActiveVideoTime;
+static NSTimeInterval YTzoomQueueActiveVideoTime;
 static IMP OriginalSetVideoCountText;
 static IMP OriginalDidTapShuffle;
 static IMP OriginalDidTapLoop;
@@ -69,30 +69,30 @@ static IMP OriginalQueueHasPrevious;
 static IMP OriginalNextNavigable;
 static IMP OriginalPreviousNavigable;
 static IMP OriginalPanelByline;
-static NSString *const YTKACEQueueLoopKey = @"YTKACE.Preference.Playback.QueueLoopMode";
-static __weak id YTKACEQueuePlayerViewController;
-static NSString *YTKACEQueueCurrentOverride;
-static NSString *YTKACEQueueActiveVideo;
-static __weak id YTKACEQueuePanelController;
-static __weak id YTKACEQueueControllerInstance;
-static id YTKACELastWatchNextResponse;
-static BOOL YTKACEQueuePanelInjected;
-static __weak id YTKACEQueueWatchViewController;
+static NSString *const YTzoomQueueLoopKey = @"YTzoom.Preference.Playback.QueueLoopMode";
+static __weak id YTzoomQueuePlayerViewController;
+static NSString *YTzoomQueueCurrentOverride;
+static NSString *YTzoomQueueActiveVideo;
+static __weak id YTzoomQueuePanelController;
+static __weak id YTzoomQueueControllerInstance;
+static id YTzoomLastWatchNextResponse;
+static BOOL YTzoomQueuePanelInjected;
+static __weak id YTzoomQueueWatchViewController;
 static IMP OriginalRouterHandle;
 static IMP OriginalRouterHandleCompletion;
 static IMP OriginalScopedRouterHandle;
 static IMP OriginalScopedRouterHandleCompletion;
 
-static NSMutableArray<NSDictionary *> *YTKACEQueueItems;
-static __weak id YTKACEQueueResponder;
-static NSString *YTKACEQueueActiveVideoID;
-static NSString *YTKACEQueueAdvancedFromVideoID;
+static NSMutableArray<NSDictionary *> *YTzoomQueueItems;
+static __weak id YTzoomQueueResponder;
+static NSString *YTzoomQueueActiveVideoID;
+static NSString *YTzoomQueueAdvancedFromVideoID;
 
-static NSString *YTKACEQueueStorePath(void) {
+static NSString *YTzoomQueueStorePath(void) {
     NSString *documents = NSSearchPathForDirectoriesInDomains(
         NSDocumentDirectory, NSUserDomainMask, YES).firstObject;
     if (documents.length == 0) return nil;
-    NSString *folder = [documents stringByAppendingPathComponent:@"YTKACE"];
+    NSString *folder = [documents stringByAppendingPathComponent:@"YTzoom"];
     [NSFileManager.defaultManager createDirectoryAtPath:folder
                             withIntermediateDirectories:YES
                                              attributes:nil
@@ -100,39 +100,39 @@ static NSString *YTKACEQueueStorePath(void) {
     return [folder stringByAppendingPathComponent:@"queue.plist"];
 }
 
-static void YTKACEQueueSave(void) {
-    NSString *path = YTKACEQueueStorePath();
+static void YTzoomQueueSave(void) {
+    NSString *path = YTzoomQueueStorePath();
     if (path.length == 0) return;
-    if (YTKACEQueueItems.count == 0) {
+    if (YTzoomQueueItems.count == 0) {
         [NSFileManager.defaultManager removeItemAtPath:path error:NULL];
         return;
     }
-    [YTKACEQueueItems writeToFile:path atomically:YES];
+    [YTzoomQueueItems writeToFile:path atomically:YES];
 }
 
-static NSMutableArray<NSDictionary *> *YTKACEQueue(void) {
-    if (YTKACEQueueItems != nil) return YTKACEQueueItems;
-    NSString *path = YTKACEQueueStorePath();
+static NSMutableArray<NSDictionary *> *YTzoomQueue(void) {
+    if (YTzoomQueueItems != nil) return YTzoomQueueItems;
+    NSString *path = YTzoomQueueStorePath();
     NSArray *stored = path.length != 0
         ? [NSArray arrayWithContentsOfFile:path]
         : nil;
-    YTKACEQueueItems = stored != nil ? [stored mutableCopy] : [NSMutableArray array];
-    return YTKACEQueueItems;
+    YTzoomQueueItems = stored != nil ? [stored mutableCopy] : [NSMutableArray array];
+    return YTzoomQueueItems;
 }
 
-BOOL YTKACEQueueHasItems(void) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return NO;
-    NSUInteger current = YTKACEQueueIndexOfVideo(YTKACEQueueCurrentVideoID());
-    if (current == NSNotFound) return YTKACEQueue().count != 0;
-    return current + 1 < YTKACEQueue().count;
+BOOL YTzoomQueueHasItems(void) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return NO;
+    NSUInteger current = YTzoomQueueIndexOfVideo(YTzoomQueueCurrentVideoID());
+    if (current == NSNotFound) return YTzoomQueue().count != 0;
+    return current + 1 < YTzoomQueue().count;
 }
 
-BOOL YTKACEQueueOwnsCurrentVideo(void) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return NO;
-    return YTKACEQueueIndexOfVideo(YTKACEQueueCurrentVideoID()) != NSNotFound;
+BOOL YTzoomQueueOwnsCurrentVideo(void) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return NO;
+    return YTzoomQueueIndexOfVideo(YTzoomQueueCurrentVideoID()) != NSNotFound;
 }
 
-static NSString *YTKACEQueueVideoIDFromParams(NSData *data, int *position) {
+static NSString *YTzoomQueueVideoIDFromParams(NSData *data, int *position) {
     const unsigned char *bytes = (const unsigned char *)data.bytes;
     const NSUInteger length = data.length;
     if (position != NULL) *position = 0;
@@ -160,7 +160,7 @@ static NSString *YTKACEQueueVideoIDFromParams(NSData *data, int *position) {
     return nil;
 }
 
-static NSString *YTKACEQueueDiscoveryParams(id command) {
+static NSString *YTzoomQueueDiscoveryParams(id command) {
     NSString *dump = nil;
     @try {
         dump = [command description];
@@ -183,7 +183,7 @@ static NSString *YTKACEQueueDiscoveryParams(id command) {
     return [dump substringWithRange:[match rangeAtIndex:1]];
 }
 
-static NSString *YTKACEQueueTitleNearView(id view) {
+static NSString *YTzoomQueueTitleNearView(id view) {
     UIView *current = [view isKindOfClass:UIView.class] ? view : nil;
     NSString *best = nil;
     for (NSUInteger depth = 0; depth < 6 && current != nil; depth++) {
@@ -196,11 +196,11 @@ static NSString *YTKACEQueueTitleNearView(id view) {
 }
 
 
-static void YTKACEQueueUpdateEntry(NSString *videoID, NSString *title,
+static void YTzoomQueueUpdateEntry(NSString *videoID, NSString *title,
                                    NSString *author, NSString *length) {
     if (videoID.length == 0 || title.length == 0) return;
     dispatch_async(dispatch_get_main_queue(), ^{
-        NSMutableArray *queue = YTKACEQueue();
+        NSMutableArray *queue = YTzoomQueue();
         for (NSUInteger index = 0; index < queue.count; index++) {
             if (![queue[index][@"videoId"] isEqualToString:videoID]) continue;
             NSMutableDictionary *entry = [queue[index] mutableCopy];
@@ -208,15 +208,15 @@ static void YTKACEQueueUpdateEntry(NSString *videoID, NSString *title,
             if (author.length != 0) entry[@"author"] = author;
             if (length.length != 0) entry[@"length"] = length;
             queue[index] = entry;
-            YTKACEQueueSave();
-            YTKACEQueueRefreshPanel();
+            YTzoomQueueSave();
+            YTzoomQueueRefreshPanel();
             break;
         }
     });
 }
 
 
-static id YTKACEQueueValue(id object, NSArray<NSString *> *keys) {
+static id YTzoomQueueValue(id object, NSArray<NSString *> *keys) {
     if (object == nil) return nil;
     for (NSString *key in keys) {
         SEL selector = NSSelectorFromString(key);
@@ -252,19 +252,19 @@ static id YTKACEQueueValue(id object, NSArray<NSString *> *keys) {
     return nil;
 }
 
-static id YTKACEQueueVideoDetails(id response) {
-    id details = YTKACEQueueValue(response, @[@"videoDetails"]);
+static id YTzoomQueueVideoDetails(id response) {
+    id details = YTzoomQueueValue(response, @[@"videoDetails"]);
     if (details != nil) return details;
     for (NSString *wrapper in @[@"playerData", @"playerResponse",
                                 @"playerResponseData"]) {
-        id inner = YTKACEQueueValue(response, @[wrapper]);
-        details = YTKACEQueueValue(inner, @[@"videoDetails"]);
+        id inner = YTzoomQueueValue(response, @[wrapper]);
+        details = YTzoomQueueValue(inner, @[@"videoDetails"]);
         if (details != nil) return details;
     }
     return nil;
 }
 
-static NSString *YTKACEQueueLengthText(NSString *seconds) {
+static NSString *YTzoomQueueLengthText(NSString *seconds) {
     const NSInteger total = seconds.integerValue;
     if (total <= 0) return nil;
     const NSInteger hours = total / 3600;
@@ -278,7 +278,7 @@ static NSString *YTKACEQueueLengthText(NSString *seconds) {
         (long)remainder];
 }
 
-static void YTKACEQueueFetchFromOEmbed(NSString *videoID) {
+static void YTzoomQueueFetchFromOEmbed(NSString *videoID) {
     NSString *address = [NSString stringWithFormat:
         @"https://www.youtube.com/oembed?url=https%%3A%%2F%%2Fwww.youtube.com"
         @"%%2Fwatch%%3Fv%%3D%@&format=json", videoID];
@@ -292,13 +292,13 @@ static void YTKACEQueueFetchFromOEmbed(NSString *videoID) {
         NSDictionary *json = [NSJSONSerialization JSONObjectWithData:data
             options:0 error:NULL];
         if (![json isKindOfClass:NSDictionary.class]) return;
-        YTKACEQueueUpdateEntry(videoID, json[@"title"], json[@"author_name"],
+        YTzoomQueueUpdateEntry(videoID, json[@"title"], json[@"author_name"],
                                nil);
     }];
     [task resume];
 }
 
-static void YTKACEQueueFetchTitle(NSString *videoID) {
+static void YTzoomQueueFetchTitle(NSString *videoID) {
     if (videoID.length == 0) return;
     static NSMutableSet<NSString *> *pending;
     static dispatch_once_t onceToken;
@@ -315,16 +315,16 @@ static void YTKACEQueueFetchTitle(NSString *videoID) {
             [pending removeObject:videoID];
         }
     });
-    YTKACEQueueFetchFromOEmbed(videoID);
-    YTKACEResolvePlayerResponse(videoID, ^(id response, __unused NSError *error) {
-        id details = YTKACEQueueVideoDetails(response);
-        id rawTitle = YTKACEQueueValue(details, @[@"title"]);
+    YTzoomQueueFetchFromOEmbed(videoID);
+    YTzoomResolvePlayerResponse(videoID, ^(id response, __unused NSError *error) {
+        id details = YTzoomQueueVideoDetails(response);
+        id rawTitle = YTzoomQueueValue(details, @[@"title"]);
         NSString *title = [rawTitle isKindOfClass:NSString.class] ? rawTitle : nil;
-        id rawAuthor = YTKACEQueueValue(details,
+        id rawAuthor = YTzoomQueueValue(details,
             @[@"author", @"channelTitle", @"ownerChannelName"]);
         NSString *author = [rawAuthor isKindOfClass:NSString.class]
             ? rawAuthor : nil;
-        id rawSeconds = YTKACEQueueValue(details,
+        id rawSeconds = YTzoomQueueValue(details,
             @[@"lengthSeconds", @"lengthSecondsString", @"videoLengthSeconds"]);
         NSString *seconds = nil;
         if ([rawSeconds isKindOfClass:NSString.class]) {
@@ -332,29 +332,29 @@ static void YTKACEQueueFetchTitle(NSString *videoID) {
         } else if ([rawSeconds isKindOfClass:NSNumber.class]) {
             seconds = [rawSeconds stringValue];
         }
-        NSString *length = YTKACEQueueLengthText(seconds);
+        NSString *length = YTzoomQueueLengthText(seconds);
 
         if (title.length != 0) {
-            YTKACEQueueUpdateEntry(videoID, title, author, length);
+            YTzoomQueueUpdateEntry(videoID, title, author, length);
         }
     });
 }
 
-static void YTKACEQueueAdd(NSString *videoID, NSString *title,
+static void YTzoomQueueAdd(NSString *videoID, NSString *title,
                            BOOL playNext) {
-    NSMutableArray *queue = YTKACEQueue();
-    NSUInteger existing = YTKACEQueueIndexOfVideo(videoID);
+    NSMutableArray *queue = YTzoomQueue();
+    NSUInteger existing = YTzoomQueueIndexOfVideo(videoID);
     if (existing != NSNotFound) [queue removeObjectAtIndex:existing];
     if (queue.count == 0) {
-        NSString *playing = YTKACEQueueCurrentVideoID();
+        NSString *playing = YTzoomQueueCurrentVideoID();
         if (playing.length != 0 && ![playing isEqualToString:videoID]) {
             NSMutableDictionary *seed = [NSMutableDictionary dictionary];
             seed[@"videoId"] = playing;
             [queue addObject:seed];
-            YTKACEQueueFetchTitle(playing);
+            YTzoomQueueFetchTitle(playing);
         }
     }
-    NSUInteger currentIndex = YTKACEQueueEnsureCurrent();
+    NSUInteger currentIndex = YTzoomQueueEnsureCurrent();
     NSMutableDictionary *item = [NSMutableDictionary dictionary];
     item[@"videoId"] = videoID;
     if (title.length != 0) item[@"title"] = title;
@@ -363,19 +363,19 @@ static void YTKACEQueueAdd(NSString *videoID, NSString *title,
     } else {
         [queue addObject:item];
     }
-    YTKACEQueueSave();
-    if (title.length == 0) YTKACEQueueFetchTitle(videoID);
-    YTKACEShowNotice(playNext ? YTKACELocalized(@"Playing next")
-                              : YTKACELocalized(@"Added to queue"));
-    YTKACEQueueAppendToController(item, YTKACEQueueIndexOfVideo(videoID));
-    if (!YTKACEQueuePanelInjected || queue.count <= 2) {
-        YTKACEQueueRebuildWatchPage();
+    YTzoomQueueSave();
+    if (title.length == 0) YTzoomQueueFetchTitle(videoID);
+    YTzoomShowNotice(playNext ? YTzoomLocalized(@"Playing next")
+                              : YTzoomLocalized(@"Added to queue"));
+    YTzoomQueueAppendToController(item, YTzoomQueueIndexOfVideo(videoID));
+    if (!YTzoomQueuePanelInjected || queue.count <= 2) {
+        YTzoomQueueRebuildWatchPage();
     }
-    YTKACEQueueRefreshPanel();
+    YTzoomQueueRefreshPanel();
 }
 
-static BOOL YTKACEQueuePlay(NSString *videoID) {
-    id responder = YTKACEQueueResponder;
+static BOOL YTzoomQueuePlay(NSString *videoID) {
+    id responder = YTzoomQueueResponder;
     Class endpointClass = NSClassFromString(@"YTIWatchEndpoint");
     Class commandClass = NSClassFromString(@"YTICommand");
     Class eventClass = NSClassFromString(@"YTCommandResponderEvent");
@@ -399,13 +399,13 @@ static BOOL YTKACEQueuePlay(NSString *videoID) {
     } @catch (NSException *exception) {
         return NO;
     }
-    YTKACEQueueActiveVideo = videoID;
-    YTKACEQueueActiveVideoTime = NSDate.timeIntervalSinceReferenceDate;
+    YTzoomQueueActiveVideo = videoID;
+    YTzoomQueueActiveVideoTime = NSDate.timeIntervalSinceReferenceDate;
     return YES;
 }
 
-static BOOL YTKACEQueueReplayCurrent(void) {
-    id player = YTKACEQueuePlayerViewController;
+static BOOL YTzoomQueueReplayCurrent(void) {
+    id player = YTzoomQueuePlayerViewController;
     if (player == nil) return NO;
     @try {
         if ([player respondsToSelector:@selector(replayWithSeekSource:)]) {
@@ -427,65 +427,65 @@ static BOOL YTKACEQueueReplayCurrent(void) {
     return NO;
 }
 
-static BOOL YTKACEQueueStep(NSInteger offset) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return NO;
-    NSArray *queue = [YTKACEQueue() copy];
-    NSUInteger current = YTKACEQueueIndexOfVideo(YTKACEQueueCurrentVideoID());
+static BOOL YTzoomQueueStep(NSInteger offset) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return NO;
+    NSArray *queue = [YTzoomQueue() copy];
+    NSUInteger current = YTzoomQueueIndexOfVideo(YTzoomQueueCurrentVideoID());
     if (current == NSNotFound) return NO;
-    const long long loop = YTKACEQueueSavedLoopMode();
+    const long long loop = YTzoomQueueSavedLoopMode();
     NSInteger target = (NSInteger)current + offset;
-    if (loop == 2) return YTKACEQueueReplayCurrent();
+    if (loop == 2) return YTzoomQueueReplayCurrent();
     if (target < 0 || target >= (NSInteger)queue.count) {
         if (loop != 1 || queue.count == 0) return NO;
         target = target < 0 ? (NSInteger)queue.count - 1 : 0;
     }
     NSString *videoID = queue[(NSUInteger)target][@"videoId"];
     if (videoID.length == 0) return NO;
-    return YTKACEQueuePlay(videoID);
+    return YTzoomQueuePlay(videoID);
 }
 
-static long long YTKACEQueueLoopMode(void) {
-    return YTKACEQueueSavedLoopMode();
+static long long YTzoomQueueLoopMode(void) {
+    return YTzoomQueueSavedLoopMode();
 }
 
-static void YTKACEQueueAdvance(void) {
-    NSArray *queue = [YTKACEQueue() copy];
-    NSString *currentID = YTKACEQueueCurrentVideoID();
-    NSUInteger current = YTKACEQueueIndexOfVideo(currentID);
+static void YTzoomQueueAdvance(void) {
+    NSArray *queue = [YTzoomQueue() copy];
+    NSString *currentID = YTzoomQueueCurrentVideoID();
+    NSUInteger current = YTzoomQueueIndexOfVideo(currentID);
     if (current == NSNotFound) return;
-    const long long loop = YTKACEQueueLoopMode();
+    const long long loop = YTzoomQueueLoopMode();
     if (loop == 2) {
-        YTKACEQueueReplayCurrent();
+        YTzoomQueueReplayCurrent();
         return;
     }
     if (current + 1 >= queue.count) {
         if (loop != 1 || queue.count == 0) return;
         NSString *first = queue.firstObject[@"videoId"];
-        if (first.length != 0) YTKACEQueuePlay(first);
+        if (first.length != 0) YTzoomQueuePlay(first);
         return;
     }
     (void)currentID;
     NSString *videoID = queue[current + 1][@"videoId"];
     if (videoID.length == 0) return;
-    YTKACEQueuePlay(videoID);
+    YTzoomQueuePlay(videoID);
 }
 
-static id YTKACEQueueMessage(NSString *className) {
+static id YTzoomQueueMessage(NSString *className) {
     Class cls = NSClassFromString(className);
     if (cls == Nil) return nil;
     return ((id (*)(id, SEL))objc_msgSend)(cls, @selector(message));
 }
 
-static id YTKACEQueueFormatted(NSString *text) {
+static id YTzoomQueueFormatted(NSString *text) {
     Class cls = NSClassFromString(@"YTIFormattedString");
     if (cls == Nil || text.length == 0) return nil;
     return ((id (*)(id, SEL, id))objc_msgSend)(
         cls, @selector(formattedStringWithString:), text);
 }
 
-static id YTKACEQueueWatchCommand(NSString *videoID) {
-    id endpoint = YTKACEQueueMessage(@"YTIWatchEndpoint");
-    id command = YTKACEQueueMessage(@"YTICommand");
+static id YTzoomQueueWatchCommand(NSString *videoID) {
+    id endpoint = YTzoomQueueMessage(@"YTIWatchEndpoint");
+    id command = YTzoomQueueMessage(@"YTICommand");
     if (endpoint == nil || command == nil) return nil;
     [endpoint setValue:videoID forKey:@"videoId"];
     [endpoint setValue:@0 forKey:@"startTimeSeconds"];
@@ -493,9 +493,9 @@ static id YTKACEQueueWatchCommand(NSString *videoID) {
     return command;
 }
 
-static NSString *YTKACEQueueTitleForVideo(NSString *videoID, NSString *stored) {
+static NSString *YTzoomQueueTitleForVideo(NSString *videoID, NSString *stored) {
     if (stored.length != 0) return stored;
-    id response = YTKACECachedPlayerResponse(videoID);
+    id response = YTzoomCachedPlayerResponse(videoID);
     if (response == nil) return nil;
     @try {
         id details = [response valueForKey:@"videoDetails"];
@@ -509,7 +509,7 @@ static NSString *YTKACEQueueTitleForVideo(NSString *videoID, NSString *stored) {
     return nil;
 }
 
-static void YTKACEQueueSafeSet(id object, id value, NSString *key) {
+static void YTzoomQueueSafeSet(id object, id value, NSString *key) {
     if (object == nil) return;
     @try {
         [object setValue:value forKey:key];
@@ -522,145 +522,145 @@ static void YTKACEQueueSafeSet(id object, id value, NSString *key) {
             if ([reported containsObject:name]) return;
             [reported addObject:name];
         }
-        YTKACEDownloadLog(@"queue", @"skipped unsupported field %@", name);
+        YTzoomDownloadLog(@"queue", @"skipped unsupported field %@", name);
     }
 }
 
-static id YTKACEQueuePanelItem(NSString *videoID, NSString *title,
+static id YTzoomQueuePanelItem(NSString *videoID, NSString *title,
                                NSString *author, NSString *length,
                                BOOL selected, NSUInteger index) {
-    id renderer = YTKACEQueueMessage(@"YTIPlaylistPanelVideoRenderer");
-    id wrapper = YTKACEQueueMessage(
+    id renderer = YTzoomQueueMessage(@"YTIPlaylistPanelVideoRenderer");
+    id wrapper = YTzoomQueueMessage(
         @"YTIPlaylistPanelRenderer_PlaylistPanelVideoSupportedRenderers");
     if (renderer == nil || wrapper == nil) return nil;
-    YTKACEQueueSafeSet(renderer, videoID, @"videoId");
-    YTKACEQueueSafeSet(renderer, videoID, @"playlistSetVideoId");
-    id titleText = YTKACEQueueFormatted(
-        YTKACEQueueTitleForVideo(videoID, title) ?: videoID);
-    if (titleText != nil) YTKACEQueueSafeSet(renderer, titleText, @"title");
-    id indexText = YTKACEQueueFormatted(
+    YTzoomQueueSafeSet(renderer, videoID, @"videoId");
+    YTzoomQueueSafeSet(renderer, videoID, @"playlistSetVideoId");
+    id titleText = YTzoomQueueFormatted(
+        YTzoomQueueTitleForVideo(videoID, title) ?: videoID);
+    if (titleText != nil) YTzoomQueueSafeSet(renderer, titleText, @"title");
+    id indexText = YTzoomQueueFormatted(
         [NSString stringWithFormat:@"%lu", (unsigned long)(index + 1)]);
-    if (indexText != nil) YTKACEQueueSafeSet(renderer, indexText, @"indexText");
-    id thumbnails = YTKACEQueueMessage(@"YTIThumbnailDetails");
+    if (indexText != nil) YTzoomQueueSafeSet(renderer, indexText, @"indexText");
+    id thumbnails = YTzoomQueueMessage(@"YTIThumbnailDetails");
     if (thumbnails != nil) {
         NSArray<NSArray *> *sizes = @[@[@"mqdefault", @320, @180],
                                       @[@"hqdefault", @480, @360]];
         for (NSArray *size in sizes) {
-            id thumbnail = YTKACEQueueMessage(@"YTIThumbnailDetails_Thumbnail");
+            id thumbnail = YTzoomQueueMessage(@"YTIThumbnailDetails_Thumbnail");
             if (thumbnail == nil) continue;
-            YTKACEQueueSafeSet(thumbnail, [NSString stringWithFormat:
+            YTzoomQueueSafeSet(thumbnail, [NSString stringWithFormat:
                 @"https://i.ytimg.com/vi/%@/%@.jpg", videoID, size[0]], @"URL");
-            YTKACEQueueSafeSet(thumbnail, size[1], @"width");
-            YTKACEQueueSafeSet(thumbnail, size[2], @"height");
+            YTzoomQueueSafeSet(thumbnail, size[1], @"width");
+            YTzoomQueueSafeSet(thumbnail, size[2], @"height");
             [[thumbnails valueForKey:@"thumbnailsArray"] addObject:thumbnail];
         }
-        YTKACEQueueSafeSet(renderer, thumbnails, @"thumbnail");
+        YTzoomQueueSafeSet(renderer, thumbnails, @"thumbnail");
     }
-    id style = YTKACEQueueMessage(@"YTIMainAppCompactRendererStyle");
+    id style = YTzoomQueueMessage(@"YTIMainAppCompactRendererStyle");
     if (style != nil) {
-        YTKACEQueueSafeSet(style, @2, @"value");
-        YTKACEQueueSafeSet(renderer, style, @"mainAppStyle");
+        YTzoomQueueSafeSet(style, @2, @"value");
+        YTzoomQueueSafeSet(renderer, style, @"mainAppStyle");
     }
     if (length.length != 0) {
-        id overlay = YTKACEQueueMessage(@"YTIThumbnailOverlaySupportedRenderers");
+        id overlay = YTzoomQueueMessage(@"YTIThumbnailOverlaySupportedRenderers");
         id timeStatus =
-            YTKACEQueueMessage(@"YTIThumbnailOverlayTimeStatusRenderer");
-        id overlayText = YTKACEQueueFormatted(length);
+            YTzoomQueueMessage(@"YTIThumbnailOverlayTimeStatusRenderer");
+        id overlayText = YTzoomQueueFormatted(length);
         if (overlay != nil && timeStatus != nil && overlayText != nil) {
-            YTKACEQueueSafeSet(timeStatus, overlayText, @"text");
-            YTKACEQueueSafeSet(overlay, timeStatus, @"thumbnailOverlayTimeStatusRenderer");
+            YTzoomQueueSafeSet(timeStatus, overlayText, @"text");
+            YTzoomQueueSafeSet(overlay, timeStatus, @"thumbnailOverlayTimeStatusRenderer");
             [[renderer valueForKey:@"thumbnailOverlaysArray"]
                 addObject:overlay];
         }
     }
-    id menu = YTKACEQueueItemMenu(videoID);
-    if (menu != nil) YTKACEQueueSafeSet(renderer, menu, @"menu");
-    id removeCommand = YTKACEQueueSentinelCommand(@"remove", videoID);
+    id menu = YTzoomQueueItemMenu(videoID);
+    if (menu != nil) YTzoomQueueSafeSet(renderer, menu, @"menu");
+    id removeCommand = YTzoomQueueSentinelCommand(@"remove", videoID);
     if (removeCommand != nil) {
-        YTKACEQueueSafeSet(renderer, removeCommand, @"onSwipeLeftCommand");
-        YTKACEQueueSafeSet(renderer, removeCommand, @"onItemRemovedCommand");
+        YTzoomQueueSafeSet(renderer, removeCommand, @"onSwipeLeftCommand");
+        YTzoomQueueSafeSet(renderer, removeCommand, @"onItemRemovedCommand");
     }
     if (!selected) {
-        id swipe = YTKACEQueueMessage(
+        id swipe = YTzoomQueueMessage(
             @"YTIPlaylistPanelVideoSwipeToRevealButtonSupportedRenderers");
-        id button = YTKACEQueueMessage(@"YTIButtonRenderer");
-        id swipeCommand = YTKACEQueueSentinelCommand(@"remove", videoID);
+        id button = YTzoomQueueMessage(@"YTIButtonRenderer");
+        id swipeCommand = YTzoomQueueSentinelCommand(@"remove", videoID);
         if (swipe != nil && button != nil && swipeCommand != nil) {
-            id label = YTKACEQueueFormatted(YTKACELocalized(@"Remove"));
-            if (label != nil) YTKACEQueueSafeSet(button, label, @"text");
-            YTKACEQueueSafeSet(button, swipeCommand, @"serviceEndpoint");
-            YTKACEQueueSafeSet(swipe, button, @"buttonRenderer");
+            id label = YTzoomQueueFormatted(YTzoomLocalized(@"Remove"));
+            if (label != nil) YTzoomQueueSafeSet(button, label, @"text");
+            YTzoomQueueSafeSet(button, swipeCommand, @"serviceEndpoint");
+            YTzoomQueueSafeSet(swipe, button, @"buttonRenderer");
             [[renderer valueForKey:@"swipeButtonsArray"] addObject:swipe];
         }
     }
-    id byline = YTKACEQueueFormatted(author);
+    id byline = YTzoomQueueFormatted(author);
     if (byline != nil) {
-        YTKACEQueueSafeSet(renderer, byline, @"shortBylineText");
-        YTKACEQueueSafeSet(renderer, byline, @"longBylineText");
+        YTzoomQueueSafeSet(renderer, byline, @"shortBylineText");
+        YTzoomQueueSafeSet(renderer, byline, @"longBylineText");
     }
-    id command = YTKACEQueueWatchCommand(videoID);
-    if (command != nil) YTKACEQueueSafeSet(renderer, command, @"navigationEndpoint");
-    YTKACEQueueSafeSet(renderer, @(selected), @"selected");
-    YTKACEQueueSafeSet(wrapper, renderer, @"playlistPanelVideoRenderer");
+    id command = YTzoomQueueWatchCommand(videoID);
+    if (command != nil) YTzoomQueueSafeSet(renderer, command, @"navigationEndpoint");
+    YTzoomQueueSafeSet(renderer, @(selected), @"selected");
+    YTzoomQueueSafeSet(wrapper, renderer, @"playlistPanelVideoRenderer");
     return wrapper;
 }
 
-static NSUInteger YTKACEQueueIndexOfVideo(NSString *videoID) {
+static NSUInteger YTzoomQueueIndexOfVideo(NSString *videoID) {
     if (videoID.length == 0) return NSNotFound;
-    NSArray *queue = YTKACEQueue();
+    NSArray *queue = YTzoomQueue();
     for (NSUInteger index = 0; index < queue.count; index++) {
         if ([queue[index][@"videoId"] isEqualToString:videoID]) return index;
     }
     return NSNotFound;
 }
 
-static NSString *YTKACEQueueCurrentVideoID(void) {
-    if (YTKACEQueueCurrentOverride.length != 0) {
-        return YTKACEQueueCurrentOverride;
+static NSString *YTzoomQueueCurrentVideoID(void) {
+    if (YTzoomQueueCurrentOverride.length != 0) {
+        return YTzoomQueueCurrentOverride;
     }
-    id player = YTKACEQueuePlayerViewController;
+    id player = YTzoomQueuePlayerViewController;
     id playerValue =
-        YTKACEQueueValue(player, @[@"currentVideoID", @"contentVideoID"]);
+        YTzoomQueueValue(player, @[@"currentVideoID", @"contentVideoID"]);
     NSMutableArray<NSString *> *candidates = [NSMutableArray array];
     const NSTimeInterval age =
-        NSDate.timeIntervalSinceReferenceDate - YTKACEQueueActiveVideoTime;
+        NSDate.timeIntervalSinceReferenceDate - YTzoomQueueActiveVideoTime;
     const BOOL preferOwn =
-        YTKACEQueueActiveVideo.length != 0 && age < 4.0;
-    if (preferOwn) [candidates addObject:YTKACEQueueActiveVideo];
+        YTzoomQueueActiveVideo.length != 0 && age < 4.0;
+    if (preferOwn) [candidates addObject:YTzoomQueueActiveVideo];
     if ([playerValue isKindOfClass:NSString.class] &&
         [playerValue length] != 0) {
         [candidates addObject:playerValue];
     }
-    if (!preferOwn && YTKACEQueueActiveVideo.length != 0) {
-        [candidates addObject:YTKACEQueueActiveVideo];
+    if (!preferOwn && YTzoomQueueActiveVideo.length != 0) {
+        [candidates addObject:YTzoomQueueActiveVideo];
     }
-    NSString *last = YTKACELastVideoID();
+    NSString *last = YTzoomLastVideoID();
     if (last.length != 0) [candidates addObject:last];
     for (NSString *candidate in candidates) {
-        if (YTKACEQueueIndexOfVideo(candidate) != NSNotFound) return candidate;
+        if (YTzoomQueueIndexOfVideo(candidate) != NSNotFound) return candidate;
     }
     return candidates.firstObject;
 }
 
-static NSUInteger YTKACEQueueEnsureCurrent(void) {
-    NSString *current = YTKACEQueueCurrentVideoID();
+static NSUInteger YTzoomQueueEnsureCurrent(void) {
+    NSString *current = YTzoomQueueCurrentVideoID();
     if (current.length == 0) return NSNotFound;
-    if (YTKACEQueue().count == 0) return NSNotFound;
-    NSUInteger index = YTKACEQueueIndexOfVideo(current);
+    if (YTzoomQueue().count == 0) return NSNotFound;
+    NSUInteger index = YTzoomQueueIndexOfVideo(current);
     if (index != NSNotFound) return index;
     NSMutableDictionary *entry = [NSMutableDictionary dictionary];
     entry[@"videoId"] = current;
-    [YTKACEQueue() insertObject:entry atIndex:0];
-    YTKACEQueueSave();
-    YTKACEQueueFetchTitle(current);
+    [YTzoomQueue() insertObject:entry atIndex:0];
+    YTzoomQueueSave();
+    YTzoomQueueFetchTitle(current);
     return 0;
 }
 
-static id YTKACEQueuePanelRenderer(void) {
-    NSUInteger currentIndex = YTKACEQueueEnsureCurrent();
-    NSArray<NSDictionary *> *queue = [YTKACEQueue() copy];
+static id YTzoomQueuePanelRenderer(void) {
+    NSUInteger currentIndex = YTzoomQueueEnsureCurrent();
+    NSArray<NSDictionary *> *queue = [YTzoomQueue() copy];
     if (queue.count < 2) return nil;
-    id panel = YTKACEQueueMessage(@"YTIPlaylistPanelRenderer");
+    id panel = YTzoomQueueMessage(@"YTIPlaylistPanelRenderer");
     if (panel == nil) return nil;
     NSMutableArray *contents = [panel valueForKey:@"contentsArray"];
     if (contents == nil) return nil;
@@ -669,18 +669,18 @@ static id YTKACEQueuePanelRenderer(void) {
         NSString *videoID = entry[@"videoId"];
         if (videoID.length == 0) continue;
         if (entry[@"title"] == nil || entry[@"length"] == nil) {
-            YTKACEQueueFetchTitle(videoID);
+            YTzoomQueueFetchTitle(videoID);
         }
-        id item = YTKACEQueuePanelItem(videoID, entry[@"title"],
+        id item = YTzoomQueuePanelItem(videoID, entry[@"title"],
                                        entry[@"author"], entry[@"length"],
                                        index == currentIndex, index);
         if (item == nil) continue;
         [contents addObject:item];
     }
     if (contents.count == 0) return nil;
-    [panel setValue:@"YTKACEQueue" forKey:@"playlistId"];
-    [panel setValue:YTKACELocalized(@"Queue") forKey:@"title"];
-    id title = YTKACEQueueFormatted(YTKACELocalized(@"Queue"));
+    [panel setValue:@"YTzoomQueue" forKey:@"playlistId"];
+    [panel setValue:YTzoomLocalized(@"Queue") forKey:@"title"];
+    id title = YTzoomQueueFormatted(YTzoomLocalized(@"Queue"));
     if (title != nil) [panel setValue:title forKey:@"titleText"];
     [panel setValue:@(contents.count) forKey:@"totalVideos"];
     [panel setValue:@(currentIndex == NSNotFound ? 0 : currentIndex)
@@ -688,43 +688,43 @@ static id YTKACEQueuePanelRenderer(void) {
     [panel setValue:@(currentIndex == NSNotFound ? 0 : currentIndex)
              forKey:@"localCurrentIndex"];
     [panel setValue:@YES forKey:@"isEditable"];
-    id reorder = YTKACEQueueSentinelCommand(@"reorder", @"");
+    id reorder = YTzoomQueueSentinelCommand(@"reorder", @"");
     if (reorder != nil) [panel setValue:reorder forKey:@"onReorderEndpoint"];
     return panel;
 }
 
-static void YTKACEQueueAppendToController(NSDictionary *entry,
+static void YTzoomQueueAppendToController(NSDictionary *entry,
                                           NSUInteger insertIndex) {
-    id controller = YTKACEQueueControllerInstance;
+    id controller = YTzoomQueueControllerInstance;
     if (controller == nil || entry[@"videoId"] == nil) return;
     SEL selector = @selector(addItemsFromPlaylistPanel:response:atIndex:
                              ignoreSelectedProperty:notifyObservers:);
     if (![controller respondsToSelector:selector]) return;
-    id panel = YTKACEQueueMessage(@"YTIPlaylistPanelRenderer");
+    id panel = YTzoomQueueMessage(@"YTIPlaylistPanelRenderer");
     if (panel == nil) return;
     NSMutableArray *contents = [panel valueForKey:@"contentsArray"];
-    id item = YTKACEQueuePanelItem(entry[@"videoId"], entry[@"title"],
+    id item = YTzoomQueuePanelItem(entry[@"videoId"], entry[@"title"],
                                    entry[@"author"], entry[@"length"], NO,
                                    insertIndex);
     if (contents == nil || item == nil) return;
     [contents addObject:item];
-    [panel setValue:@"YTKACEQueue" forKey:@"playlistId"];
+    [panel setValue:@"YTzoomQueue" forKey:@"playlistId"];
     [panel setValue:@1 forKey:@"totalVideos"];
     @try {
         ((void (*)(id, SEL, id, id, unsigned long long, BOOL, BOOL))objc_msgSend)(
-            controller, selector, panel, YTKACELastWatchNextResponse,
+            controller, selector, panel, YTzoomLastWatchNextResponse,
             (unsigned long long)insertIndex, YES, YES);
     } @catch (NSException *exception) {
         return;
     }
 }
 
-static void YTKACEQueueRebuildWatchPage(void) {
-    id watch = YTKACEQueueWatchViewController;
-    id response = YTKACELastWatchNextResponse;
+static void YTzoomQueueRebuildWatchPage(void) {
+    id watch = YTzoomQueueWatchViewController;
+    id response = YTzoomLastWatchNextResponse;
     if (watch == nil || response == nil) return;
-    if (YTKACEQueuePanelInjected) {
-        YTKACEQueueRefreshPanel();
+    if (YTzoomQueuePanelInjected) {
+        YTzoomQueueRefreshPanel();
         return;
     }
     if (![watch respondsToSelector:@selector(updateWithWatchNextResponse:)]) {
@@ -740,11 +740,11 @@ static void YTKACEQueueRebuildWatchPage(void) {
     });
 }
 
-static void YTKACEQueueRefreshPanel(void) {
-    id controller = YTKACEQueuePanelController;
+static void YTzoomQueueRefreshPanel(void) {
+    id controller = YTzoomQueuePanelController;
     if (controller == nil) return;
     dispatch_async(dispatch_get_main_queue(), ^{
-        id panel = YTKACEQueuePanelRenderer();
+        id panel = YTzoomQueuePanelRenderer();
         if (panel == nil) return;
         @try {
             [controller setValue:panel forKey:@"playlistPanelRenderer"];
@@ -761,8 +761,8 @@ static void YTKACEQueueRefreshPanel(void) {
         } @catch (NSException *exception) {
             return;
         }
-        YTKACEQueueRestoreLoopMode(controller);
-        id watchController = YTKACEQueueWatchViewController;
+        YTzoomQueueRestoreLoopMode(controller);
+        id watchController = YTzoomQueueWatchViewController;
         if ([watchController respondsToSelector:
                 @selector(showPlaylistMiniBarIfNeeded)]) {
             @try {
@@ -774,30 +774,30 @@ static void YTKACEQueueRefreshPanel(void) {
     });
 }
 
-static id YTKACEQueuePanelParse(id receiver, SEL selector, id response) {
+static id YTzoomQueuePanelParse(id receiver, SEL selector, id response) {
     id original = nil;
     if (OriginalPanelParse != NULL) {
         original = ((id (*)(id, SEL, id))OriginalPanelParse)(
             receiver, selector, response);
     }
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return original;
-    if (YTKACEQueue().count == 0) return original;
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return original;
+    if (YTzoomQueue().count == 0) return original;
     if (original != nil) {
         return original;
     }
-    id panel = YTKACEQueuePanelRenderer();
+    id panel = YTzoomQueuePanelRenderer();
     return panel ?: original;
 }
 
-static id YTKACEQueueResponsePanel(id receiver, SEL selector) {
+static id YTzoomQueueResponsePanel(id receiver, SEL selector) {
     id original = NULL;
     if (OriginalResponsePanel != NULL) {
         original = ((id (*)(id, SEL))OriginalResponsePanel)(receiver, selector);
     }
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return original;
-    if (YTKACEQueue().count == 0) return original;
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return original;
+    if (YTzoomQueue().count == 0) return original;
     if (original != nil) return original;
-    id panel = YTKACEQueuePanelRenderer();
+    id panel = YTzoomQueuePanelRenderer();
     return panel ?: original;
 }
 
@@ -808,7 +808,7 @@ static id YTKACEQueueResponsePanel(id receiver, SEL selector) {
 
 
 
-static NSString *YTKACEQueuePanelField(id wrapper) {
+static NSString *YTzoomQueuePanelField(id wrapper) {
     static NSString *cached;
     if (cached != nil) return cached;
     NSString *found = nil;
@@ -830,53 +830,53 @@ static NSString *YTKACEQueuePanelField(id wrapper) {
     return cached;
 }
 
-static void YTKACEQueueInjectPanel(id response) {
-    YTKACELastWatchNextResponse = response;
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return;
-    if (YTKACEQueue().count == 0) return;
+static void YTzoomQueueInjectPanel(id response) {
+    YTzoomLastWatchNextResponse = response;
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return;
+    if (YTzoomQueue().count == 0) return;
     @try {
         id contents = [response valueForKey:@"contents"];
         id single = [contents valueForKey:@"singleColumnWatchNextResults"];
         if (single == nil) return;
         id existing = [single valueForKey:@"playlist"];
-        NSString *field = existing != nil ? YTKACEQueuePanelField(existing) : @"playlist";
+        NSString *field = existing != nil ? YTzoomQueuePanelField(existing) : @"playlist";
         id current = existing != nil ? [existing valueForKey:field] : nil;
-        id owner = current != nil ? YTKACEQueueValue(current, @[@"playlistId"]) : nil;
+        id owner = current != nil ? YTzoomQueueValue(current, @[@"playlistId"]) : nil;
         if ([owner isKindOfClass:NSString.class] && [owner length] != 0) {
-            if (![owner isEqual:@"YTKACEQueue"]) {
+            if (![owner isEqual:@"YTzoomQueue"]) {
                     return;
             }
         }
-        id panel = YTKACEQueuePanelRenderer();
+        id panel = YTzoomQueuePanelRenderer();
         if (panel == nil) return;
-        id wrapper = YTKACEQueueMessage(
+        id wrapper = YTzoomQueueMessage(
             @"YTISingleColumnWatchNextResultsRenderer_"
             @"SingleColumnWatchNextPlaylistSupportedRenderers");
         if (wrapper == nil) return;
-        [wrapper setValue:panel forKey:YTKACEQueuePanelField(wrapper)];
+        [wrapper setValue:panel forKey:YTzoomQueuePanelField(wrapper)];
         [single setValue:wrapper forKey:@"playlist"];
-        YTKACEQueuePanelInjected = YES;
+        YTzoomQueuePanelInjected = YES;
     } @catch (__unused NSException *exception) {
     }
 }
 
-static void YTKACEQueueSetWatchNext(id receiver, SEL selector, id response) {
-    YTKACEQueuePlayerViewController = receiver;
-    id fresh = YTKACEQueueValue(receiver, @[@"currentVideoID", @"contentVideoID"]);
-    YTKACEQueueCurrentOverride =
+static void YTzoomQueueSetWatchNext(id receiver, SEL selector, id response) {
+    YTzoomQueuePlayerViewController = receiver;
+    id fresh = YTzoomQueueValue(receiver, @[@"currentVideoID", @"contentVideoID"]);
+    YTzoomQueueCurrentOverride =
         [fresh isKindOfClass:NSString.class] ? fresh : nil;
-    if (YTKACEQueueCurrentOverride.length != 0) {
-        YTKACEQueueActiveVideo = YTKACEQueueCurrentOverride;
-        YTKACEQueueActiveVideoTime = 0;
+    if (YTzoomQueueCurrentOverride.length != 0) {
+        YTzoomQueueActiveVideo = YTzoomQueueCurrentOverride;
+        YTzoomQueueActiveVideoTime = 0;
     }
-    YTKACEQueueInjectPanel(response);
-    YTKACEQueueCurrentOverride = nil;
+    YTzoomQueueInjectPanel(response);
+    YTzoomQueueCurrentOverride = nil;
     if (OriginalSetWatchNext == NULL) return;
     ((void (*)(id, SEL, id))OriginalSetWatchNext)(receiver, selector, response);
 }
 
-static void YTKACEQueuePrepareWatchNext(id receiver, SEL selector, id response) {
-    YTKACEQueueInjectPanel(response);
+static void YTzoomQueuePrepareWatchNext(id receiver, SEL selector, id response) {
+    YTzoomQueueInjectPanel(response);
     if (OriginalPrepareWatchNext != NULL) {
         ((void (*)(id, SEL, id))OriginalPrepareWatchNext)(
             receiver, selector, response);
@@ -886,11 +886,11 @@ static void YTKACEQueuePrepareWatchNext(id receiver, SEL selector, id response) 
 
 
 
-static void YTKACEQueueViewUpdateWatchNext(id receiver, SEL selector,
+static void YTzoomQueueViewUpdateWatchNext(id receiver, SEL selector,
                                            id response) {
-    YTKACEQueueWatchViewController = receiver;
-    YTKACEQueuePanelInjected = NO;
-    YTKACEQueueInjectPanel(response);
+    YTzoomQueueWatchViewController = receiver;
+    YTzoomQueuePanelInjected = NO;
+    YTzoomQueueInjectPanel(response);
     if (OriginalViewUpdateWatchNext != NULL) {
         ((void (*)(id, SEL, id))OriginalViewUpdateWatchNext)(
             receiver, selector, response);
@@ -898,8 +898,8 @@ static void YTKACEQueueViewUpdateWatchNext(id receiver, SEL selector,
 }
 
 
-static void YTKACEQueueEnableEditing(id panelController, id queueController) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return;
+static void YTzoomQueueEnableEditing(id panelController, id queueController) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return;
     NSArray<NSString *> *flags = @[@"_enableSwipeToRemove",
                                    @"_enableQueueEditBuffer",
                                    @"_queuePhase4Enabled"];
@@ -915,63 +915,63 @@ static void YTKACEQueueEnableEditing(id panelController, id queueController) {
     }
 }
 
-static id YTKACEQueuePanelInit(id receiver, SEL selector, id account,
+static id YTzoomQueuePanelInit(id receiver, SEL selector, id account,
                                id responder) {
     id result = NULL;
     if (OriginalPanelInit != NULL) {
         result = ((id (*)(id, SEL, id, id))OriginalPanelInit)(
             receiver, selector, account, responder);
     }
-    YTKACEQueuePanelController = result;
+    YTzoomQueuePanelController = result;
     return result;
 }
 
-static id YTKACEQueuePanelInitQueue(id receiver, SEL selector, id account,
+static id YTzoomQueuePanelInitQueue(id receiver, SEL selector, id account,
                                     id responder, id controller) {
     id result = NULL;
     if (OriginalPanelInitQueue != NULL) {
         result = ((id (*)(id, SEL, id, id, id))OriginalPanelInitQueue)(
             receiver, selector, account, responder, controller);
     }
-    YTKACEQueuePanelController = result;
-    YTKACEQueueControllerInstance = controller;
-    YTKACEQueueEnableEditing(result, controller);
-    YTKACEQueueRestoreLoopMode(result);
+    YTzoomQueuePanelController = result;
+    YTzoomQueueControllerInstance = controller;
+    YTzoomQueueEnableEditing(result, controller);
+    YTzoomQueueRestoreLoopMode(result);
     return result;
 }
 
-static id YTKACEQueueControllerInit(id receiver, SEL selector, id account,
+static id YTzoomQueueControllerInit(id receiver, SEL selector, id account,
                                     id responder) {
     id result = NULL;
     if (OriginalQueueControllerInit != NULL) {
         result = ((id (*)(id, SEL, id, id))OriginalQueueControllerInit)(
             receiver, selector, account, responder);
     }
-    YTKACEQueueControllerInstance = result;
+    YTzoomQueueControllerInstance = result;
     return result;
 }
 
-static BOOL YTKACEQueueIsActive(void) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return NO;
-    return YTKACEQueueIndexOfVideo(YTKACEQueueCurrentVideoID()) != NSNotFound;
+static BOOL YTzoomQueueIsActive(void) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return NO;
+    return YTzoomQueueIndexOfVideo(YTzoomQueueCurrentVideoID()) != NSNotFound;
 }
 
-static void YTKACEQueueDidPressNext(id receiver, SEL selector, id sender) {
-    if (YTKACEQueueStep(1)) {
+static void YTzoomQueueDidPressNext(id receiver, SEL selector, id sender) {
+    if (YTzoomQueueStep(1)) {
         return;
     }
-    if (YTKACEQueueIsActive()) {
+    if (YTzoomQueueIsActive()) {
         return;
     }
     if (OriginalDidPressNext == NULL) return;
     ((void (*)(id, SEL, id))OriginalDidPressNext)(receiver, selector, sender);
 }
 
-static void YTKACEQueueDidPressPrevious(id receiver, SEL selector, id sender) {
-    if (YTKACEQueueStep(-1)) {
+static void YTzoomQueueDidPressPrevious(id receiver, SEL selector, id sender) {
+    if (YTzoomQueueStep(-1)) {
         return;
     }
-    if (YTKACEQueueIsActive()) {
+    if (YTzoomQueueIsActive()) {
         return;
     }
     if (OriginalDidPressPrevious == NULL) return;
@@ -979,11 +979,11 @@ static void YTKACEQueueDidPressPrevious(id receiver, SEL selector, id sender) {
                                                       sender);
 }
 
-static void YTKACEQueueAutonavPlayNext(id receiver, SEL selector) {
-    if (YTKACEQueueStep(1)) {
+static void YTzoomQueueAutonavPlayNext(id receiver, SEL selector) {
+    if (YTzoomQueueStep(1)) {
         return;
     }
-    if (YTKACEQueueIsActive()) {
+    if (YTzoomQueueIsActive()) {
         return;
     }
     if (OriginalAutonavPlayNext == NULL) return;
@@ -991,8 +991,8 @@ static void YTKACEQueueAutonavPlayNext(id receiver, SEL selector) {
 }
 
 
-static void YTKACEQueueSyncFromController(id controller) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return;
+static void YTzoomQueueSyncFromController(id controller) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return;
     NSArray *items = nil;
     @try {
         items = [controller valueForKey:@"playbackQueueItems"];
@@ -1008,76 +1008,76 @@ static void YTKACEQueueSyncFromController(id controller) {
             videoID = nil;
         }
         if (videoID.length == 0) continue;
-        NSUInteger existing = YTKACEQueueIndexOfVideo(videoID);
+        NSUInteger existing = YTzoomQueueIndexOfVideo(videoID);
         if (existing == NSNotFound) continue;
-        [ordered addObject:YTKACEQueue()[existing]];
+        [ordered addObject:YTzoomQueue()[existing]];
     }
     if (ordered.count == 0) return;
-    if (ordered.count == YTKACEQueue().count) {
+    if (ordered.count == YTzoomQueue().count) {
         BOOL identical = YES;
         for (NSUInteger index = 0; index < ordered.count; index++) {
-            if (ordered[index] == YTKACEQueue()[index]) continue;
+            if (ordered[index] == YTzoomQueue()[index]) continue;
             identical = NO;
             break;
         }
         if (identical) return;
     }
-    [YTKACEQueue() setArray:ordered];
-    YTKACEQueueSave();
+    [YTzoomQueue() setArray:ordered];
+    YTzoomQueueSave();
 }
 
-static void YTKACEQueueMoveItem(id receiver, SEL selector, id from, id to,
+static void YTzoomQueueMoveItem(id receiver, SEL selector, id from, id to,
                                 BOOL triggered) {
     if (OriginalMoveItem != NULL) {
         ((void (*)(id, SEL, id, id, BOOL))OriginalMoveItem)(
             receiver, selector, from, to, triggered);
     }
-    YTKACEQueueSyncFromController(receiver);
+    YTzoomQueueSyncFromController(receiver);
 }
 
-static void YTKACEQueueRemoveItem(id receiver, SEL selector, id path,
+static void YTzoomQueueRemoveItem(id receiver, SEL selector, id path,
                                   BOOL triggered) {
     if (OriginalRemoveItem != NULL) {
         ((void (*)(id, SEL, id, BOOL))OriginalRemoveItem)(
             receiver, selector, path, triggered);
     }
-    YTKACEQueueSyncFromController(receiver);
+    YTzoomQueueSyncFromController(receiver);
 }
 
-static void YTKACEQueueRemoveIndex(id receiver, SEL selector,
+static void YTzoomQueueRemoveIndex(id receiver, SEL selector,
                                    unsigned long long index) {
     if (OriginalRemoveIndex != NULL) {
         ((void (*)(id, SEL, unsigned long long))OriginalRemoveIndex)(
             receiver, selector, index);
     }
-    YTKACEQueueSyncFromController(receiver);
+    YTzoomQueueSyncFromController(receiver);
 }
 
-static void YTKACEQueueClearQueue(id receiver, SEL selector) {
+static void YTzoomQueueClearQueue(id receiver, SEL selector) {
     if (OriginalClearQueue != NULL) {
         ((void (*)(id, SEL))OriginalClearQueue)(receiver, selector);
     }
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return;
-    [YTKACEQueue() removeAllObjects];
-    YTKACEQueueSave();
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return;
+    [YTzoomQueue() removeAllObjects];
+    YTzoomQueueSave();
 }
 
-static BOOL YTKACEQueueCanMoveItem(id receiver, SEL selector, id from, id to) {
-    if (YTKACEQueueIsActive()) return YES;
+static BOOL YTzoomQueueCanMoveItem(id receiver, SEL selector, id from, id to) {
+    if (YTzoomQueueIsActive()) return YES;
     if (OriginalCanMoveItem == NULL) return NO;
     return ((BOOL (*)(id, SEL, id, id))OriginalCanMoveItem)(receiver, selector,
                                                             from, to);
 }
 
-static NSDictionary *YTKACEQueueUpcomingEntry(void) {
-    NSArray *queue = [YTKACEQueue() copy];
-    NSUInteger current = YTKACEQueueIndexOfVideo(YTKACEQueueCurrentVideoID());
+static NSDictionary *YTzoomQueueUpcomingEntry(void) {
+    NSArray *queue = [YTzoomQueue() copy];
+    NSUInteger current = YTzoomQueueIndexOfVideo(YTzoomQueueCurrentVideoID());
     if (current == NSNotFound || current + 1 >= queue.count) return nil;
     return queue[current + 1];
 }
 
-static id YTKACEQueueNextVideoTitle(id receiver, SEL selector) {
-    NSDictionary *entry = YTKACEQueueIsActive() ? YTKACEQueueUpcomingEntry()
+static id YTzoomQueueNextVideoTitle(id receiver, SEL selector) {
+    NSDictionary *entry = YTzoomQueueIsActive() ? YTzoomQueueUpcomingEntry()
                                                 : nil;
     NSString *title = entry[@"title"];
     if (title.length != 0) return title;
@@ -1086,11 +1086,11 @@ static id YTKACEQueueNextVideoTitle(id receiver, SEL selector) {
     return ((id (*)(id, SEL))OriginalNextVideoTitle)(receiver, selector);
 }
 
-static long long YTKACEQueueNextVideoIndex(id receiver, SEL selector) {
-    if (YTKACEQueueIsActive()) {
+static long long YTzoomQueueNextVideoIndex(id receiver, SEL selector) {
+    if (YTzoomQueueIsActive()) {
         NSUInteger current =
-            YTKACEQueueIndexOfVideo(YTKACEQueueCurrentVideoID());
-        if (current != NSNotFound && current + 1 < YTKACEQueue().count) {
+            YTzoomQueueIndexOfVideo(YTzoomQueueCurrentVideoID());
+        if (current != NSNotFound && current + 1 < YTzoomQueue().count) {
             return (long long)(current + 1);
         }
     }
@@ -1098,8 +1098,8 @@ static long long YTKACEQueueNextVideoIndex(id receiver, SEL selector) {
     return ((long long (*)(id, SEL))OriginalNextVideoIndex)(receiver, selector);
 }
 
-static void YTKACEQueueReplaceAutoplay(id receiver, SEL selector, id response) {
-    if (YTKACEQueueIsActive()) {
+static void YTzoomQueueReplaceAutoplay(id receiver, SEL selector, id response) {
+    if (YTzoomQueueIsActive()) {
         return;
     }
     if (OriginalReplaceAutoplay == NULL) return;
@@ -1107,9 +1107,9 @@ static void YTKACEQueueReplaceAutoplay(id receiver, SEL selector, id response) {
                                                      response);
 }
 
-static void YTKACEQueueCellControllerSetCell(id receiver, SEL selector,
+static void YTzoomQueueCellControllerSetCell(id receiver, SEL selector,
                                              id cell) {
-    if (YTKACEQueueIsActive()) {
+    if (YTzoomQueueIsActive()) {
         for (NSString *flag in @[@"_enableSwipeToRemove",
                                  @"_enableSwipeToRemoveInPlaylistWatchEp2"]) {
             @try {
@@ -1123,14 +1123,14 @@ static void YTKACEQueueCellControllerSetCell(id receiver, SEL selector,
                                                             cell);
 }
 
-static double YTKACEQueueAlphaForIndex(id receiver, SEL selector,
+static double YTzoomQueueAlphaForIndex(id receiver, SEL selector,
                                        unsigned long long index) {
     double value = 1.0;
     if (OriginalAlphaForIndex != NULL) {
         value = ((double (*)(id, SEL, unsigned long long))OriginalAlphaForIndex)(
             receiver, selector, index);
     }
-    if (YTKACEQueueIsActive()) {
+    if (YTzoomQueueIsActive()) {
         if (value < 1.0) {
         }
         return 1.0;
@@ -1141,7 +1141,7 @@ static double YTKACEQueueAlphaForIndex(id receiver, SEL selector,
 
 
 
-static void YTKACEQueueClearSlideBackground(UIView *view, NSUInteger depth) {
+static void YTzoomQueueClearSlideBackground(UIView *view, NSUInteger depth) {
     if (view == nil || depth > 3) return;
     if ([NSStringFromClass([view class]) isEqualToString:
             @"YTSlideForActionsView"]) {
@@ -1149,15 +1149,15 @@ static void YTKACEQueueClearSlideBackground(UIView *view, NSUInteger depth) {
         view.opaque = NO;
     }
     for (UIView *child in view.subviews) {
-        YTKACEQueueClearSlideBackground(child, depth + 1);
+        YTzoomQueueClearSlideBackground(child, depth + 1);
     }
 }
 
-static void YTKACEQueueSlideLayoutSubviews(id receiver, SEL selector) {
+static void YTzoomQueueSlideLayoutSubviews(id receiver, SEL selector) {
     if (OriginalSlideLayoutSubviews != NULL) {
         ((void (*)(id, SEL))OriginalSlideLayoutSubviews)(receiver, selector);
     }
-    if (!YTKACEQueueIsActive()) return;
+    if (!YTzoomQueueIsActive()) return;
     if (![receiver isKindOfClass:UIView.class]) return;
     UIView *view = receiver;
     UIView *content = nil;
@@ -1174,19 +1174,19 @@ static void YTKACEQueueSlideLayoutSubviews(id receiver, SEL selector) {
         : UIColor.clearColor;
 }
 
-static void YTKACEQueueUpdateCellForIndex(id receiver, SEL selector, id cell,
+static void YTzoomQueueUpdateCellForIndex(id receiver, SEL selector, id cell,
                                           __unused long long index) {
     if (OriginalUpdateCellForIndex != NULL) {
         ((void (*)(id, SEL, id, long long))OriginalUpdateCellForIndex)(
             receiver, selector, cell, index);
     }
-    if (!YTKACEQueueIsActive()) return;
+    if (!YTzoomQueueIsActive()) return;
     if ([cell isKindOfClass:UIView.class]) {
-        YTKACEQueueClearSlideBackground(cell, 0);
+        YTzoomQueueClearSlideBackground(cell, 0);
     }
 }
 
-static void YTKACEQueueCellPrepareForReuse(id receiver, SEL selector) {
+static void YTzoomQueueCellPrepareForReuse(id receiver, SEL selector) {
     @try {
         id button = [receiver valueForKey:@"_swipeToRevealButton"];
         if ([button isKindOfClass:UIView.class]) {
@@ -1202,7 +1202,7 @@ static void YTKACEQueueCellPrepareForReuse(id receiver, SEL selector) {
     }
     if ([receiver isKindOfClass:UIView.class]) {
         UIView *cell = receiver;
-        YTKACEQueueClearSlideBackground(cell, 0);
+        YTzoomQueueClearSlideBackground(cell, 0);
         cell.alpha = 1.0;
         cell.transform = CGAffineTransformIdentity;
         for (UIView *subview in cell.subviews) {
@@ -1214,21 +1214,21 @@ static void YTKACEQueueCellPrepareForReuse(id receiver, SEL selector) {
     ((void (*)(id, SEL))OriginalCellPrepareForReuse)(receiver, selector);
 }
 
-static void YTKACEQueueSetCanReorder(id receiver, SEL selector, BOOL value) {
+static void YTzoomQueueSetCanReorder(id receiver, SEL selector, BOOL value) {
     if (OriginalSetCanReorder == NULL) return;
     ((void (*)(id, SEL, BOOL))OriginalSetCanReorder)(receiver, selector,
-        YTKACEQueueIsActive() ? YES : value);
+        YTzoomQueueIsActive() ? YES : value);
 }
 
-static BOOL YTKACEQueueAllowsReordering(id receiver, SEL selector,
+static BOOL YTzoomQueueAllowsReordering(id receiver, SEL selector,
                                         CGPoint point) {
-    if (YTKACEQueueIsActive()) return YES;
+    if (YTzoomQueueIsActive()) return YES;
     if (OriginalAllowsReordering == NULL) return NO;
     return ((BOOL (*)(id, SEL, CGPoint))OriginalAllowsReordering)(
         receiver, selector, point);
 }
 
-static void YTKACEQueueSetVideoCountText(id receiver, SEL selector, id text,
+static void YTzoomQueueSetVideoCountText(id receiver, SEL selector, id text,
                                          BOOL countHidden, BOOL shuffleEnabled,
                                          BOOL shuffleSelected,
                                          BOOL loopEnabled, BOOL loopSelected,
@@ -1238,11 +1238,11 @@ static void YTKACEQueueSetVideoCountText(id receiver, SEL selector, id text,
                                          BOOL useRendererSaveIcons,
                                          BOOL headerHidden) {
     if (OriginalSetVideoCountText == NULL) return;
-    if (YTKACEQueueIsActive()) {
+    if (YTzoomQueueIsActive()) {
         shuffleEnabled = YES;
         loopEnabled = YES;
         actionEnabled = YES;
-        loopMode = YTKACEQueueSavedLoopMode();
+        loopMode = YTzoomQueueSavedLoopMode();
         loopSelected = loopMode != 0;
     }
     ((void (*)(id, SEL, id, BOOL, BOOL, BOOL, BOOL, BOOL, BOOL, BOOL, BOOL,
@@ -1255,7 +1255,7 @@ static void YTKACEQueueSetVideoCountText(id receiver, SEL selector, id text,
 static IMP OriginalLegacySetVideoCountText;
 static IMP OriginalShouldShowPlaylist;
 
-static void YTKACEQueueLegacySetVideoCountText(id receiver, SEL selector, id text,
+static void YTzoomQueueLegacySetVideoCountText(id receiver, SEL selector, id text,
                                                BOOL countHidden, BOOL shuffleEnabled,
                                                BOOL shuffleSelected,
                                                BOOL loopEnabled, BOOL loopSelected,
@@ -1264,11 +1264,11 @@ static void YTKACEQueueLegacySetVideoCountText(id receiver, SEL selector, id tex
                                                long long loopMode, id renderer,
                                                BOOL useRendererSaveIcons) {
     if (OriginalLegacySetVideoCountText == NULL) return;
-    if (YTKACEQueueIsActive()) {
+    if (YTzoomQueueIsActive()) {
         shuffleEnabled = YES;
         loopEnabled = YES;
         actionEnabled = YES;
-        loopMode = YTKACEQueueSavedLoopMode();
+        loopMode = YTzoomQueueSavedLoopMode();
         loopSelected = loopMode != 0;
     }
     ((void (*)(id, SEL, id, BOOL, BOOL, BOOL, BOOL, BOOL, BOOL, BOOL, BOOL,
@@ -1278,24 +1278,24 @@ static void YTKACEQueueLegacySetVideoCountText(id receiver, SEL selector, id tex
         actionEnabled, loopMode, renderer, useRendererSaveIcons);
 }
 
-static BOOL YTKACEQueueShouldShowPlaylist(id receiver, SEL selector) {
-    if (YTKACEQueuePanelController != receiver) {
-        YTKACEQueuePanelController = receiver;
+static BOOL YTzoomQueueShouldShowPlaylist(id receiver, SEL selector) {
+    if (YTzoomQueuePanelController != receiver) {
+        YTzoomQueuePanelController = receiver;
     }
-    if (YTKACEQueueIsActive()) return YES;
+    if (YTzoomQueueIsActive()) return YES;
     if (OriginalShouldShowPlaylist == NULL) return NO;
     return ((BOOL (*)(id, SEL))OriginalShouldShowPlaylist)(receiver, selector);
 }
 
-static void YTKACEQueueDidTapShuffle(id receiver, SEL selector) {
-    if (!YTKACEQueueIsActive()) {
+static void YTzoomQueueDidTapShuffle(id receiver, SEL selector) {
+    if (!YTzoomQueueIsActive()) {
         if (OriginalDidTapShuffle == NULL) return;
         ((void (*)(id, SEL))OriginalDidTapShuffle)(receiver, selector);
         return;
     }
-    NSMutableArray *queue = YTKACEQueue();
-    NSString *currentID = YTKACEQueueCurrentVideoID();
-    NSUInteger current = YTKACEQueueIndexOfVideo(currentID);
+    NSMutableArray *queue = YTzoomQueue();
+    NSString *currentID = YTzoomQueueCurrentVideoID();
+    NSUInteger current = YTzoomQueueIndexOfVideo(currentID);
     if (current == NSNotFound || queue.count < 3) return;
     NSDictionary *entry = queue[current];
     [queue removeObjectAtIndex:current];
@@ -1304,31 +1304,31 @@ static void YTKACEQueueDidTapShuffle(id receiver, SEL selector) {
         [queue exchangeObjectAtIndex:index - 1 withObjectAtIndex:pick];
     }
     [queue insertObject:entry atIndex:0];
-    YTKACEQueueSave();
+    YTzoomQueueSave();
     NSMutableArray<NSString *> *order = [NSMutableArray array];
     for (NSDictionary *item in queue) {
         [order addObject:item[@"videoId"] ?: @"?"];
     }
-    YTKACEQueueRebuildWatchPage();
+    YTzoomQueueRebuildWatchPage();
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.4 * NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        YTKACEQueueRefreshPanel();
-        YTKACEQueueApplyLoopMode(YTKACEQueuePanelController,
-                                 YTKACEQueueSavedLoopMode());
+        YTzoomQueueRefreshPanel();
+        YTzoomQueueApplyLoopMode(YTzoomQueuePanelController,
+                                 YTzoomQueueSavedLoopMode());
     });
 }
 
-static long long YTKACEQueueSavedLoopMode(void) {
-    id value = YTKACEPreferenceObject(YTKACEQueueLoopKey);
+static long long YTzoomQueueSavedLoopMode(void) {
+    id value = YTzoomPreferenceObject(YTzoomQueueLoopKey);
     return [value respondsToSelector:@selector(longLongValue)]
         ? [value longLongValue] : 0;
 }
 
-static void YTKACEQueueStoreLoopMode(long long mode) {
-    YTKACESetPreferenceObject(YTKACEQueueLoopKey, @(mode));
+static void YTzoomQueueStoreLoopMode(long long mode) {
+    YTzoomSetPreferenceObject(YTzoomQueueLoopKey, @(mode));
 }
 
-static void YTKACEQueueApplyLoopMode(id controller, long long mode) {
+static void YTzoomQueueApplyLoopMode(id controller, long long mode) {
     if (controller == nil) return;
     @try {
         [controller setValue:@(mode) forKey:@"loopMode"];
@@ -1355,15 +1355,15 @@ static void YTKACEQueueApplyLoopMode(id controller, long long mode) {
     }
 }
 
-static void YTKACEQueueRestoreLoopMode(id controller) {
-    if (controller == nil || !YTKACEQueueIsActive()) return;
-    YTKACEQueueApplyLoopMode(controller, YTKACEQueueSavedLoopMode());
+static void YTzoomQueueRestoreLoopMode(id controller) {
+    if (controller == nil || !YTzoomQueueIsActive()) return;
+    YTzoomQueueApplyLoopMode(controller, YTzoomQueueSavedLoopMode());
 }
 
-static void YTKACEQueueClearAll(void) {
-    [YTKACEQueue() removeAllObjects];
-    YTKACEQueueSave();
-    id controller = YTKACEQueueControllerInstance;
+static void YTzoomQueueClearAll(void) {
+    [YTzoomQueue() removeAllObjects];
+    YTzoomQueueSave();
+    id controller = YTzoomQueueControllerInstance;
     if ([controller respondsToSelector:@selector(clearQueue)]) {
         @try {
             ((void (*)(id, SEL))objc_msgSend)(controller,
@@ -1371,73 +1371,73 @@ static void YTKACEQueueClearAll(void) {
         } @catch (__unused NSException *exception) {
         }
     }
-    YTKACEShowNotice(YTKACELocalized(@"Queue cleared"));
-    YTKACEQueueRebuildWatchPage();
+    YTzoomShowNotice(YTzoomLocalized(@"Queue cleared"));
+    YTzoomQueueRebuildWatchPage();
 }
 
-static void YTKACEQueueDidTapAction(id receiver, SEL selector, id button) {
-    if (!YTKACEQueueIsActive()) {
+static void YTzoomQueueDidTapAction(id receiver, SEL selector, id button) {
+    if (!YTzoomQueueIsActive()) {
         if (OriginalDidTapAction == NULL) return;
         ((void (*)(id, SEL, id))OriginalDidTapAction)(receiver, selector,
                                                       button);
         return;
     }
-    YTKACEShowYouTubeConfirmation(YTKACELocalized(@"Clear queue"),
-        YTKACELocalized(@"Remove every video from the queue?"),
-        YTKACELocalized(@"Clear"), ^{
-        YTKACEQueueClearAll();
+    YTzoomShowYouTubeConfirmation(YTzoomLocalized(@"Clear queue"),
+        YTzoomLocalized(@"Remove every video from the queue?"),
+        YTzoomLocalized(@"Clear"), ^{
+        YTzoomQueueClearAll();
     });
 }
 
-static void YTKACEQueueDidTapLoop(id receiver, SEL selector) {
+static void YTzoomQueueDidTapLoop(id receiver, SEL selector) {
     if (OriginalDidTapLoop != NULL) {
         ((void (*)(id, SEL))OriginalDidTapLoop)(receiver, selector);
     }
-    if (!YTKACEQueueIsActive()) return;
-    const long long resolved = (YTKACEQueueSavedLoopMode() + 1) % 3;
-    YTKACEQueueStoreLoopMode(resolved);
-    YTKACEQueueApplyLoopMode(receiver, resolved);
+    if (!YTzoomQueueIsActive()) return;
+    const long long resolved = (YTzoomQueueSavedLoopMode() + 1) % 3;
+    YTzoomQueueStoreLoopMode(resolved);
+    YTzoomQueueApplyLoopMode(receiver, resolved);
 }
 
-static BOOL YTKACEQueueHasStep(NSInteger offset) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return NO;
-    NSUInteger current = YTKACEQueueIndexOfVideo(YTKACEQueueCurrentVideoID());
+static BOOL YTzoomQueueHasStep(NSInteger offset) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return NO;
+    NSUInteger current = YTzoomQueueIndexOfVideo(YTzoomQueueCurrentVideoID());
     if (current == NSNotFound) return NO;
-    if (YTKACEQueueSavedLoopMode() != 0) return YTKACEQueue().count > 1;
+    if (YTzoomQueueSavedLoopMode() != 0) return YTzoomQueue().count > 1;
     const NSInteger target = (NSInteger)current + offset;
-    return target >= 0 && target < (NSInteger)YTKACEQueue().count;
+    return target >= 0 && target < (NSInteger)YTzoomQueue().count;
 }
 
-static BOOL YTKACEQueueAutonavHasNext(id receiver, SEL selector) {
-    if (YTKACEQueueHasStep(1)) return YES;
+static BOOL YTzoomQueueAutonavHasNext(id receiver, SEL selector) {
+    if (YTzoomQueueHasStep(1)) return YES;
     if (OriginalAutonavHasNext == NULL) return NO;
     return ((BOOL (*)(id, SEL))OriginalAutonavHasNext)(receiver, selector);
 }
 
-static BOOL YTKACEQueueAutonavHasPrevious(id receiver, SEL selector) {
-    if (YTKACEQueueHasStep(-1)) return YES;
+static BOOL YTzoomQueueAutonavHasPrevious(id receiver, SEL selector) {
+    if (YTzoomQueueHasStep(-1)) return YES;
     if (OriginalAutonavHasPrevious == NULL) return NO;
     return ((BOOL (*)(id, SEL))OriginalAutonavHasPrevious)(receiver, selector);
 }
 
-static BOOL YTKACEQueueControllerHasNext(id receiver, SEL selector) {
-    if (YTKACEQueueHasStep(1)) return YES;
+static BOOL YTzoomQueueControllerHasNext(id receiver, SEL selector) {
+    if (YTzoomQueueHasStep(1)) return YES;
     if (OriginalQueueHasNext == NULL) return NO;
     return ((BOOL (*)(id, SEL))OriginalQueueHasNext)(receiver, selector);
 }
 
-static BOOL YTKACEQueueControllerHasPrevious(id receiver, SEL selector) {
-    if (YTKACEQueueHasStep(-1)) return YES;
+static BOOL YTzoomQueueControllerHasPrevious(id receiver, SEL selector) {
+    if (YTzoomQueueHasStep(-1)) return YES;
     if (OriginalQueueHasPrevious == NULL) return NO;
     return ((BOOL (*)(id, SEL))OriginalQueueHasPrevious)(receiver, selector);
 }
 
-static unsigned long long YTKACEQueueNextNavigable(id receiver, SEL selector) {
-    if (YTKACEQueueHasStep(1)) {
+static unsigned long long YTzoomQueueNextNavigable(id receiver, SEL selector) {
+    if (YTzoomQueueHasStep(1)) {
         NSUInteger current =
-            YTKACEQueueIndexOfVideo(YTKACEQueueCurrentVideoID());
+            YTzoomQueueIndexOfVideo(YTzoomQueueCurrentVideoID());
         if (current != NSNotFound) {
-            const NSUInteger count = YTKACEQueue().count;
+            const NSUInteger count = YTzoomQueue().count;
             return (unsigned long long)((current + 1) % MAX(count, 1u));
         }
     }
@@ -1446,12 +1446,12 @@ static unsigned long long YTKACEQueueNextNavigable(id receiver, SEL selector) {
                                                                     selector);
 }
 
-static unsigned long long YTKACEQueuePreviousNavigable(id receiver,
+static unsigned long long YTzoomQueuePreviousNavigable(id receiver,
                                                        SEL selector) {
-    if (YTKACEQueueHasStep(-1)) {
+    if (YTzoomQueueHasStep(-1)) {
         NSUInteger current =
-            YTKACEQueueIndexOfVideo(YTKACEQueueCurrentVideoID());
-        const NSUInteger count = YTKACEQueue().count;
+            YTzoomQueueIndexOfVideo(YTzoomQueueCurrentVideoID());
+        const NSUInteger count = YTzoomQueue().count;
         if (current != NSNotFound && count != 0) {
             return (unsigned long long)(current == 0 ? count - 1 : current - 1);
         }
@@ -1461,14 +1461,14 @@ static unsigned long long YTKACEQueuePreviousNavigable(id receiver,
         receiver, selector);
 }
 
-static id YTKACEQueuePanelByline(id receiver, SEL selector) {
-    if (YTKACEQueueIsActive()) {
+static id YTzoomQueuePanelByline(id receiver, SEL selector) {
+    if (YTzoomQueueIsActive()) {
         NSUInteger current =
-            YTKACEQueueIndexOfVideo(YTKACEQueueCurrentVideoID());
-        const NSUInteger count = YTKACEQueue().count;
+            YTzoomQueueIndexOfVideo(YTzoomQueueCurrentVideoID());
+        const NSUInteger count = YTzoomQueue().count;
         if (current != NSNotFound && count != 0) {
             return [NSString stringWithFormat:@"%@ • %lu/%lu",
-                YTKACELocalized(@"Queue"), (unsigned long)(current + 1),
+                YTzoomLocalized(@"Queue"), (unsigned long)(current + 1),
                 (unsigned long)count];
         }
     }
@@ -1476,100 +1476,100 @@ static id YTKACEQueuePanelByline(id receiver, SEL selector) {
     return ((id (*)(id, SEL))OriginalPanelByline)(receiver, selector);
 }
 
-static BOOL YTKACEQueueIsQueue(id receiver, SEL selector) {
-    if (YTKACEQueuePanelController != receiver) {
-        YTKACEQueuePanelController = receiver;
+static BOOL YTzoomQueueIsQueue(id receiver, SEL selector) {
+    if (YTzoomQueuePanelController != receiver) {
+        YTzoomQueuePanelController = receiver;
     }
-    if (YTKACEQueueIsActive()) return YES;
+    if (YTzoomQueueIsActive()) return YES;
     if (OriginalIsQueue == NULL) return NO;
     return ((BOOL (*)(id, SEL))OriginalIsQueue)(receiver, selector);
 }
 
-static BOOL YTKACEQueueHasContents(id receiver, SEL selector) {
-    if (YTKACEQueuePanelController != receiver) {
-        YTKACEQueuePanelController = receiver;
+static BOOL YTzoomQueueHasContents(id receiver, SEL selector) {
+    if (YTzoomQueuePanelController != receiver) {
+        YTzoomQueuePanelController = receiver;
     }
-    if (YTKACEQueueIsActive()) return YES;
+    if (YTzoomQueueIsActive()) return YES;
     if (OriginalHasQueueContents == NULL) return NO;
     return ((BOOL (*)(id, SEL))OriginalHasQueueContents)(receiver, selector);
 }
 
-static void YTKACEQueueHandlePlaybackTime(NSNotification *notification) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return;
+static void YTzoomQueueHandlePlaybackTime(NSNotification *notification) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return;
     id receiver = notification.object;
     if (receiver == nil) return;
-    YTKACEQueueResponder = receiver;
-    id live = YTKACEQueueValue(receiver, @[@"currentVideoID", @"contentVideoID"]);
+    YTzoomQueueResponder = receiver;
+    id live = YTzoomQueueValue(receiver, @[@"currentVideoID", @"contentVideoID"]);
     if ([live isKindOfClass:NSString.class] && [live length] != 0 &&
-        ![live isEqualToString:YTKACEQueueActiveVideo]) {
-        YTKACEQueueActiveVideo = live;
-        YTKACEQueueActiveVideoTime = 0;
+        ![live isEqualToString:YTzoomQueueActiveVideo]) {
+        YTzoomQueueActiveVideo = live;
+        YTzoomQueueActiveVideoTime = 0;
     }
-    if (YTKACEQueue().count == 0) return;
+    if (YTzoomQueue().count == 0) return;
     SEL totalSelector = NSSelectorFromString(@"currentVideoTotalMediaTime");
     if (![receiver respondsToSelector:totalSelector]) return;
     const double total = ((double (*)(id, SEL))objc_msgSend)(receiver, totalSelector);
     const double time = [notification.userInfo[@"time"] doubleValue];
     if (total <= 0.0 || time <= 0.0) return;
-    NSString *videoID = YTKACELastVideoID();
-    if (![videoID isEqualToString:YTKACEQueueActiveVideoID]) {
-        YTKACEQueueActiveVideoID = videoID;
-        YTKACEQueueAdvancedFromVideoID = nil;
+    NSString *videoID = YTzoomLastVideoID();
+    if (![videoID isEqualToString:YTzoomQueueActiveVideoID]) {
+        YTzoomQueueActiveVideoID = videoID;
+        YTzoomQueueAdvancedFromVideoID = nil;
     }
     if (time < total - 0.75) return;
     if (videoID.length != 0 &&
-        [videoID isEqualToString:YTKACEQueueAdvancedFromVideoID]) {
+        [videoID isEqualToString:YTzoomQueueAdvancedFromVideoID]) {
         return;
     }
 
     NSString *finishing = [live isKindOfClass:NSString.class] && [live length] != 0
         ? (NSString *)live : videoID;
     if (finishing.length == 0 ||
-        YTKACEQueueIndexOfVideo(finishing) == NSNotFound) {
+        YTzoomQueueIndexOfVideo(finishing) == NSNotFound) {
         return;
     }
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.AutoplayDisabled")) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.AutoplayDisabled")) {
         return;
     }
-    YTKACEQueueAdvancedFromVideoID = videoID;
-    YTKACEQueueAdvance();
+    YTzoomQueueAdvancedFromVideoID = videoID;
+    YTzoomQueueAdvance();
 }
 
 
-static NSString *const YTKACEQueueSentinelPrefix = @"YTKACEQ|";
+static NSString *const YTzoomQueueSentinelPrefix = @"YTzoomQ|";
 
-static id YTKACEQueueSentinelCommand(NSString *action, NSString *videoID) {
-    id command = YTKACEQueueMessage(@"YTICommand");
+static id YTzoomQueueSentinelCommand(NSString *action, NSString *videoID) {
+    id command = YTzoomQueueMessage(@"YTICommand");
     if (command == nil) return nil;
     NSString *marker = [NSString stringWithFormat:@"%@%@|%@",
-        YTKACEQueueSentinelPrefix, action, videoID];
+        YTzoomQueueSentinelPrefix, action, videoID];
     [command setValue:[marker dataUsingEncoding:NSUTF8StringEncoding]
                forKey:@"clickTrackingParams"];
     return command;
 }
 
-static id YTKACEQueueMenuItem(NSString *label, NSString *action,
+static id YTzoomQueueMenuItem(NSString *label, NSString *action,
                               NSString *videoID) {
-    id wrapper = YTKACEQueueMessage(@"YTIMenuItemSupportedRenderers");
-    id item = YTKACEQueueMessage(@"YTIMenuServiceItemRenderer");
-    id command = YTKACEQueueSentinelCommand(action, videoID);
+    id wrapper = YTzoomQueueMessage(@"YTIMenuItemSupportedRenderers");
+    id item = YTzoomQueueMessage(@"YTIMenuServiceItemRenderer");
+    id command = YTzoomQueueSentinelCommand(action, videoID);
     if (wrapper == nil || item == nil || command == nil) return nil;
-    id text = YTKACEQueueFormatted(label);
+    id text = YTzoomQueueFormatted(label);
     if (text != nil) [item setValue:text forKey:@"text"];
     [item setValue:command forKey:@"serviceEndpoint"];
     [wrapper setValue:item forKey:@"menuServiceItemRenderer"];
     return wrapper;
 }
 
-static id YTKACEQueueItemMenu(NSString *videoID) {
-    id supported = YTKACEQueueMessage(@"YTIMenuSupportedRenderers");
-    id renderer = YTKACEQueueMessage(@"YTIMenuRenderer");
+static id YTzoomQueueItemMenu(NSString *videoID) {
+    id supported = YTzoomQueueMessage(@"YTIMenuSupportedRenderers");
+    id renderer = YTzoomQueueMessage(@"YTIMenuRenderer");
     if (supported == nil || renderer == nil) return nil;
     NSMutableArray *items = [renderer valueForKey:@"itemsArray"];
     if (items == nil) return nil;
-    id playNext = YTKACEQueueMenuItem(YTKACELocalized(@"Play next in queue"),
+    id playNext = YTzoomQueueMenuItem(YTzoomLocalized(@"Play next in queue"),
                                       @"next", videoID);
-    id remove = YTKACEQueueMenuItem(YTKACELocalized(@"Remove from queue"),
+    id remove = YTzoomQueueMenuItem(YTzoomLocalized(@"Remove from queue"),
                                     @"remove", videoID);
     if (playNext != nil) [items addObject:playNext];
     if (remove != nil) [items addObject:remove];
@@ -1578,10 +1578,10 @@ static id YTKACEQueueItemMenu(NSString *videoID) {
     return supported;
 }
 
-static BOOL YTKACEQueueHandleSentinel(id command) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return NO;
-    NSString *dump = YTKACEQueueClip(command, 600);
-    NSRange range = [dump rangeOfString:YTKACEQueueSentinelPrefix];
+static BOOL YTzoomQueueHandleSentinel(id command) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return NO;
+    NSString *dump = YTzoomQueueClip(command, 600);
+    NSRange range = [dump rangeOfString:YTzoomQueueSentinelPrefix];
     if (range.location == NSNotFound) return NO;
     NSString *tail = [dump substringFromIndex:NSMaxRange(range)];
     NSArray<NSString *> *parts = [tail componentsSeparatedByString:@"|"];
@@ -1589,13 +1589,13 @@ static BOOL YTKACEQueueHandleSentinel(id command) {
     NSString *action = parts[0];
     NSString *videoID = [parts[1] substringToIndex:
         MIN((NSUInteger)11, [parts[1] length])];
-    NSUInteger index = YTKACEQueueIndexOfVideo(videoID);
+    NSUInteger index = YTzoomQueueIndexOfVideo(videoID);
     if (index == NSNotFound) return NO;
-    NSDictionary *entry = YTKACEQueue()[index];
+    NSDictionary *entry = YTzoomQueue()[index];
     if ([action isEqualToString:@"remove"]) {
-        [YTKACEQueue() removeObjectAtIndex:index];
-        YTKACEQueueSave();
-        id controller = YTKACEQueueControllerInstance;
+        [YTzoomQueue() removeObjectAtIndex:index];
+        YTzoomQueueSave();
+        id controller = YTzoomQueueControllerInstance;
         if ([controller respondsToSelector:@selector(removeVideoID:)]) {
             @try {
                 ((void (*)(id, SEL, id))objc_msgSend)(controller,
@@ -1603,29 +1603,29 @@ static BOOL YTKACEQueueHandleSentinel(id command) {
             } @catch (__unused NSException *exception) {
             }
         }
-        YTKACEShowNotice(YTKACELocalized(@"Removed from queue"));
-        YTKACEQueueRebuildWatchPage();
+        YTzoomShowNotice(YTzoomLocalized(@"Removed from queue"));
+        YTzoomQueueRebuildWatchPage();
     } else if ([action isEqualToString:@"next"]) {
-        NSUInteger current = YTKACEQueueIndexOfVideo(YTKACEQueueCurrentVideoID());
+        NSUInteger current = YTzoomQueueIndexOfVideo(YTzoomQueueCurrentVideoID());
         if (current == NSNotFound) return NO;
-        [YTKACEQueue() removeObjectAtIndex:index];
+        [YTzoomQueue() removeObjectAtIndex:index];
         NSUInteger target = current < index ? current + 1 : current;
-        [YTKACEQueue() insertObject:entry atIndex:MIN(target,
-            YTKACEQueue().count)];
-        YTKACEQueueSave();
-        YTKACEShowNotice(YTKACELocalized(@"Playing next"));
+        [YTzoomQueue() insertObject:entry atIndex:MIN(target,
+            YTzoomQueue().count)];
+        YTzoomQueueSave();
+        YTzoomShowNotice(YTzoomLocalized(@"Playing next"));
     } else {
         return NO;
     }
-    YTKACEQueueRefreshPanel();
+    YTzoomQueueRefreshPanel();
     return YES;
 }
 
-static BOOL YTKACEQueueHandleDiscovery(id command, id view) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return NO;
+static BOOL YTzoomQueueHandleDiscovery(id command, id view) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return NO;
     NSString *params = nil;
     @try {
-        params = YTKACEQueueDiscoveryParams(command);
+        params = YTzoomQueueDiscoveryParams(command);
     } @catch (__unused NSException *exception) {
         return NO;
     }
@@ -1635,23 +1635,23 @@ static BOOL YTKACEQueueHandleDiscovery(id command, id view) {
         options:NSDataBase64DecodingIgnoreUnknownCharacters];
     if (data.length == 0) return NO;
     int position = 0;
-    NSString *videoID = YTKACEQueueVideoIDFromParams(data, &position);
+    NSString *videoID = YTzoomQueueVideoIDFromParams(data, &position);
     if (videoID.length == 0) return NO;
     if (position != 2 && position != 3) return NO;
-    YTKACEQueueAdd(videoID, YTKACEQueueTitleNearView(view), position == 2);
+    YTzoomQueueAdd(videoID, YTzoomQueueTitleNearView(view), position == 2);
     return YES;
 }
 
-static void YTKACEQueueDiscoveryExecute(id receiver, SEL selector, id command,
+static void YTzoomQueueDiscoveryExecute(id receiver, SEL selector, id command,
                                         id entry, id view, id sender) {
-    if (YTKACEQueueHandleDiscovery(command, view)) return;
+    if (YTzoomQueueHandleDiscovery(command, view)) return;
     if (OriginalDiscoveryExecute == NULL) return;
     ((void (*)(id, SEL, id, id, id, id))OriginalDiscoveryExecute)(
         receiver, selector, command, entry, view, sender);
 }
 
 
-static NSString *YTKACEQueueClip(id object, NSUInteger limit) {
+static NSString *YTzoomQueueClip(id object, NSUInteger limit) {
     NSString *text = nil;
     @try {
         text = [object description];
@@ -1667,8 +1667,8 @@ static NSString *YTKACEQueueClip(id object, NSUInteger limit) {
 
 
 
-static BOOL YTKACEQueueHandleMenuAdd(id command, id view) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey)) return NO;
+static BOOL YTzoomQueueHandleMenuAdd(id command, id view) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey)) return NO;
     NSString *dump = nil;
     @try {
         dump = [command description];
@@ -1690,7 +1690,7 @@ static BOOL YTKACEQueueHandleMenuAdd(id command, id view) {
     NSString *decoded = [params stringByRemovingPercentEncoding] ?: params;
     NSData *data = [[NSData alloc] initWithBase64EncodedString:decoded
         options:NSDataBase64DecodingIgnoreUnknownCharacters];
-    NSString *videoID = data.length ? YTKACEQueueVideoIDFromParams(data, NULL) : nil;
+    NSString *videoID = data.length ? YTzoomQueueVideoIDFromParams(data, NULL) : nil;
     if (videoID.length == 0) return NO;
     BOOL playNext = YES;
     const unsigned char *bytes = (const unsigned char *)data.bytes;
@@ -1700,11 +1700,11 @@ static BOOL YTKACEQueueHandleMenuAdd(id command, id view) {
             break;
         }
     }
-    YTKACEQueueAdd(videoID, YTKACEQueueTitleNearView(view), playNext);
+    YTzoomQueueAdd(videoID, YTzoomQueueTitleNearView(view), playNext);
     return YES;
 }
 
-static id YTKACEQueueConditionalItem(id wrapper) {
+static id YTzoomQueueConditionalItem(id wrapper) {
     SEL getter = NSSelectorFromString(@"menuConditionalServiceItemRenderer");
     SEL has = NSSelectorFromString(@"hasMenuConditionalServiceItemRenderer");
     if (![wrapper respondsToSelector:getter] || ![wrapper respondsToSelector:has]) return nil;
@@ -1712,12 +1712,12 @@ static id YTKACEQueueConditionalItem(id wrapper) {
     return ((id (*)(id, SEL))objc_msgSend)(wrapper, getter);
 }
 
-void YTKACEQueuePrepareMenuRenderers(id renderers) {
-    if (!YTKACEFeatureEnabled(YTKACEQueueKey) || ![renderers isKindOfClass:NSArray.class]) return;
+void YTzoomQueuePrepareMenuRenderers(id renderers) {
+    if (!YTzoomFeatureEnabled(YTzoomQueueKey) || ![renderers isKindOfClass:NSArray.class]) return;
     NSMutableDictionary<NSString *, id> *commands = [NSMutableDictionary dictionary];
     NSMutableArray *upsells = [NSMutableArray array];
     for (id wrapper in renderers) {
-        id item = YTKACEQueueConditionalItem(wrapper);
+        id item = YTzoomQueueConditionalItem(wrapper);
         if (item == nil) continue;
         NSString *dump = [item description];
         NSString *icon = [dump containsString:@"QUEUE_PLAY_NEXT"] ? @"next"
@@ -1741,44 +1741,44 @@ void YTKACEQueuePrepareMenuRenderers(id renderers) {
     }
 }
 
-static BOOL YTKACEQueueRouterHandle(id receiver, SEL selector, id command,
+static BOOL YTzoomQueueRouterHandle(id receiver, SEL selector, id command,
                                     id entry, id view, id sender) {
-    if (YTKACEQueueHandleMenuAdd(command, view)) return YES;
-    if (YTKACEQueueHandleSentinel(command)) return YES;
-    if (YTKACEQueueHandleDiscovery(command, view)) return YES;
+    if (YTzoomQueueHandleMenuAdd(command, view)) return YES;
+    if (YTzoomQueueHandleSentinel(command)) return YES;
+    if (YTzoomQueueHandleDiscovery(command, view)) return YES;
     if (OriginalRouterHandle == NULL) return NO;
     return ((BOOL (*)(id, SEL, id, id, id, id))OriginalRouterHandle)(
         receiver, selector, command, entry, view, sender);
 }
 
-static BOOL YTKACEQueueRouterHandleCompletion(id receiver, SEL selector,
+static BOOL YTzoomQueueRouterHandleCompletion(id receiver, SEL selector,
                                               id command, id entry, id view,
                                               id sender, id block) {
-    if (YTKACEQueueHandleMenuAdd(command, view)) return YES;
-    if (YTKACEQueueHandleSentinel(command)) return YES;
-    if (YTKACEQueueHandleDiscovery(command, view)) return YES;
+    if (YTzoomQueueHandleMenuAdd(command, view)) return YES;
+    if (YTzoomQueueHandleSentinel(command)) return YES;
+    if (YTzoomQueueHandleDiscovery(command, view)) return YES;
     if (OriginalRouterHandleCompletion == NULL) return NO;
     return ((BOOL (*)(id, SEL, id, id, id, id, id))OriginalRouterHandleCompletion)(
         receiver, selector, command, entry, view, sender, block);
 }
 
-static BOOL YTKACEQueueScopedRouterHandle(id receiver, SEL selector, id command,
+static BOOL YTzoomQueueScopedRouterHandle(id receiver, SEL selector, id command,
                                           id entry, id view, id sender) {
-    if (YTKACEQueueHandleMenuAdd(command, view)) return YES;
-    if (YTKACEQueueHandleSentinel(command)) return YES;
-    if (YTKACEQueueHandleDiscovery(command, view)) return YES;
+    if (YTzoomQueueHandleMenuAdd(command, view)) return YES;
+    if (YTzoomQueueHandleSentinel(command)) return YES;
+    if (YTzoomQueueHandleDiscovery(command, view)) return YES;
     if (OriginalScopedRouterHandle == NULL) return NO;
     return ((BOOL (*)(id, SEL, id, id, id, id))OriginalScopedRouterHandle)(
         receiver, selector, command, entry, view, sender);
 }
 
-static BOOL YTKACEQueueScopedRouterHandleCompletion(id receiver, SEL selector,
+static BOOL YTzoomQueueScopedRouterHandleCompletion(id receiver, SEL selector,
                                                     id command, id entry,
                                                     id view, id sender,
                                                     id block) {
-    if (YTKACEQueueHandleMenuAdd(command, view)) return YES;
-    if (YTKACEQueueHandleSentinel(command)) return YES;
-    if (YTKACEQueueHandleDiscovery(command, view)) return YES;
+    if (YTzoomQueueHandleMenuAdd(command, view)) return YES;
+    if (YTzoomQueueHandleSentinel(command)) return YES;
+    if (YTzoomQueueHandleDiscovery(command, view)) return YES;
     if (OriginalScopedRouterHandleCompletion == NULL) return NO;
     return ((BOOL (*)(id, SEL, id, id, id, id, id))
         OriginalScopedRouterHandleCompletion)(
@@ -1788,167 +1788,167 @@ static BOOL YTKACEQueueScopedRouterHandleCompletion(id receiver, SEL selector,
 static IMP OriginalLegacyQueueMenuAdd;
 static IMP OriginalLegacyWatchNextQueueAdd;
 
-static void YTKACELegacyQueueMenuAdd(id receiver, SEL selector, id command,
+static void YTzoomLegacyQueueMenuAdd(id receiver, SEL selector, id command,
                                      id entry, id view, id sender) {
-    if (YTKACEQueueHandleMenuAdd(command, view)) return;
+    if (YTzoomQueueHandleMenuAdd(command, view)) return;
     ((void (*)(id, SEL, id, id, id, id))OriginalLegacyQueueMenuAdd)(
         receiver, selector, command, entry, view, sender);
 }
 
-static void YTKACELegacyWatchNextQueueAdd(id receiver, SEL selector, id command,
+static void YTzoomLegacyWatchNextQueueAdd(id receiver, SEL selector, id command,
                                           id entry, id view, id sender) {
-    if (YTKACEQueueHandleMenuAdd(command, view)) return;
+    if (YTzoomQueueHandleMenuAdd(command, view)) return;
     ((void (*)(id, SEL, id, id, id, id))OriginalLegacyWatchNextQueueAdd)(
         receiver, selector, command, entry, view, sender);
 }
 
-void YTKACEInstallQueueHooks(void) {
-    YTKACEInstallInstanceHook(@"YTQueueAddMenuItemCommandHandler",
+void YTzoomInstallQueueHooks(void) {
+    YTzoomInstallInstanceHook(@"YTQueueAddMenuItemCommandHandler",
         @"executeWithCommand:entry:fromView:sender:",
-        (IMP)YTKACELegacyQueueMenuAdd, &OriginalLegacyQueueMenuAdd);
-    YTKACEInstallInstanceHook(@"YTGetWatchNextQueueAddCommandHandler",
+        (IMP)YTzoomLegacyQueueMenuAdd, &OriginalLegacyQueueMenuAdd);
+    YTzoomInstallInstanceHook(@"YTGetWatchNextQueueAddCommandHandler",
         @"executeWithCommand:entry:fromView:sender:",
-        (IMP)YTKACELegacyWatchNextQueueAdd, &OriginalLegacyWatchNextQueueAdd);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomLegacyWatchNextQueueAdd, &OriginalLegacyWatchNextQueueAdd);
+    YTzoomInstallInstanceHook(
         @"MDXRequestDeviceDiscoveryCommandHandlerImpl",
         @"executeWithCommand:entry:fromView:sender:",
-        (IMP)YTKACEQueueDiscoveryExecute, &OriginalDiscoveryExecute);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomQueueDiscoveryExecute, &OriginalDiscoveryExecute);
+    YTzoomInstallInstanceHook(
         @"YTDefaultQueueWatchNextResponseParser",
         @"playlistPanelRendererFromWatchNextResponse:",
-        (IMP)YTKACEQueuePanelParse, &OriginalPanelParse);
-    if (!YTKACEInstallInstanceHook(@"YTPlaylistPanelSectionController",
+        (IMP)YTzoomQueuePanelParse, &OriginalPanelParse);
+    if (!YTzoomInstallInstanceHook(@"YTPlaylistPanelSectionController",
         @"setVideoCountText:videoCountHidden:shuffleEnabled:shuffleSelected:"
         @"loopEnabled:loopSelected:saveEnabled:shareEnabled:saveSelected:"
         @"actionEnabled:loopMode:playlistPanelRenderer:useRendererSaveIcons:"
         @"headerHidden:",
-        (IMP)YTKACEQueueSetVideoCountText, &OriginalSetVideoCountText)) {
-        YTKACEInstallInstanceHook(@"YTPlaylistPanelSectionController",
+        (IMP)YTzoomQueueSetVideoCountText, &OriginalSetVideoCountText)) {
+        YTzoomInstallInstanceHook(@"YTPlaylistPanelSectionController",
             @"setVideoCountText:videoCountHidden:shuffleEnabled:shuffleSelected:"
             @"loopEnabled:loopSelected:saveEnabled:shareEnabled:saveSelected:"
             @"actionEnabled:loopMode:playlistPanelRenderer:useRendererSaveIcons:",
-            (IMP)YTKACEQueueLegacySetVideoCountText, &OriginalLegacySetVideoCountText);
+            (IMP)YTzoomQueueLegacySetVideoCountText, &OriginalLegacySetVideoCountText);
     }
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelController",
-        @"didTapShuffleButton", (IMP)YTKACEQueueDidTapShuffle,
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelController",
+        @"didTapShuffleButton", (IMP)YTzoomQueueDidTapShuffle,
         &OriginalDidTapShuffle);
-    YTKACEInstallInstanceHook(@"YTAutoplayAutonavController", @"hasNextVideo",
-        (IMP)YTKACEQueueAutonavHasNext, &OriginalAutonavHasNext);
-    YTKACEInstallInstanceHook(@"YTAutoplayAutonavController",
-        @"hasPreviousVideo", (IMP)YTKACEQueueAutonavHasPrevious,
+    YTzoomInstallInstanceHook(@"YTAutoplayAutonavController", @"hasNextVideo",
+        (IMP)YTzoomQueueAutonavHasNext, &OriginalAutonavHasNext);
+    YTzoomInstallInstanceHook(@"YTAutoplayAutonavController",
+        @"hasPreviousVideo", (IMP)YTzoomQueueAutonavHasPrevious,
         &OriginalAutonavHasPrevious);
-    YTKACEInstallInstanceHook(@"YTQueueController", @"nextNavigableVideoIndex",
-        (IMP)YTKACEQueueNextNavigable, &OriginalNextNavigable);
-    YTKACEInstallInstanceHook(@"YTQueueController",
-        @"previousNavigableVideoIndex", (IMP)YTKACEQueuePreviousNavigable,
+    YTzoomInstallInstanceHook(@"YTQueueController", @"nextNavigableVideoIndex",
+        (IMP)YTzoomQueueNextNavigable, &OriginalNextNavigable);
+    YTzoomInstallInstanceHook(@"YTQueueController",
+        @"previousNavigableVideoIndex", (IMP)YTzoomQueuePreviousNavigable,
         &OriginalPreviousNavigable);
-    YTKACEInstallInstanceHook(@"YTQueueController", @"hasNextVideo",
-        (IMP)YTKACEQueueControllerHasNext, &OriginalQueueHasNext);
-    YTKACEInstallInstanceHook(@"YTQueueController", @"hasPreviousVideo",
-        (IMP)YTKACEQueueControllerHasPrevious, &OriginalQueueHasPrevious);
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelController",
-        @"didTapActionButton:", (IMP)YTKACEQueueDidTapAction,
+    YTzoomInstallInstanceHook(@"YTQueueController", @"hasNextVideo",
+        (IMP)YTzoomQueueControllerHasNext, &OriginalQueueHasNext);
+    YTzoomInstallInstanceHook(@"YTQueueController", @"hasPreviousVideo",
+        (IMP)YTzoomQueueControllerHasPrevious, &OriginalQueueHasPrevious);
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelController",
+        @"didTapActionButton:", (IMP)YTzoomQueueDidTapAction,
         &OriginalDidTapAction);
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelController", @"didTapLoopButton",
-        (IMP)YTKACEQueueDidTapLoop, &OriginalDidTapLoop);
-    YTKACEInstallInstanceHook(
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelController", @"didTapLoopButton",
+        (IMP)YTzoomQueueDidTapLoop, &OriginalDidTapLoop);
+    YTzoomInstallInstanceHook(
         @"YTPlaylistPanelProminentThumbnailVideoCellController", @"setCell:",
-        (IMP)YTKACEQueueCellControllerSetCell, &OriginalCellControllerSetCell);
-    YTKACEInstallInstanceHook(@"YTSlideForActionsView", @"layoutSubviews",
-        (IMP)YTKACEQueueSlideLayoutSubviews, &OriginalSlideLayoutSubviews);
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelSectionController",
-        @"updateCell:forIndex:", (IMP)YTKACEQueueUpdateCellForIndex,
+        (IMP)YTzoomQueueCellControllerSetCell, &OriginalCellControllerSetCell);
+    YTzoomInstallInstanceHook(@"YTSlideForActionsView", @"layoutSubviews",
+        (IMP)YTzoomQueueSlideLayoutSubviews, &OriginalSlideLayoutSubviews);
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelSectionController",
+        @"updateCell:forIndex:", (IMP)YTzoomQueueUpdateCellForIndex,
         &OriginalUpdateCellForIndex);
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelSectionController",
-        @"alphaForIndex:", (IMP)YTKACEQueueAlphaForIndex,
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelSectionController",
+        @"alphaForIndex:", (IMP)YTzoomQueueAlphaForIndex,
         &OriginalAlphaForIndex);
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelProminentThumbnailVideoCell",
-        @"prepareForReuse", (IMP)YTKACEQueueCellPrepareForReuse,
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelProminentThumbnailVideoCell",
+        @"prepareForReuse", (IMP)YTzoomQueueCellPrepareForReuse,
         &OriginalCellPrepareForReuse);
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelProminentThumbnailVideoCell",
-        @"setCanReorder:", (IMP)YTKACEQueueSetCanReorder,
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelProminentThumbnailVideoCell",
+        @"setCanReorder:", (IMP)YTzoomQueueSetCanReorder,
         &OriginalSetCanReorder);
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelProminentThumbnailVideoCell",
-        @"allowsReorderingAtPoint:", (IMP)YTKACEQueueAllowsReordering,
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelProminentThumbnailVideoCell",
+        @"allowsReorderingAtPoint:", (IMP)YTzoomQueueAllowsReordering,
         &OriginalAllowsReordering);
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelController", @"nextVideoTitle",
-        (IMP)YTKACEQueueNextVideoTitle, &OriginalNextVideoTitle);
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelController", @"nextVideoIndex",
-        (IMP)YTKACEQueueNextVideoIndex, &OriginalNextVideoIndex);
-    YTKACEInstallInstanceHook(@"YTQueueAutoplayController",
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelController", @"nextVideoTitle",
+        (IMP)YTzoomQueueNextVideoTitle, &OriginalNextVideoTitle);
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelController", @"nextVideoIndex",
+        (IMP)YTzoomQueueNextVideoIndex, &OriginalNextVideoIndex);
+    YTzoomInstallInstanceHook(@"YTQueueAutoplayController",
         @"replaceAutoplayItemsWithWatchNextResponse:",
-        (IMP)YTKACEQueueReplaceAutoplay, &OriginalReplaceAutoplay);
-    YTKACEInstallInstanceHook(@"YTQueueController",
-        @"canMoveItemAtIndexPath:toIndexPath:", (IMP)YTKACEQueueCanMoveItem,
+        (IMP)YTzoomQueueReplaceAutoplay, &OriginalReplaceAutoplay);
+    YTzoomInstallInstanceHook(@"YTQueueController",
+        @"canMoveItemAtIndexPath:toIndexPath:", (IMP)YTzoomQueueCanMoveItem,
         &OriginalCanMoveItem);
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelController", @"byline",
-        (IMP)YTKACEQueuePanelByline, &OriginalPanelByline);
-    YTKACEInstallInstanceHook(@"YTPlaylistPanelController", @"isQueue",
-        (IMP)YTKACEQueueIsQueue, &OriginalIsQueue);
-    if (!YTKACEInstallInstanceHook(@"YTPlaylistPanelController",
-        @"hasQueueContents", (IMP)YTKACEQueueHasContents,
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelController", @"byline",
+        (IMP)YTzoomQueuePanelByline, &OriginalPanelByline);
+    YTzoomInstallInstanceHook(@"YTPlaylistPanelController", @"isQueue",
+        (IMP)YTzoomQueueIsQueue, &OriginalIsQueue);
+    if (!YTzoomInstallInstanceHook(@"YTPlaylistPanelController",
+        @"hasQueueContents", (IMP)YTzoomQueueHasContents,
         &OriginalHasQueueContents)) {
-        YTKACEInstallInstanceHook(@"YTPlaylistPanelController",
-            @"shouldShowPlaylist", (IMP)YTKACEQueueShouldShowPlaylist,
+        YTzoomInstallInstanceHook(@"YTPlaylistPanelController",
+            @"shouldShowPlaylist", (IMP)YTzoomQueueShouldShowPlaylist,
             &OriginalShouldShowPlaylist);
     }
-    YTKACEInstallInstanceHook(@"YTQueueController",
+    YTzoomInstallInstanceHook(@"YTQueueController",
         @"moveItemAtIndexPath:toIndexPath:userTriggered:",
-        (IMP)YTKACEQueueMoveItem, &OriginalMoveItem);
-    YTKACEInstallInstanceHook(@"YTQueueController",
+        (IMP)YTzoomQueueMoveItem, &OriginalMoveItem);
+    YTzoomInstallInstanceHook(@"YTQueueController",
         @"removeItemAtIndexPath:userTriggered:",
-        (IMP)YTKACEQueueRemoveItem, &OriginalRemoveItem);
-    YTKACEInstallInstanceHook(@"YTQueueController", @"removeQueueItemAtIndex:",
-        (IMP)YTKACEQueueRemoveIndex, &OriginalRemoveIndex);
-    YTKACEInstallInstanceHook(@"YTQueueController", @"clearQueue",
-        (IMP)YTKACEQueueClearQueue, &OriginalClearQueue);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
-        @"didPressNext:", (IMP)YTKACEQueueDidPressNext, &OriginalDidPressNext);
-    YTKACEInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
-        @"didPressPrevious:", (IMP)YTKACEQueueDidPressPrevious,
+        (IMP)YTzoomQueueRemoveItem, &OriginalRemoveItem);
+    YTzoomInstallInstanceHook(@"YTQueueController", @"removeQueueItemAtIndex:",
+        (IMP)YTzoomQueueRemoveIndex, &OriginalRemoveIndex);
+    YTzoomInstallInstanceHook(@"YTQueueController", @"clearQueue",
+        (IMP)YTzoomQueueClearQueue, &OriginalClearQueue);
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
+        @"didPressNext:", (IMP)YTzoomQueueDidPressNext, &OriginalDidPressNext);
+    YTzoomInstallInstanceHook(@"YTMainAppVideoPlayerOverlayViewController",
+        @"didPressPrevious:", (IMP)YTzoomQueueDidPressPrevious,
         &OriginalDidPressPrevious);
-    YTKACEInstallInstanceHook(@"YTAutoplayAutonavController", @"playNext",
-        (IMP)YTKACEQueueAutonavPlayNext, &OriginalAutonavPlayNext);
-    YTKACEInstallInstanceHook(
+    YTzoomInstallInstanceHook(@"YTAutoplayAutonavController", @"playNext",
+        (IMP)YTzoomQueueAutonavPlayNext, &OriginalAutonavPlayNext);
+    YTzoomInstallInstanceHook(
         @"YTWatchViewController", @"updateWithWatchNextResponse:",
-        (IMP)YTKACEQueueViewUpdateWatchNext, &OriginalViewUpdateWatchNext);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomQueueViewUpdateWatchNext, &OriginalViewUpdateWatchNext);
+    YTzoomInstallInstanceHook(
         @"YTPlaylistPanelController", @"initWithAccountID:parentResponder:",
-        (IMP)YTKACEQueuePanelInit, &OriginalPanelInit);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomQueuePanelInit, &OriginalPanelInit);
+    YTzoomInstallInstanceHook(
         @"YTPlaylistPanelController",
         @"initWithAccountID:parentResponder:queueController:",
-        (IMP)YTKACEQueuePanelInitQueue, &OriginalPanelInitQueue);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomQueuePanelInitQueue, &OriginalPanelInitQueue);
+    YTzoomInstallInstanceHook(
         @"YTQueueController", @"initWithAccountID:parentResponder:",
-        (IMP)YTKACEQueueControllerInit, &OriginalQueueControllerInit);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomQueueControllerInit, &OriginalQueueControllerInit);
+    YTzoomInstallInstanceHook(
         @"YTWatchController", @"prepareWithWatchNextResponse:",
-        (IMP)YTKACEQueuePrepareWatchNext, &OriginalPrepareWatchNext);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomQueuePrepareWatchNext, &OriginalPrepareWatchNext);
+    YTzoomInstallInstanceHook(
         @"YTPlayerViewController", @"setWatchNextResponse:",
-        (IMP)YTKACEQueueSetWatchNext, &OriginalSetWatchNext);
-    YTKACEInstallInstanceHook(
+        (IMP)YTzoomQueueSetWatchNext, &OriginalSetWatchNext);
+    YTzoomInstallInstanceHook(
         @"YTIWatchNextResponse", @"yt_playlistPanelRenderer",
-        (IMP)YTKACEQueueResponsePanel, &OriginalResponsePanel);
-    YTKACEInstallInstanceHook(@"YTCommandRouter",
+        (IMP)YTzoomQueueResponsePanel, &OriginalResponsePanel);
+    YTzoomInstallInstanceHook(@"YTCommandRouter",
         @"handleCommand:entry:fromView:sender:",
-        (IMP)YTKACEQueueRouterHandle, &OriginalRouterHandle);
-    YTKACEInstallInstanceHook(@"YTCommandRouter",
+        (IMP)YTzoomQueueRouterHandle, &OriginalRouterHandle);
+    YTzoomInstallInstanceHook(@"YTCommandRouter",
         @"handleCommand:entry:fromView:sender:completionBlock:",
-        (IMP)YTKACEQueueRouterHandleCompletion, &OriginalRouterHandleCompletion);
-    YTKACEInstallInstanceHook(@"YTAccountScopedCommandRouter",
+        (IMP)YTzoomQueueRouterHandleCompletion, &OriginalRouterHandleCompletion);
+    YTzoomInstallInstanceHook(@"YTAccountScopedCommandRouter",
         @"handleCommand:entry:fromView:sender:",
-        (IMP)YTKACEQueueScopedRouterHandle, &OriginalScopedRouterHandle);
-    YTKACEInstallInstanceHook(@"YTAccountScopedCommandRouter",
+        (IMP)YTzoomQueueScopedRouterHandle, &OriginalScopedRouterHandle);
+    YTzoomInstallInstanceHook(@"YTAccountScopedCommandRouter",
         @"handleCommand:entry:fromView:sender:completionBlock:",
-        (IMP)YTKACEQueueScopedRouterHandleCompletion,
+        (IMP)YTzoomQueueScopedRouterHandleCompletion,
         &OriginalScopedRouterHandleCompletion);
     [NSNotificationCenter.defaultCenter
-        addObserverForName:@"YTKACEPlaybackTimeDidChange"
+        addObserverForName:@"YTzoomPlaybackTimeDidChange"
                     object:nil
                      queue:NSOperationQueue.mainQueue
                 usingBlock:^(NSNotification *notification) {
-        YTKACEQueueHandlePlaybackTime(notification);
+        YTzoomQueueHandlePlaybackTime(notification);
     }];
 }

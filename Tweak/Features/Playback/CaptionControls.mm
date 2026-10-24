@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../Downloads/DownloadLog.h"
@@ -13,83 +13,83 @@ static IMP OriginalSetSingleVideoCaptionTrack;
 static IMP OriginalSetCaptionError;
 static IMP OriginalSetLocalCaptionTrack;
 static IMP OriginalSetMDXCaptionTrack;
-static BOOL YTKACEHasRememberedSource;
-static NSMutableSet<NSString *> *YTKACEAppliedKeys;
-static NSMutableDictionary<NSString *, NSNumber *> *YTKACERestoredAt;
-static const NSTimeInterval YTKACERestoreWindow = 4.0;
-static NSMutableSet<NSString *> *YTKACEFailedKeys;
-static NSString *YTKACELastAppliedKey;
+static BOOL YTzoomHasRememberedSource;
+static NSMutableSet<NSString *> *YTzoomAppliedKeys;
+static NSMutableDictionary<NSString *, NSNumber *> *YTzoomRestoredAt;
+static const NSTimeInterval YTzoomRestoreWindow = 4.0;
+static NSMutableSet<NSString *> *YTzoomFailedKeys;
+static NSString *YTzoomLastAppliedKey;
 
-static BOOL YTKACECaptionKeyFailed(NSString *key) {
-    if (key.length == 0 || YTKACEFailedKeys == nil) return NO;
-    @synchronized (YTKACEFailedKeys) {
-        return [YTKACEFailedKeys containsObject:key];
+static BOOL YTzoomCaptionKeyFailed(NSString *key) {
+    if (key.length == 0 || YTzoomFailedKeys == nil) return NO;
+    @synchronized (YTzoomFailedKeys) {
+        return [YTzoomFailedKeys containsObject:key];
     }
 }
 
-static void YTKACENoteCaptionFailure(NSString *key) {
+static void YTzoomNoteCaptionFailure(NSString *key) {
     if (key.length == 0) return;
-    if (YTKACEFailedKeys == nil) {
-        YTKACEFailedKeys = [NSMutableSet set];
+    if (YTzoomFailedKeys == nil) {
+        YTzoomFailedKeys = [NSMutableSet set];
     }
-    @synchronized (YTKACEFailedKeys) {
-        if (YTKACEFailedKeys.count >= 128) {
-            [YTKACEFailedKeys removeAllObjects];
+    @synchronized (YTzoomFailedKeys) {
+        if (YTzoomFailedKeys.count >= 128) {
+            [YTzoomFailedKeys removeAllObjects];
         }
-        [YTKACEFailedKeys addObject:key];
+        [YTzoomFailedKeys addObject:key];
     }
 }
 
-static NSString *YTKACECurrentVideoID(id player) {
+static NSString *YTzoomCurrentVideoID(id player) {
     SEL selector = NSSelectorFromString(@"currentVideoID");
     if (![player respondsToSelector:selector]) return nil;
     id value = ((id (*)(id, SEL))objc_msgSend)(player, selector);
     return [value isKindOfClass:NSString.class] ? value : nil;
 }
-static NSTimeInterval YTKACECaptionBackoffUntil;
+static NSTimeInterval YTzoomCaptionBackoffUntil;
 
-static __weak id YTKACERememberedTrack;
-static NSString *YTKACERememberedVSSID;
-static NSString *YTKACERememberedLanguage;
-static long long YTKACERememberedSource;
-static BOOL YTKACEHasRememberedTrack;
+static __weak id YTzoomRememberedTrack;
+static NSString *YTzoomRememberedVSSID;
+static NSString *YTzoomRememberedLanguage;
+static long long YTzoomRememberedSource;
+static BOOL YTzoomHasRememberedTrack;
 
-static NSString *YTKACECaptionString(id track, NSString *name) {
+static NSString *YTzoomCaptionString(id track, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     if (track == nil || ![track respondsToSelector:selector]) return nil;
     id value = ((id (*)(id, SEL))objc_msgSend)(track, selector);
     return [value isKindOfClass:NSString.class] ? value : nil;
 }
 
-static id YTKACECaptionValueForKey(id receiver, NSString *name) {
+static id YTzoomCaptionValueForKey(id receiver, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     if (receiver == nil || ![receiver respondsToSelector:selector]) return nil;
     return ((id (*)(id, SEL))objc_msgSend)(receiver, selector);
 }
 
-static void YTKACERememberTrack(id track, long long source) {
-    YTKACERememberedTrack = track;
-    YTKACERememberedVSSID = [YTKACECaptionString(track, @"VSSID") copy];
-    YTKACERememberedLanguage = [YTKACECaptionString(track, @"languageCode") copy];
-    YTKACERememberedSource = source;
-    YTKACEHasRememberedSource = YES;
-    YTKACEHasRememberedTrack = YES;
+static void YTzoomRememberTrack(id track, long long source) {
+    YTzoomRememberedTrack = track;
+    YTzoomRememberedVSSID = [YTzoomCaptionString(track, @"VSSID") copy];
+    YTzoomRememberedLanguage = [YTzoomCaptionString(track, @"languageCode") copy];
+    YTzoomRememberedSource = source;
+    YTzoomHasRememberedSource = YES;
+    YTzoomHasRememberedTrack = YES;
 }
 
-static void YTKACESetActiveCaptionTrack(id receiver,
+static void YTzoomSetActiveCaptionTrack(id receiver,
                                         SEL selector,
                                         id track,
                                         long long source) {
-    YTKACEDownloadLog(@"caption", @"app set track=%@ source=%lld class=%@",
-                      YTKACECaptionString(track, @"languageCode") ?: @"nil",
+    YTzoomDownloadLog(@"caption", @"app set track=%@ source=%lld class=%@",
+                      YTzoomCaptionString(track, @"languageCode") ?: @"nil",
                       source, NSStringFromClass(object_getClass(receiver)));
     if (track != nil) {
-        YTKACERememberTrack(track, source);
+        YTzoomRememberTrack(track, source);
     } else {
-        YTKACEHasRememberedTrack = NO;
-        YTKACERememberedTrack = nil;
-        YTKACERememberedVSSID = nil;
-        YTKACERememberedLanguage = nil;
+        YTzoomHasRememberedTrack = NO;
+        YTzoomRememberedTrack = nil;
+        YTzoomRememberedVSSID = nil;
+        YTzoomRememberedLanguage = nil;
     }
     if (OriginalSetActiveCaptionTrack != NULL) {
         ((void (*)(id, SEL, id, long long))OriginalSetActiveCaptionTrack)(
@@ -97,15 +97,15 @@ static void YTKACESetActiveCaptionTrack(id receiver,
     }
 }
 
-static void YTKACESetSingleVideoCaptionTrack(id receiver,
+static void YTzoomSetSingleVideoCaptionTrack(id receiver,
                                              SEL selector,
                                              id track,
                                              long long source) {
-    YTKACEDownloadLog(@"caption", @"single set track=%@ source=%lld class=%@",
-                      YTKACECaptionString(track, @"languageCode") ?: @"nil",
+    YTzoomDownloadLog(@"caption", @"single set track=%@ source=%lld class=%@",
+                      YTzoomCaptionString(track, @"languageCode") ?: @"nil",
                       source, NSStringFromClass(object_getClass(receiver)));
     if (track != nil) {
-        YTKACERememberTrack(track, source);
+        YTzoomRememberTrack(track, source);
     }
     if (OriginalSetSingleVideoCaptionTrack != NULL) {
         ((void (*)(id, SEL, id, long long))OriginalSetSingleVideoCaptionTrack)(
@@ -113,20 +113,20 @@ static void YTKACESetSingleVideoCaptionTrack(id receiver,
     }
 }
 
-static void YTKACESetCaptionError(id receiver, SEL selector, id error) {
+static void YTzoomSetCaptionError(id receiver, SEL selector, id error) {
     if (error != nil) {
         NSError *value = [error isKindOfClass:NSError.class] ? error : nil;
-        YTKACEDownloadLog(@"caption",
+        YTzoomDownloadLog(@"caption",
                           @"ERROR domain=%@ code=%ld desc=%@ class=%@",
                           value.domain ?: @"?", (long)value.code,
                           value.localizedDescription ?: [error description],
                           NSStringFromClass(object_getClass(receiver)));
         if (value.code == 429) {
-            YTKACENoteCaptionFailure(YTKACELastAppliedKey);
-            YTKACECaptionBackoffUntil = CACurrentMediaTime() + 30;
-            YTKACEDownloadLog(@"caption",
+            YTzoomNoteCaptionFailure(YTzoomLastAppliedKey);
+            YTzoomCaptionBackoffUntil = CACurrentMediaTime() + 30;
+            YTzoomDownloadLog(@"caption",
                               @"429 cooldown 30s blamed=%@",
-                              YTKACELastAppliedKey ?: @"nil");
+                              YTzoomLastAppliedKey ?: @"nil");
         }
     }
     if (OriginalSetCaptionError != NULL) {
@@ -135,10 +135,10 @@ static void YTKACESetCaptionError(id receiver, SEL selector, id error) {
     }
 }
 
-static void YTKACESetLocalCaptionTrack(id receiver, SEL selector, id track,
+static void YTzoomSetLocalCaptionTrack(id receiver, SEL selector, id track,
                                        long long source) {
-    YTKACEDownloadLog(@"caption", @"local set track=%@ source=%lld class=%@",
-                      YTKACECaptionString(track, @"languageCode") ?: @"nil",
+    YTzoomDownloadLog(@"caption", @"local set track=%@ source=%lld class=%@",
+                      YTzoomCaptionString(track, @"languageCode") ?: @"nil",
                       source, NSStringFromClass(object_getClass(receiver)));
     if (OriginalSetLocalCaptionTrack != NULL) {
         ((void (*)(id, SEL, id, long long))OriginalSetLocalCaptionTrack)(
@@ -146,10 +146,10 @@ static void YTKACESetLocalCaptionTrack(id receiver, SEL selector, id track,
     }
 }
 
-static void YTKACESetMDXCaptionTrack(id receiver, SEL selector, id track,
+static void YTzoomSetMDXCaptionTrack(id receiver, SEL selector, id track,
                                      long long source) {
-    YTKACEDownloadLog(@"caption", @"mdx set track=%@ source=%lld class=%@",
-                      YTKACECaptionString(track, @"languageCode") ?: @"nil",
+    YTzoomDownloadLog(@"caption", @"mdx set track=%@ source=%lld class=%@",
+                      YTzoomCaptionString(track, @"languageCode") ?: @"nil",
                       source, NSStringFromClass(object_getClass(receiver)));
     if (OriginalSetMDXCaptionTrack != NULL) {
         ((void (*)(id, SEL, id, long long))OriginalSetMDXCaptionTrack)(
@@ -157,56 +157,56 @@ static void YTKACESetMDXCaptionTrack(id receiver, SEL selector, id track,
     }
 }
 
-static id YTKACEMatchingTrack(id player) {
-    id video = YTKACECaptionValueForKey(player, @"activeVideo");
-    id available = YTKACECaptionValueForKey(video, @"availableCaptionTracks")
-        ?: YTKACECaptionValueForKey(player, @"availableCaptionTracks");
-    if (![available isKindOfClass:NSArray.class]) return YTKACERememberedTrack;
+static id YTzoomMatchingTrack(id player) {
+    id video = YTzoomCaptionValueForKey(player, @"activeVideo");
+    id available = YTzoomCaptionValueForKey(video, @"availableCaptionTracks")
+        ?: YTzoomCaptionValueForKey(player, @"availableCaptionTracks");
+    if (![available isKindOfClass:NSArray.class]) return YTzoomRememberedTrack;
     for (id track in (NSArray *)available) {
-        NSString *vssID = YTKACECaptionString(track, @"VSSID");
-        if (YTKACERememberedVSSID.length != 0 &&
-            [vssID isEqualToString:YTKACERememberedVSSID]) {
+        NSString *vssID = YTzoomCaptionString(track, @"VSSID");
+        if (YTzoomRememberedVSSID.length != 0 &&
+            [vssID isEqualToString:YTzoomRememberedVSSID]) {
             return track;
         }
     }
     for (id track in (NSArray *)available) {
-        NSString *language = YTKACECaptionString(track, @"languageCode");
-        if (YTKACERememberedLanguage.length != 0 &&
-            [language isEqualToString:YTKACERememberedLanguage]) {
+        NSString *language = YTzoomCaptionString(track, @"languageCode");
+        if (YTzoomRememberedLanguage.length != 0 &&
+            [language isEqualToString:YTzoomRememberedLanguage]) {
             return track;
         }
     }
-    return YTKACERememberedTrack;
+    return YTzoomRememberedTrack;
 }
 
 
-static NSString *const YTKACEPreferredLanguageKey =
-    @"YTKACE.Preference.Playback.CaptionLanguage";
+static NSString *const YTzoomPreferredLanguageKey =
+    @"YTzoom.Preference.Playback.CaptionLanguage";
 
-static NSString *YTKACETrackLanguage(id track) {
-    id value = YTKACECaptionValueForKey(track, @"languageCode");
+static NSString *YTzoomTrackLanguage(id track) {
+    id value = YTzoomCaptionValueForKey(track, @"languageCode");
     return [value isKindOfClass:NSString.class] ? value : nil;
 }
 
-void YTKACEApplyPreferredCaptionLanguage(id player) {
+void YTzoomApplyPreferredCaptionLanguage(id player) {
     NSString *preferred = [NSUserDefaults.standardUserDefaults
-        stringForKey:YTKACEPreferredLanguageKey];
+        stringForKey:YTzoomPreferredLanguageKey];
     if (preferred.length == 0) return;
 
-    id video = YTKACECaptionValueForKey(player, @"activeVideo");
-    id available = YTKACECaptionValueForKey(video, @"availableCaptionTracks")
-        ?: YTKACECaptionValueForKey(player, @"availableCaptionTracks");
+    id video = YTzoomCaptionValueForKey(player, @"activeVideo");
+    id available = YTzoomCaptionValueForKey(video, @"availableCaptionTracks")
+        ?: YTzoomCaptionValueForKey(player, @"availableCaptionTracks");
     if (![available isKindOfClass:NSArray.class] || [available count] == 0) {
         return;
     }
-    id active = YTKACECaptionValueForKey(video, @"activeCaptionTrack");
+    id active = YTzoomCaptionValueForKey(video, @"activeCaptionTrack");
     if (active != nil &&
-        [YTKACETrackLanguage(active) hasPrefix:preferred]) {
+        [YTzoomTrackLanguage(active) hasPrefix:preferred]) {
         return;
     }
 
-    if (YTKACECaptionBackoffUntil != 0 &&
-        CACurrentMediaTime() < YTKACECaptionBackoffUntil) {
+    if (YTzoomCaptionBackoffUntil != 0 &&
+        CACurrentMediaTime() < YTzoomCaptionBackoffUntil) {
         return;
     }
 
@@ -218,14 +218,14 @@ void YTKACEApplyPreferredCaptionLanguage(id player) {
     }
     NSString *appliedKey = videoID.length != 0
         ? [NSString stringWithFormat:@"%@|%@", videoID, preferred] : nil;
-    if (YTKACEAppliedKeys == nil) {
-        YTKACEAppliedKeys = [NSMutableSet set];
+    if (YTzoomAppliedKeys == nil) {
+        YTzoomAppliedKeys = [NSMutableSet set];
     }
-    if (appliedKey != nil && [YTKACEAppliedKeys containsObject:appliedKey]) {
+    if (appliedKey != nil && [YTzoomAppliedKeys containsObject:appliedKey]) {
         return;
     }
-    if (YTKACECaptionKeyFailed(appliedKey)) {
-        YTKACEDownloadLog(@"caption", @"skip known-failed %@", appliedKey);
+    if (YTzoomCaptionKeyFailed(appliedKey)) {
+        YTzoomDownloadLog(@"caption", @"skip known-failed %@", appliedKey);
         return;
     }
 
@@ -234,9 +234,9 @@ void YTKACEApplyPreferredCaptionLanguage(id player) {
     id prefix = nil;
     NSMutableArray<NSString *> *vssList = [NSMutableArray array];
     for (id track in (NSArray *)available) {
-        NSString *code = YTKACETrackLanguage(track);
+        NSString *code = YTzoomTrackLanguage(track);
         if (code.length == 0) continue;
-        NSString *vss = YTKACECaptionString(track, @"VSSID") ?: @"";
+        NSString *vss = YTzoomCaptionString(track, @"VSSID") ?: @"";
         if ([code caseInsensitiveCompare:preferred] == NSOrderedSame) {
             [vssList addObject:vss.length != 0 ? vss : @"-"];
             NSInteger rank = 2;
@@ -257,25 +257,25 @@ void YTKACEApplyPreferredCaptionLanguage(id player) {
         }
     }
     if (vssList.count > 1) {
-        YTKACEDownloadLog(@"caption", @"candidates %@ picked rank=%ld",
+        YTzoomDownloadLog(@"caption", @"candidates %@ picked rank=%ld",
                           [vssList componentsJoinedByString:@","],
                           (long)exactRank);
     }
     NSMutableArray<NSString *> *codes = [NSMutableArray array];
     for (id track in (NSArray *)available) {
-        [codes addObject:YTKACETrackLanguage(track) ?: @"?"];
+        [codes addObject:YTzoomTrackLanguage(track) ?: @"?"];
     }
-    YTKACEDownloadLog(@"caption",
+    YTzoomDownloadLog(@"caption",
                       @"apply preferred=%@ count=%lu tracks=%@ active=%@ "
                        "haveSource=%d source=%lld",
                       preferred, (unsigned long)[available count],
                       [codes componentsJoinedByString:@","],
-                      YTKACETrackLanguage(active) ?: @"nil",
-                      YTKACEHasRememberedSource, YTKACERememberedSource);
+                      YTzoomTrackLanguage(active) ?: @"nil",
+                      YTzoomHasRememberedSource, YTzoomRememberedSource);
 
     id chosen = exact ?: prefix;
     if (chosen == nil) {
-        YTKACEDownloadLog(@"caption",
+        YTzoomDownloadLog(@"caption",
                           @"no usable track for %@ translatedOnly=%@",
                           preferred,
                           vssList.count != 0
@@ -285,92 +285,92 @@ void YTKACEApplyPreferredCaptionLanguage(id player) {
     SEL setter = NSSelectorFromString(@"setActiveCaptionTrack:source:");
     if (![player respondsToSelector:setter]) return;
     if (appliedKey != nil) {
-        if (YTKACEAppliedKeys.count >= 64) {
-            [YTKACEAppliedKeys removeAllObjects];
+        if (YTzoomAppliedKeys.count >= 64) {
+            [YTzoomAppliedKeys removeAllObjects];
         }
-        [YTKACEAppliedKeys addObject:appliedKey];
-        YTKACELastAppliedKey = appliedKey;
+        [YTzoomAppliedKeys addObject:appliedKey];
+        YTzoomLastAppliedKey = appliedKey;
     }
     const long long applySource = 3;
     ((void (*)(id, SEL, id, long long))objc_msgSend)(
         player, setter, chosen, applySource);
-    YTKACEDownloadLog(@"caption",
+    YTzoomDownloadLog(@"caption",
                       @"applied preferred=%@ chosen=%@ vss=%@ exact=%d "
                        "source=%lld video=%@",
-                      preferred, YTKACETrackLanguage(chosen) ?: @"?",
-                      YTKACECaptionString(chosen, @"VSSID") ?: @"-",
+                      preferred, YTzoomTrackLanguage(chosen) ?: @"?",
+                      YTzoomCaptionString(chosen, @"VSSID") ?: @"-",
                       exact != nil, applySource,
                       videoID ?: @"?");
 }
 
-void YTKACECaptionsSnapshot(id player) {
-    id video = YTKACECaptionValueForKey(player, @"activeVideo");
-    id active = YTKACECaptionValueForKey(video, @"activeCaptionTrack");
+void YTzoomCaptionsSnapshot(id player) {
+    id video = YTzoomCaptionValueForKey(player, @"activeVideo");
+    id active = YTzoomCaptionValueForKey(video, @"activeCaptionTrack");
     if (active != nil) {
-        YTKACERememberTrack(active, YTKACERememberedSource);
+        YTzoomRememberTrack(active, YTzoomRememberedSource);
     }
 }
 
-void YTKACECaptionsRestore(id player) {
-    if (!YTKACEHasRememberedTrack) return;
-    if (YTKACECaptionBackoffUntil != 0 &&
-        CACurrentMediaTime() < YTKACECaptionBackoffUntil) {
+void YTzoomCaptionsRestore(id player) {
+    if (!YTzoomHasRememberedTrack) return;
+    if (YTzoomCaptionBackoffUntil != 0 &&
+        CACurrentMediaTime() < YTzoomCaptionBackoffUntil) {
         return;
     }
-    id video = YTKACECaptionValueForKey(player, @"activeVideo");
-    if (YTKACECaptionValueForKey(video, @"activeCaptionTrack") != nil) return;
+    id video = YTzoomCaptionValueForKey(player, @"activeVideo");
+    if (YTzoomCaptionValueForKey(video, @"activeCaptionTrack") != nil) return;
 
-    id track = YTKACEMatchingTrack(player);
+    id track = YTzoomMatchingTrack(player);
     if (track == nil) return;
 
-    NSString *videoID = YTKACECurrentVideoID(player);
-    NSString *language = YTKACECaptionString(track, @"languageCode") ?: @"?";
+    NSString *videoID = YTzoomCurrentVideoID(player);
+    NSString *language = YTzoomCaptionString(track, @"languageCode") ?: @"?";
     NSString *restoreKey = videoID.length != 0
         ? [NSString stringWithFormat:@"%@|%@", videoID, language] : nil;
-    if (YTKACERestoredAt == nil) {
-        YTKACERestoredAt = [NSMutableDictionary dictionary];
+    if (YTzoomRestoredAt == nil) {
+        YTzoomRestoredAt = [NSMutableDictionary dictionary];
     }
     const NSTimeInterval now = CACurrentMediaTime();
-    NSNumber *lastRestore = restoreKey != nil ? YTKACERestoredAt[restoreKey] : nil;
-    if (lastRestore != nil && now - lastRestore.doubleValue < YTKACERestoreWindow) {
+    NSNumber *lastRestore = restoreKey != nil ? YTzoomRestoredAt[restoreKey] : nil;
+    if (lastRestore != nil && now - lastRestore.doubleValue < YTzoomRestoreWindow) {
         return;
     }
-    if (YTKACECaptionKeyFailed(restoreKey)) return;
+    if (YTzoomCaptionKeyFailed(restoreKey)) return;
 
     SEL setter = NSSelectorFromString(@"setActiveCaptionTrack:source:");
     if (![player respondsToSelector:setter]) return;
     if (restoreKey != nil) {
-        if (YTKACERestoredAt.count >= 64) {
-            [YTKACERestoredAt removeAllObjects];
+        if (YTzoomRestoredAt.count >= 64) {
+            [YTzoomRestoredAt removeAllObjects];
         }
-        YTKACERestoredAt[restoreKey] = @(now);
-        YTKACELastAppliedKey = restoreKey;
+        YTzoomRestoredAt[restoreKey] = @(now);
+        YTzoomLastAppliedKey = restoreKey;
     }
     ((void (*)(id, SEL, id, long long))objc_msgSend)(
-        player, setter, track, YTKACERememberedSource);
-    YTKACEDownloadLog(@"fix", @"captions restored %@ video=%@", language,
+        player, setter, track, YTzoomRememberedSource);
+    YTzoomDownloadLog(@"fix", @"captions restored %@ video=%@", language,
                       videoID ?: @"?");
 }
 
-void YTKACEInstallCaptionHooks(void) {
-    BOOL pvc = YTKACEInstallInstanceHook(@"YTPlayerViewController",
+void YTzoomInstallCaptionHooks(void) {
+    BOOL pvc = YTzoomInstallInstanceHook(@"YTPlayerViewController",
                                         @"setActiveCaptionTrack:source:",
-                                        (IMP)YTKACESetActiveCaptionTrack,
+                                        (IMP)YTzoomSetActiveCaptionTrack,
                                         &OriginalSetActiveCaptionTrack);
-    BOOL svc = YTKACEInstallInstanceHook(
+    BOOL svc = YTzoomInstallInstanceHook(
         @"YTSingleVideoController", @"setActiveCaptionTrack:source:",
-        (IMP)YTKACESetSingleVideoCaptionTrack,
+        (IMP)YTzoomSetSingleVideoCaptionTrack,
         &OriginalSetSingleVideoCaptionTrack);
-    BOOL err = YTKACEInstallInstanceHook(
+    BOOL err = YTzoomInstallInstanceHook(
         @"YTMainAppVideoPlayerOverlayViewController", @"setCaptionError:",
-        (IMP)YTKACESetCaptionError, &OriginalSetCaptionError);
-    BOOL loc = YTKACEInstallInstanceHook(
+        (IMP)YTzoomSetCaptionError, &OriginalSetCaptionError);
+    BOOL loc = YTzoomInstallInstanceHook(
         @"YTLocalPlaybackController", @"setActiveCaptionTrack:source:",
-        (IMP)YTKACESetLocalCaptionTrack, &OriginalSetLocalCaptionTrack);
-    BOOL mdx = YTKACEInstallInstanceHook(
+        (IMP)YTzoomSetLocalCaptionTrack, &OriginalSetLocalCaptionTrack);
+    BOOL mdx = YTzoomInstallInstanceHook(
         @"MDXPlaybackController", @"setActiveCaptionTrack:source:",
-        (IMP)YTKACESetMDXCaptionTrack, &OriginalSetMDXCaptionTrack);
-    YTKACEDownloadLog(@"caption",
+        (IMP)YTzoomSetMDXCaptionTrack, &OriginalSetMDXCaptionTrack);
+    YTzoomDownloadLog(@"caption",
                       @"hooks pvc=%d single=%d error=%d local=%d mdx=%d",
                       pvc, svc, err, loc, mdx);
 }

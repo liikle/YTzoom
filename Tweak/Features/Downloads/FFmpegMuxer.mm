@@ -1,7 +1,7 @@
 #import "FFmpegMuxer.h"
 #import <copyfile.h>
 
-#define AVMediaType YTKACEFFmpegMediaType
+#define AVMediaType YTzoomFFmpegMediaType
 extern "C" {
 #include <libavcodec/avcodec.h>
 #include <libavcodec/packet.h>
@@ -21,20 +21,20 @@ extern "C" {
 #import <VideoToolbox/VideoToolbox.h>
 #import "DownloadLog.h"
 
-static NSString *YTKACEFFmpegMessage(int code) {
+static NSString *YTzoomFFmpegMessage(int code) {
     char buffer[AV_ERROR_MAX_STRING_SIZE] = {0};
     av_strerror(code, buffer, sizeof(buffer));
     return [NSString stringWithUTF8String:buffer] ?: @"FFmpeg failed";
 }
 
-static NSError *YTKACEFFmpegError(int code, NSString *stage) {
+static NSError *YTzoomFFmpegError(int code, NSString *stage) {
     NSString *message = [NSString stringWithFormat:@"%@: %@", stage,
-        YTKACEFFmpegMessage(code)];
-    return [NSError errorWithDomain:@"YTKACEFFmpeg" code:code
+        YTzoomFFmpegMessage(code)];
+    return [NSError errorWithDomain:@"YTzoomFFmpeg" code:code
         userInfo:@{NSLocalizedDescriptionKey: message}];
 }
 
-static int YTKACEOpenInput(NSURL *URL, enum YTKACEFFmpegMediaType type,
+static int YTzoomOpenInput(NSURL *URL, enum YTzoomFFmpegMediaType type,
                            AVFormatContext **context, int *streamIndex) {
     int result = avformat_open_input(context, URL.fileSystemRepresentation,
         NULL, NULL);
@@ -47,7 +47,7 @@ static int YTKACEOpenInput(NSURL *URL, enum YTKACEFFmpegMediaType type,
     return 0;
 }
 
-static int YTKACEReadPacket(AVFormatContext *context, int streamIndex,
+static int YTzoomReadPacket(AVFormatContext *context, int streamIndex,
                             AVPacket *packet) {
     int result = 0;
     while ((result = av_read_frame(context, packet)) >= 0) {
@@ -57,13 +57,13 @@ static int YTKACEReadPacket(AVFormatContext *context, int streamIndex,
     return result;
 }
 
-static int64_t YTKACEPacketTime(AVPacket *packet, AVStream *stream) {
+static int64_t YTzoomPacketTime(AVPacket *packet, AVStream *stream) {
     int64_t value = packet->dts != AV_NOPTS_VALUE ? packet->dts : packet->pts;
     return value == AV_NOPTS_VALUE ? INT64_MAX :
         av_rescale_q(value, stream->time_base, AV_TIME_BASE_Q);
 }
 
-static int YTKACEWritePacket(AVFormatContext *output, AVPacket *packet,
+static int YTzoomWritePacket(AVFormatContext *output, AVPacket *packet,
                              AVStream *inputStream, AVStream *outputStream) {
     av_packet_rescale_ts(packet, inputStream->time_base, outputStream->time_base);
     packet->stream_index = outputStream->index;
@@ -73,7 +73,7 @@ static int YTKACEWritePacket(AVFormatContext *output, AVPacket *packet,
     return result;
 }
 
-static NSError *YTKACERemux(NSURL *videoURL, NSURL *audioURL,
+static NSError *YTzoomRemux(NSURL *videoURL, NSURL *audioURL,
                             NSURL *outputURL) {
     AVFormatContext *video = NULL;
     AVFormatContext *audio = NULL;
@@ -90,9 +90,9 @@ static NSError *YTKACERemux(NSURL *videoURL, NSURL *audioURL,
     BOOL hasVideo = NO;
     BOOL hasAudio = NO;
     NSString *stage = @"Open video";
-    int result = YTKACEOpenInput(videoURL, AVMEDIA_TYPE_VIDEO, &video, &videoIndex);
+    int result = YTzoomOpenInput(videoURL, AVMEDIA_TYPE_VIDEO, &video, &videoIndex);
     if (result < 0) goto cleanup;
-    result = YTKACEOpenInput(audioURL, AVMEDIA_TYPE_AUDIO, &audio, &audioIndex);
+    result = YTzoomOpenInput(audioURL, AVMEDIA_TYPE_AUDIO, &audio, &audioIndex);
     stage = @"Open audio";
     if (result < 0) goto cleanup;
     result = avformat_alloc_output_context2(&output, NULL, "mp4",
@@ -137,24 +137,24 @@ static NSError *YTKACERemux(NSURL *videoURL, NSURL *audioURL,
         stage = @"Create packets";
         goto cleanup;
     }
-    hasVideo = YTKACEReadPacket(video, videoIndex, videoPacket) >= 0;
-    hasAudio = YTKACEReadPacket(audio, audioIndex, audioPacket) >= 0;
+    hasVideo = YTzoomReadPacket(video, videoIndex, videoPacket) >= 0;
+    hasAudio = YTzoomReadPacket(audio, audioIndex, audioPacket) >= 0;
     while (hasVideo || hasAudio) {
         BOOL writeVideo = hasVideo;
         if (hasVideo && hasAudio) {
-            writeVideo = YTKACEPacketTime(videoPacket, videoInput) <=
-                YTKACEPacketTime(audioPacket, audioInput);
+            writeVideo = YTzoomPacketTime(videoPacket, videoInput) <=
+                YTzoomPacketTime(audioPacket, audioInput);
         }
         if (writeVideo) {
-            result = YTKACEWritePacket(output, videoPacket, videoInput, videoOutput);
+            result = YTzoomWritePacket(output, videoPacket, videoInput, videoOutput);
             stage = @"Write video";
             if (result < 0) goto cleanup;
-            hasVideo = YTKACEReadPacket(video, videoIndex, videoPacket) >= 0;
+            hasVideo = YTzoomReadPacket(video, videoIndex, videoPacket) >= 0;
         } else {
-            result = YTKACEWritePacket(output, audioPacket, audioInput, audioOutput);
+            result = YTzoomWritePacket(output, audioPacket, audioInput, audioOutput);
             stage = @"Write audio";
             if (result < 0) goto cleanup;
-            hasAudio = YTKACEReadPacket(audio, audioIndex, audioPacket) >= 0;
+            hasAudio = YTzoomReadPacket(audio, audioIndex, audioPacket) >= 0;
         }
     }
     result = av_write_trailer(output);
@@ -170,10 +170,10 @@ cleanup:
         if (output->pb != NULL) avio_closep(&output->pb);
         avformat_free_context(output);
     }
-    return result < 0 ? YTKACEFFmpegError(result, stage) : nil;
+    return result < 0 ? YTzoomFFmpegError(result, stage) : nil;
 }
 
-static NSError *YTKACERemuxAudio(NSURL *audioURL, NSURL *outputURL) {
+static NSError *YTzoomRemuxAudio(NSURL *audioURL, NSURL *outputURL) {
     AVFormatContext *audio = NULL;
     AVFormatContext *output = NULL;
     AVPacket *packet = NULL;
@@ -182,7 +182,7 @@ static NSError *YTKACERemuxAudio(NSURL *audioURL, NSURL *outputURL) {
     AVDictionary *options = NULL;
     int audioIndex = -1;
     NSString *stage = @"Open audio";
-    int result = YTKACEOpenInput(audioURL, AVMEDIA_TYPE_AUDIO, &audio, &audioIndex);
+    int result = YTzoomOpenInput(audioURL, AVMEDIA_TYPE_AUDIO, &audio, &audioIndex);
     if (result < 0) goto cleanup;
     result = avformat_alloc_output_context2(&output, NULL, "mp4",
         outputURL.fileSystemRepresentation);
@@ -218,8 +218,8 @@ static NSError *YTKACERemuxAudio(NSURL *audioURL, NSURL *outputURL) {
         stage = @"Create packet";
         goto cleanup;
     }
-    while ((result = YTKACEReadPacket(audio, audioIndex, packet)) >= 0) {
-        result = YTKACEWritePacket(output, packet, audioInput, audioOutput);
+    while ((result = YTzoomReadPacket(audio, audioIndex, packet)) >= 0) {
+        result = YTzoomWritePacket(output, packet, audioInput, audioOutput);
         stage = @"Write audio";
         if (result < 0) goto cleanup;
     }
@@ -236,32 +236,32 @@ cleanup:
         if (output->pb != NULL) avio_closep(&output->pb);
         avformat_free_context(output);
     }
-    return result < 0 ? YTKACEFFmpegError(result, stage) : nil;
+    return result < 0 ? YTzoomFFmpegError(result, stage) : nil;
 }
 
 
-static NSMutableSet<NSString *> *YTKACECancelledConversions(void) {
+static NSMutableSet<NSString *> *YTzoomCancelledConversions(void) {
     static NSMutableSet<NSString *> *set;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{ set = [NSMutableSet set]; });
     return set;
 }
 
-void YTKACEFFmpegCancelConversion(NSString *identifier) {
+void YTzoomFFmpegCancelConversion(NSString *identifier) {
     if (identifier.length == 0) return;
-    @synchronized (YTKACECancelledConversions()) {
-        [YTKACECancelledConversions() addObject:identifier];
+    @synchronized (YTzoomCancelledConversions()) {
+        [YTzoomCancelledConversions() addObject:identifier];
     }
-    YTKACEDownloadLog(@"convert", @"cancel requested %@", identifier);
+    YTzoomDownloadLog(@"convert", @"cancel requested %@", identifier);
 }
 
-static NSError *YTKACEAudioToVideo(NSURL *audioURL, NSData *artwork,
+static NSError *YTzoomAudioToVideo(NSURL *audioURL, NSData *artwork,
                                    NSURL *outputURL,
-                                   YTKACEFFmpegProgress progress) {
+                                   YTzoomFFmpegProgress progress) {
     NSString *artworkPath = nil;
     if (artwork.length != 0) {
         artworkPath = [NSTemporaryDirectory()
-            stringByAppendingPathComponent:@"ytkace-art.jpg"];
+            stringByAppendingPathComponent:@"ytzoom-art.jpg"];
         [artwork writeToFile:artworkPath atomically:YES];
     }
     AVFormatContext *audioInput = NULL;
@@ -278,7 +278,7 @@ static NSError *YTKACEAudioToVideo(NSURL *audioURL, NSData *artwork,
 
     if (avformat_open_input(&audioInput, audioURL.path.UTF8String, NULL, NULL) < 0 ||
         avformat_find_stream_info(audioInput, NULL) < 0) {
-        error = YTKACEFFmpegError(-1, @"Could not read the audio");
+        error = YTzoomFFmpegError(-1, @"Could not read the audio");
         goto finish;
     }
     for (unsigned int index = 0; index < audioInput->nb_streams; index++) {
@@ -288,7 +288,7 @@ static NSError *YTKACEAudioToVideo(NSURL *audioURL, NSData *artwork,
         }
     }
     if (audioIndex < 0) {
-        error = YTKACEFFmpegError(-1, @"No audio track");
+        error = YTzoomFFmpegError(-1, @"No audio track");
         goto finish;
     }
 
@@ -298,13 +298,13 @@ static NSError *YTKACEAudioToVideo(NSURL *audioURL, NSData *artwork,
         avformat_alloc_output_context2(&output, NULL, "mp4",
                                        outputURL.path.UTF8String);
         if (output == NULL) {
-            error = YTKACEFFmpegError(-1, @"Could not create the file");
+            error = YTzoomFFmpegError(-1, @"Could not create the file");
             goto finish;
         }
         const AVCodec *encoderCodec =
             avcodec_find_encoder_by_name("h264_videotoolbox");
         if (encoderCodec == NULL) {
-            error = YTKACEFFmpegError(-1, @"Conversion is unavailable");
+            error = YTzoomFFmpegError(-1, @"Conversion is unavailable");
             goto finish;
         }
         encoder = avcodec_alloc_context3(encoderCodec);
@@ -318,7 +318,7 @@ static NSError *YTKACEAudioToVideo(NSURL *audioURL, NSData *artwork,
             encoder->flags |= AV_CODEC_FLAG_GLOBAL_HEADER;
         }
         if (avcodec_open2(encoder, encoderCodec, NULL) < 0) {
-            error = YTKACEFFmpegError(-1, @"Conversion is unavailable");
+            error = YTzoomFFmpegError(-1, @"Conversion is unavailable");
             goto finish;
         }
         AVStream *videoStream = avformat_new_stream(output, NULL);
@@ -333,12 +333,12 @@ static NSError *YTKACEAudioToVideo(NSURL *audioURL, NSData *artwork,
         if (!(output->oformat->flags & AVFMT_NOFILE)) {
             if (avio_open(&output->pb, outputURL.path.UTF8String,
                           AVIO_FLAG_WRITE) < 0) {
-                error = YTKACEFFmpegError(-1, @"Could not create the file");
+                error = YTzoomFFmpegError(-1, @"Could not create the file");
                 goto finish;
             }
         }
         if (avformat_write_header(output, NULL) < 0) {
-            error = YTKACEFFmpegError(-1, @"Could not create the file");
+            error = YTzoomFFmpegError(-1, @"Could not create the file");
             goto finish;
         }
 
@@ -350,7 +350,7 @@ static NSError *YTKACEAudioToVideo(NSURL *audioURL, NSData *artwork,
         memset(videoFrame->data[1], 128,
                (size_t)videoFrame->linesize[1] * height / 2);
 
-        YTKACEDownloadLog(@"convert", @"artwork bytes=%lu path=%@",
+        YTzoomDownloadLog(@"convert", @"artwork bytes=%lu path=%@",
             (unsigned long)artwork.length, artworkPath ?: @"none");
         if (artworkPath != nil &&
             avformat_open_input(&imageInput, artworkPath.UTF8String, NULL, NULL) >= 0 &&
@@ -373,7 +373,7 @@ static NSError *YTKACEAudioToVideo(NSURL *audioURL, NSData *artwork,
                                   0, imageFrame->height, videoFrame->data,
                                   videoFrame->linesize);
                     }
-                    YTKACEDownloadLog(@"convert", @"artwork frame %dx%d scaler=%d",
+                    YTzoomDownloadLog(@"convert", @"artwork frame %dx%d scaler=%d",
                         imageFrame->width, imageFrame->height, scaler != NULL);
                 }
                 av_packet_unref(packet);
@@ -445,7 +445,7 @@ finish:
     return error;
 }
 
-static NSArray<NSDictionary *> *YTKACENormalizedCues(NSArray<NSDictionary *> *cues) {
+static NSArray<NSDictionary *> *YTzoomNormalizedCues(NSArray<NSDictionary *> *cues) {
     NSCharacterSet *invisible = [NSCharacterSet characterSetWithCharactersInString:@"\u200b\u200c\u200d\ufeff"];
     NSMutableArray<NSMutableDictionary *> *clean = [NSMutableArray array];
     for (NSDictionary *cue in cues) {
@@ -491,7 +491,7 @@ static NSArray<NSDictionary *> *YTKACENormalizedCues(NSArray<NSDictionary *> *cu
     return result;
 }
 
-static NSString *YTKACEMP4LanguageCode(NSString *language) {
+static NSString *YTzoomMP4LanguageCode(NSString *language) {
     NSString *base = [[language.lowercaseString componentsSeparatedByCharactersInSet:
         [NSCharacterSet characterSetWithCharactersInString:@"-_"]] firstObject];
     if (base.length == 3) return base;
@@ -503,15 +503,15 @@ static NSString *YTKACEMP4LanguageCode(NSString *language) {
     return base.length != 0 ? codes[base] : nil;
 }
 
-@implementation YTKACEFFmpegMuxer
+@implementation YTzoomFFmpegMuxer
 
 + (void)remuxAudioURL:(NSURL *)audioURL
             outputURL:(NSURL *)outputURL
-           completion:(YTKACEFFmpegCompletion)completion {
+           completion:(YTzoomFFmpegCompletion)completion {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         [NSFileManager.defaultManager removeItemAtURL:outputURL error:nil];
         av_log_set_level(AV_LOG_ERROR);
-        NSError *error = YTKACERemuxAudio(audioURL, outputURL);
+        NSError *error = YTzoomRemuxAudio(audioURL, outputURL);
         dispatch_async(dispatch_get_main_queue(), ^{ completion(error); });
     });
 }
@@ -519,27 +519,27 @@ static NSString *YTKACEMP4LanguageCode(NSString *language) {
 + (void)remuxVideoURL:(NSURL *)videoURL
              audioURL:(NSURL *)audioURL
             outputURL:(NSURL *)outputURL
-           completion:(YTKACEFFmpegCompletion)completion {
+           completion:(YTzoomFFmpegCompletion)completion {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         [NSFileManager.defaultManager removeItemAtURL:outputURL error:nil];
         av_log_set_level(AV_LOG_ERROR);
-        NSError *error = YTKACERemux(videoURL, audioURL, outputURL);
+        NSError *error = YTzoomRemux(videoURL, audioURL, outputURL);
         dispatch_async(dispatch_get_main_queue(), ^{ completion(error); });
     });
 }
 
 + (void)normalizeMediaURL:(NSURL *)mediaURL
                 outputURL:(NSURL *)outputURL
-               completion:(YTKACEFFmpegCompletion)completion {
+               completion:(YTzoomFFmpegCompletion)completion {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         [NSFileManager.defaultManager removeItemAtURL:outputURL error:nil];
         av_log_set_level(AV_LOG_ERROR);
-        NSError *error = YTKACERemux(mediaURL, mediaURL, outputURL);
+        NSError *error = YTzoomRemux(mediaURL, mediaURL, outputURL);
         dispatch_async(dispatch_get_main_queue(), ^{ completion(error); });
     });
 }
 
-static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
+static BOOL YTzoomPatchTextSampleDescription(NSURL *URL,
                                              int width,
                                              int height) {
     NSMutableData *data = [NSMutableData dataWithContentsOfURL:URL];
@@ -584,7 +584,7 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
     }
     if (patched == 0) return NO;
     if (![data writeToURL:URL atomically:YES]) return NO;
-    YTKACEDownloadLog(@"subs", @"patched %lu tx3g entries %dx%d",
+    YTzoomDownloadLog(@"subs", @"patched %lu tx3g entries %dx%d",
                       (unsigned long)patched, width, height);
     return YES;
 }
@@ -593,7 +593,7 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
                        cues:(NSArray<NSDictionary *> *)cues
                    language:(NSString *)language
                   outputURL:(NSURL *)outputURL
-                 completion:(YTKACEFFmpegCompletion)completion {
+                 completion:(YTzoomFFmpegCompletion)completion {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{
         AVFormatContext *input = NULL;
         AVFormatContext *output = NULL;
@@ -611,28 +611,28 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
             status = avformat_open_input(
                 &input, mediaURL.fileSystemRepresentation, NULL, NULL);
             if (status < 0) {
-                failure = YTKACEFFmpegError(status, @"subtitle open");
+                failure = YTzoomFFmpegError(status, @"subtitle open");
                 break;
             }
             status = avformat_find_stream_info(input, NULL);
             if (status < 0) {
-                failure = YTKACEFFmpegError(status, @"subtitle probe");
+                failure = YTzoomFFmpegError(status, @"subtitle probe");
                 break;
             }
             status = avformat_alloc_output_context2(
                 &output, NULL, "mp4", outputURL.fileSystemRepresentation);
             if (status < 0 || output == NULL) {
-                failure = YTKACEFFmpegError(status, @"subtitle output");
+                failure = YTzoomFFmpegError(status, @"subtitle output");
                 break;
             }
             streamMap = (int *)av_calloc(input->nb_streams, sizeof(int));
             if (streamMap == NULL) {
-                failure = YTKACEFFmpegError(AVERROR(ENOMEM), @"subtitle map");
+                failure = YTzoomFFmpegError(AVERROR(ENOMEM), @"subtitle map");
                 break;
             }
             for (unsigned int index = 0; index < input->nb_streams; index++) {
                 AVStream *source = input->streams[index];
-                const enum YTKACEFFmpegMediaType type =
+                const enum YTzoomFFmpegMediaType type =
                     source->codecpar->codec_type;
                 if (type != AVMEDIA_TYPE_VIDEO && type != AVMEDIA_TYPE_AUDIO) {
                     streamMap[index] = -1;
@@ -640,14 +640,14 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
                 }
                 AVStream *copy = avformat_new_stream(output, NULL);
                 if (copy == NULL) {
-                    failure = YTKACEFFmpegError(AVERROR(ENOMEM),
+                    failure = YTzoomFFmpegError(AVERROR(ENOMEM),
                                                 @"subtitle stream");
                     break;
                 }
                 status = avcodec_parameters_copy(copy->codecpar,
                                                  source->codecpar);
                 if (status < 0) {
-                    failure = YTKACEFFmpegError(status, @"subtitle params");
+                    failure = YTzoomFFmpegError(status, @"subtitle params");
                     break;
                 }
                 if (type == AVMEDIA_TYPE_VIDEO) {
@@ -666,7 +666,7 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
 
             text = avformat_new_stream(output, NULL);
             if (text == NULL) {
-                failure = YTKACEFFmpegError(AVERROR(ENOMEM), @"subtitle track");
+                failure = YTzoomFFmpegError(AVERROR(ENOMEM), @"subtitle track");
                 break;
             }
             text->codecpar->codec_type = AVMEDIA_TYPE_SUBTITLE;
@@ -708,7 +708,7 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
             text->codecpar->extradata = (uint8_t *)av_mallocz(
                 cursor + AV_INPUT_BUFFER_PADDING_SIZE);
             if (text->codecpar->extradata == NULL) {
-                failure = YTKACEFFmpegError(AVERROR(ENOMEM),
+                failure = YTzoomFFmpegError(AVERROR(ENOMEM),
                                             @"subtitle extradata");
                 break;
             }
@@ -716,9 +716,9 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
             text->codecpar->extradata_size = (int)cursor;
             text->codecpar->width = videoWidth;
             text->codecpar->height = videoHeight;
-            YTKACEDownloadLog(@"subs", @"tx3g desc %zu bytes box=%dx%d",
+            YTzoomDownloadLog(@"subs", @"tx3g desc %zu bytes box=%dx%d",
                               cursor, videoWidth, videoHeight);
-            NSString *mp4Language = YTKACEMP4LanguageCode(language);
+            NSString *mp4Language = YTzoomMP4LanguageCode(language);
             if (mp4Language.length != 0) {
                 av_dict_set(&text->metadata, "language", mp4Language.UTF8String, 0);
             }
@@ -729,19 +729,19 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
                                    outputURL.fileSystemRepresentation,
                                    AVIO_FLAG_WRITE);
                 if (status < 0) {
-                    failure = YTKACEFFmpegError(status, @"subtitle avio");
+                    failure = YTzoomFFmpegError(status, @"subtitle avio");
                     break;
                 }
             }
             status = avformat_write_header(output, NULL);
             if (status < 0) {
-                failure = YTKACEFFmpegError(status, @"subtitle header");
+                failure = YTzoomFFmpegError(status, @"subtitle header");
                 break;
             }
 
             packet = av_packet_alloc();
             if (packet == NULL) {
-                failure = YTKACEFFmpegError(AVERROR(ENOMEM), @"subtitle packet");
+                failure = YTzoomFFmpegError(AVERROR(ENOMEM), @"subtitle packet");
                 break;
             }
             while (av_read_frame(input, packet) >= 0) {
@@ -763,7 +763,7 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
                 av_packet_unref(packet);
             }
 
-            for (NSDictionary *cue in YTKACENormalizedCues(cues)) {
+            for (NSDictionary *cue in YTzoomNormalizedCues(cues)) {
                 NSString *value = cue[@"text"];
                 if (![value isKindOfClass:NSString.class] || value.length == 0) {
                     continue;
@@ -784,8 +784,8 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
                 packet->pos = -1;
                 const int rc = av_interleaved_write_frame(output, packet);
                 if (rc < 0) {
-                    YTKACEDownloadLog(@"subs", @"cue write failed: %@",
-                                      YTKACEFFmpegMessage(rc));
+                    YTzoomDownloadLog(@"subs", @"cue write failed: %@",
+                                      YTzoomFFmpegMessage(rc));
                     av_packet_unref(packet);
                     break;
                 }
@@ -795,7 +795,7 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
 
             status = av_write_trailer(output);
             if (status < 0) {
-                failure = YTKACEFFmpegError(status, @"subtitle trailer");
+                failure = YTzoomFFmpegError(status, @"subtitle trailer");
             }
         } while (0);
 
@@ -810,14 +810,14 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
         }
         if (failure != nil) {
             [NSFileManager.defaultManager removeItemAtURL:outputURL error:nil];
-            YTKACEDownloadLog(@"subs", @"mux failed: %@",
+            YTzoomDownloadLog(@"subs", @"mux failed: %@",
                               failure.localizedDescription);
         } else {
-            YTKACEDownloadLog(@"subs", @"muxed %ld/%lu cues written",
+            YTzoomDownloadLog(@"subs", @"muxed %ld/%lu cues written",
                               (long)written, (unsigned long)cues.count);
-            if (!YTKACEPatchTextSampleDescription(outputURL, videoWidth,
+            if (!YTzoomPatchTextSampleDescription(outputURL, videoWidth,
                                                   videoHeight)) {
-                YTKACEDownloadLog(@"subs", @"tx3g patch skipped");
+                YTzoomDownloadLog(@"subs", @"tx3g patch skipped");
             }
         }
         dispatch_async(dispatch_get_main_queue(), ^{ completion(failure); });
@@ -826,23 +826,23 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
 
 + (void)embedArtworkData:(NSData *)artworkData
                  mediaURL:(NSURL *)mediaURL
-               completion:(YTKACEFFmpegCompletion)completion {
+               completion:(YTzoomFFmpegCompletion)completion {
     if (artworkData.length == 0 || mediaURL == nil) {
-        completion(YTKACEFFmpegError(AVERROR(EINVAL), @"Read artwork"));
+        completion(YTzoomFFmpegError(AVERROR(EINVAL), @"Read artwork"));
         return;
     }
     AVURLAsset *asset = [AVURLAsset URLAssetWithURL:mediaURL options:nil];
     AVAssetExportSession *exporter = [[AVAssetExportSession alloc]
         initWithAsset:asset presetName:AVAssetExportPresetPassthrough];
     if (exporter == nil) {
-        completion(YTKACEFFmpegError(AVERROR_UNKNOWN, @"Create artwork export"));
+        completion(YTzoomFFmpegError(AVERROR_UNKNOWN, @"Create artwork export"));
         return;
     }
     NSString *extension = mediaURL.pathExtension.lowercaseString;
     AVFileType outputType = [extension isEqualToString:@"m4a"]
         ? AVFileTypeAppleM4A : AVFileTypeMPEG4;
     if (![exporter.supportedFileTypes containsObject:outputType]) {
-        completion(YTKACEFFmpegError(AVERROR(ENOTSUP), @"Embed artwork"));
+        completion(YTzoomFFmpegError(AVERROR(ENOTSUP), @"Embed artwork"));
         return;
     }
     NSURL *temporary = [mediaURL.URLByDeletingLastPathComponent
@@ -887,13 +887,13 @@ static BOOL YTKACEPatchTextSampleDescription(NSURL *URL,
 + (void)videoFromAudioURL:(NSURL *)audioURL
              artworkData:(NSData *)artworkData
                 outputURL:(NSURL *)outputURL
-                 progress:(YTKACEFFmpegProgress)progress
-               completion:(YTKACEFFmpegCompletion)completion {
+                 progress:(YTzoomFFmpegProgress)progress
+               completion:(YTzoomFFmpegCompletion)completion {
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         const CFAbsoluteTime started = CFAbsoluteTimeGetCurrent();
-        NSError *error = YTKACEAudioToVideo(audioURL, artworkData, outputURL,
+        NSError *error = YTzoomAudioToVideo(audioURL, artworkData, outputURL,
                                             progress);
-        YTKACEDownloadLog(@"convert", @"audio video elapsed=%.1fs error=%@",
+        YTzoomDownloadLog(@"convert", @"audio video elapsed=%.1fs error=%@",
             CFAbsoluteTimeGetCurrent() - started,
             error.localizedDescription ?: @"none");
         dispatch_async(dispatch_get_main_queue(), ^{ completion(error); });

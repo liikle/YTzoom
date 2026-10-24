@@ -1,31 +1,31 @@
 #import <Foundation/Foundation.h>
 #import "SABRDownloader.h"
 
-@class YTKACEStreamOption;
+@class YTzoomStreamOption;
 
 NS_ASSUME_NONNULL_BEGIN
 
-FOUNDATION_EXPORT NSString * const YTKACEDownloadMethodKey;
-FOUNDATION_EXPORT BOOL YTKACEDirectDownloadsEnabled(void);
-FOUNDATION_EXPORT BOOL YTKACETVDownloadsEnabled(void);
+FOUNDATION_EXPORT NSString * const YTzoomDownloadMethodKey;
+FOUNDATION_EXPORT BOOL YTzoomDirectDownloadsEnabled(void);
+FOUNDATION_EXPORT BOOL YTzoomTVDownloadsEnabled(void);
 
-@interface YTKACEDirectTask : NSObject
+@interface YTzoomDirectTask : NSObject
 - (void)cancel;
 @end
 
-@interface YTKACEDirectDownloader : NSObject
+@interface YTzoomDirectDownloader : NSObject
 
 + (void)fetchOptionsForVideoID:(NSString *)videoID
-                    completion:(void (^)(NSArray<YTKACEStreamOption *> *options))completion;
-+ (NSString *)codecNameForOption:(YTKACEStreamOption *)option;
+                    completion:(void (^)(NSArray<YTzoomStreamOption *> *options))completion;
++ (NSString *)codecNameForOption:(YTzoomStreamOption *)option;
 
-+ (YTKACEDirectTask *)downloadVideoID:(NSString *)videoID
-                          videoOption:(nullable YTKACEStreamOption *)videoOption
-                          audioOption:(YTKACEStreamOption *)audioOption
++ (YTzoomDirectTask *)downloadVideoID:(NSString *)videoID
+                          videoOption:(nullable YTzoomStreamOption *)videoOption
+                          audioOption:(YTzoomStreamOption *)audioOption
                             audioOnly:(BOOL)audioOnly
                            identifier:(NSString *)identifier
-                             progress:(nullable YTKACESABRProgress)progress
-                           completion:(YTKACESABRCompletion)completion;
+                             progress:(nullable YTzoomSABRProgress)progress
+                           completion:(YTzoomSABRCompletion)completion;
 
 @end
 

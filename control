@@ -1,5 +1,5 @@
-Package: com.itzzace.ytkace
-Name: YTKACE
+Package: com.itzzace.ytzoom
+Name: YTzoom
 Version: 1.1.2
 Architecture: iphoneos-arm64
 Description: Open-source YouTube enhancement with downloads, SponsorBlock, background playback and interface controls
@@ -7,5 +7,5 @@ Maintainer: itzzace
 Author: itzzace
 Section: Tweaks
 Depends: mobilesubstrate | ellekit, firmware (>= 15.0)
-Homepage: https://github.com/itzzace/ytkace
+Homepage: https://github.com/liikle/ytzoom
 Tag: role::enduser

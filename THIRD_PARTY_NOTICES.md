@@ -1,18 +1,18 @@
 # Third-Party Notices
 
-YTKACE source is licensed under MIT. The following components and services have separate terms.
+YTzoom source is licensed under MIT. The following components and services have separate terms.
 
 ## FFmpeg
 
-YTKACE statically links FFmpeg 8.1.2 for local media processing. It is built from the official release tarball by `Scripts/build-ffmpeg.sh`, without `--enable-gpl` and without `--enable-nonfree`, so the result is LGPL only. Licence texts ship in the repository at `Vendor/FFmpeg/COPYING.LGPLv2.1` and `COPYING.LGPLv3`. See https://ffmpeg.org/legal.html.
+YTzoom statically links FFmpeg 8.1.2 for local media processing. It is built from the official release tarball by `Scripts/build-ffmpeg.sh`, without `--enable-gpl` and without `--enable-nonfree`, so the result is LGPL only. Licence texts ship in the repository at `Vendor/FFmpeg/COPYING.LGPLv2.1` and `COPYING.LGPLv3`. See https://ffmpeg.org/legal.html.
 
 ## SponsorBlock and DeArrow
 
-SponsorBlock and DeArrow community data is provided by the SponsorBlock service under CC BY-NC-SA 4.0. See https://sponsor.ajay.app/. The shield image shipped in `YTKACE.bundle` is SponsorBlock's artwork, taken from the same site and used to mark the integration.
+SponsorBlock and DeArrow community data is provided by the SponsorBlock service under CC BY-NC-SA 4.0. See https://sponsor.ajay.app/. The shield image shipped in `YTzoom.bundle` is SponsorBlock's artwork, taken from the same site and used to mark the integration.
 
 ## SABR reference
 
-The download path implements YouTube's SABR streaming protocol. It was written for YTKACE, developed against an iPad on iOS 16. Protocol understanding came in part from reading [LuanRT/googlevideo](https://github.com/LuanRT/googlevideo), an MIT-licensed library implementing UMP and SABR. No code from that project is included.
+The download path implements YouTube's SABR streaming protocol. It was written for YTzoom, developed against an iPad on iOS 16. Protocol understanding came in part from reading [LuanRT/googlevideo](https://github.com/LuanRT/googlevideo), an MIT-licensed library implementing UMP and SABR. No code from that project is included.
 
 ## YTPlaybackFix
 
@@ -22,7 +22,7 @@ MIT License, Copyright (c) 2026 Mark02.
 
 ## yt-dlp EJS challenge solver
 
-`Resources/YTKACE.bundle/ejs/yt.solver.core.min.js` and `yt.solver.lib.min.js` are the JavaScript challenge solver from [yt-dlp/ejs](https://github.com/yt-dlp/ejs), release 0.8.0, used unmodified by `Tweak/Features/Playback/ChallengeSolver.mm` to compute the `n` parameter of TV client stream URLs from YouTube's player script. The solver is released under the Unlicense. The library bundle includes [meriyah](https://github.com/meriyah/meriyah) (ISC License, Copyright (c) 2019 and later, KFlash and others) and [astring](https://github.com/davidbonnet/astring) (MIT License, Copyright (c) 2015, David Bonnet); their licence texts are reproduced in the header of that file.
+`Resources/YTzoom.bundle/ejs/yt.solver.core.min.js` and `yt.solver.lib.min.js` are the JavaScript challenge solver from [yt-dlp/ejs](https://github.com/yt-dlp/ejs), release 0.8.0, used unmodified by `Tweak/Features/Playback/ChallengeSolver.mm` to compute the `n` parameter of TV client stream URLs from YouTube's player script. The solver is released under the Unlicense. The library bundle includes [meriyah](https://github.com/meriyah/meriyah) (ISC License, Copyright (c) 2019 and later, KFlash and others) and [astring](https://github.com/davidbonnet/astring) (MIT License, Copyright (c) 2015, David Bonnet); their licence texts are reproduced in the header of that file.
 
 ## TV client identifiers
 
@@ -34,7 +34,7 @@ MIT License, Copyright (c) 2026 Mark02.
 
 ## YTLiquidGlass
 
-The Liquid Glass tab bar and top bar in `Tweak/Features/Navigation/TabBarHooks.mm` and `GlassChrome.mm` build on ideas from [YTLiquidGlass](https://github.com/UltraGeek0102/YTLiquidGlassEXTRA) by UltraGeek0102, used with permission: fading YouTube's own tab bar background instead of removing it, selecting tabs through the pivot bar controller, and placing glass behind the top right buttons, search bar and header buttons. The code here was written for YTKACE.
+The Liquid Glass tab bar and top bar in `Tweak/Features/Navigation/TabBarHooks.mm` and `GlassChrome.mm` build on ideas from [YTLiquidGlass](https://github.com/UltraGeek0102/YTLiquidGlassEXTRA) by UltraGeek0102, used with permission: fading YouTube's own tab bar background instead of removing it, selecting tabs through the pivot bar controller, and placing glass behind the top right buttons, search bar and header buttons. The code here was written for YTzoom.
 
 ## LiquidLens
 
@@ -42,4 +42,4 @@ The tab bar selection lens uses UIKit's private `_UILiquidLensView`. How to crea
 
 ## Apple frameworks
 
-YTKACE uses UIKit, AVFoundation and SF Symbols supplied by iOS. SF Symbols artwork is requested at runtime and is not included as a redistributed asset pack.
+YTzoom uses UIKit, AVFoundation and SF Symbols supplied by iOS. SF Symbols artwork is requested at runtime and is not included as a redistributed asset pack.

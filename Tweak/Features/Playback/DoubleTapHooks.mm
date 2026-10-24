@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 
@@ -8,10 +8,10 @@
 #import <objc/message.h>
 #import <string.h>
 
-static NSMutableDictionary<NSString *, NSValue *> *YTKACEDoubleTapOriginals;
-static const void *YTKACETapSeekHelperKey = &YTKACETapSeekHelperKey;
+static NSMutableDictionary<NSString *, NSValue *> *YTzoomDoubleTapOriginals;
+static const void *YTzoomTapSeekHelperKey = &YTzoomTapSeekHelperKey;
 
-static BOOL YTKACECommitTapSeek(UIResponder *first, double time) {
+static BOOL YTzoomCommitTapSeek(UIResponder *first, double time) {
     for (UIResponder *responder = first; responder != nil;
          responder = responder.nextResponder) {
         SEL detailed = NSSelectorFromString(@"seekToTime:seekSource:");
@@ -36,7 +36,7 @@ static BOOL YTKACECommitTapSeek(UIResponder *first, double time) {
     return NO;
 }
 
-static double YTKACEMaximumSeekableTime(UIResponder *responder,
+static double YTzoomMaximumSeekableTime(UIResponder *responder,
                                         NSString **providerName) {
     SEL selector = NSSelectorFromString(@"maximumSeekableTime");
     for (NSUInteger depth = 0; responder != nil && depth < 20; depth++) {
@@ -64,7 +64,7 @@ static double YTKACEMaximumSeekableTime(UIResponder *responder,
     return 0.0;
 }
 
-static UIView *YTKACEScrubberDot(UIView *view) {
+static UIView *YTzoomScrubberDot(UIView *view) {
     SEL selector = NSSelectorFromString(@"scrubberDot");
     if ([view respondsToSelector:selector]) {
         id dot = ((id (*)(id, SEL))objc_msgSend)(view, selector);
@@ -88,9 +88,9 @@ static UIView *YTKACEScrubberDot(UIView *view) {
     return nil;
 }
 
-static BOOL YTKACETapHitsScrubber(UIView *view, CGPoint point,
+static BOOL YTzoomTapHitsScrubber(UIView *view, CGPoint point,
                                   CGFloat *trackY) {
-    UIView *dot = YTKACEScrubberDot(view);
+    UIView *dot = YTzoomScrubberDot(view);
     CGFloat centerY = MAX(CGRectGetMinY(view.bounds),
                           CGRectGetMaxY(view.bounds) - 2.0);
     if (dot != nil && dot.superview != nil) {
@@ -100,7 +100,7 @@ static BOOL YTKACETapHitsScrubber(UIView *view, CGPoint point,
     return fabs(point.y - centerY) <= 14.0;
 }
 
-static BOOL YTKACETapHitsOverlayControl(UIView *view, CGPoint point,
+static BOOL YTzoomTapHitsOverlayControl(UIView *view, CGPoint point,
                                         NSString **controlName) {
     UIView *candidate = [view hitTest:point withEvent:nil];
     while (candidate != nil && candidate != view) {
@@ -122,20 +122,20 @@ static BOOL YTKACETapHitsOverlayControl(UIView *view, CGPoint point,
     return NO;
 }
 
-@interface YTKACETapSeekTarget : NSObject <UIGestureRecognizerDelegate>
+@interface YTzoomTapSeekTarget : NSObject <UIGestureRecognizerDelegate>
 @property(nonatomic, weak) UIView *view;
 @end
 
-@implementation YTKACETapSeekTarget
+@implementation YTzoomTapSeekTarget
 - (void)tap:(UITapGestureRecognizer *)recognizer {
     UIView *view = self.view;
-    if (!YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.TapToSeek") || view == nil ||
+    if (!YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.TapToSeek") || view == nil ||
         CGRectGetWidth(view.bounds) <= 1.0) return;
     CGPoint point = [recognizer locationInView:view];
-    if (YTKACETapHitsOverlayControl(view, point, NULL)) {
+    if (YTzoomTapHitsOverlayControl(view, point, NULL)) {
         return;
     }
-    if (!YTKACETapHitsScrubber(view, point, NULL)) {
+    if (!YTzoomTapHitsScrubber(view, point, NULL)) {
         return;
     }
     double x = point.x;
@@ -148,12 +148,12 @@ static BOOL YTKACETapHitsOverlayControl(UIView *view, CGPoint point,
         view, rangeSelector, x);
     if (!isfinite(ratio)) return;
     ratio = MIN(1.0, MAX(0.0, ratio));
-    double duration = YTKACEMaximumSeekableTime(view, NULL);
+    double duration = YTzoomMaximumSeekableTime(view, NULL);
     if (!isfinite(duration) || duration <= 0.0) {
         return;
     }
     double time = ratio * duration;
-    BOOL committed = YTKACECommitTapSeek(view, time);
+    BOOL committed = YTzoomCommitTapSeek(view, time);
     if (!committed && [view respondsToSelector:nativeSeek]) {
         ((void (*)(id, SEL, double))objc_msgSend)(view, nativeSeek, time);
     }
@@ -162,44 +162,44 @@ static BOOL YTKACETapHitsOverlayControl(UIView *view, CGPoint point,
 - (BOOL)gestureRecognizer:(UIGestureRecognizer *)gestureRecognizer
         shouldRecognizeSimultaneouslyWithGestureRecognizer:
             (UIGestureRecognizer *)otherGestureRecognizer {
-    return YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.TapToSeek");
+    return YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.TapToSeek");
 }
 @end
 
-void YTKACEConfigureTapToSeek(UIView *receiver) {
+void YTzoomConfigureTapToSeek(UIView *receiver) {
     if (receiver == nil) return;
-    YTKACETapSeekTarget *target = objc_getAssociatedObject(
-        receiver, YTKACETapSeekHelperKey);
+    YTzoomTapSeekTarget *target = objc_getAssociatedObject(
+        receiver, YTzoomTapSeekHelperKey);
     if (target == nil) {
-        target = [YTKACETapSeekTarget new];
+        target = [YTzoomTapSeekTarget new];
         target.view = receiver;
         UITapGestureRecognizer *tap = [[UITapGestureRecognizer alloc]
             initWithTarget:target action:@selector(tap:)];
         tap.cancelsTouchesInView = NO;
         tap.delegate = target;
         [receiver addGestureRecognizer:tap];
-        objc_setAssociatedObject(receiver, YTKACETapSeekHelperKey, target,
+        objc_setAssociatedObject(receiver, YTzoomTapSeekHelperKey, target,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     }
 }
 
-static NSValue *YTKACEDoubleTapValueForIMP(IMP implementation) {
+static NSValue *YTzoomDoubleTapValueForIMP(IMP implementation) {
     return [NSValue value:&implementation withObjCType:@encode(IMP)];
 }
 
-static IMP YTKACEDoubleTapIMPFromValue(NSValue *value) {
+static IMP YTzoomDoubleTapIMPFromValue(NSValue *value) {
     IMP implementation = NULL;
     [value getValue:&implementation];
     return implementation;
 }
 
-static double YTKACEDoubleTapValue(void) {
+static double YTzoomDoubleTapValue(void) {
     double value = [NSUserDefaults.standardUserDefaults
-        doubleForKey:@"YTKACE.Preference.Playback.DoubleTapSeconds"];
+        doubleForKey:@"YTzoom.Preference.Playback.DoubleTapSeconds"];
     return MIN(60.0, MAX(5.0, value > 0.0 ? value : 10.0));
 }
 
-static NSString *YTKACEDoubleTapKey(Class cls,
+static NSString *YTzoomDoubleTapKey(Class cls,
                                     BOOL classMethod,
                                     SEL selector) {
     return [NSString stringWithFormat:@"%@|%@|%@",
@@ -208,106 +208,106 @@ static NSString *YTKACEDoubleTapKey(Class cls,
             NSStringFromSelector(selector)];
 }
 
-static IMP YTKACEDoubleTapOriginal(id receiver, SEL selector) {
+static IMP YTzoomDoubleTapOriginal(id receiver, SEL selector) {
     BOOL classMethod = object_isClass(receiver);
     Class cls = classMethod ? (Class)receiver : [receiver class];
     while (cls != Nil) {
         NSValue *value =
-            YTKACEDoubleTapOriginals[YTKACEDoubleTapKey(cls, classMethod, selector)];
+            YTzoomDoubleTapOriginals[YTzoomDoubleTapKey(cls, classMethod, selector)];
         if (value != nil) {
-            return YTKACEDoubleTapIMPFromValue(value);
+            return YTzoomDoubleTapIMPFromValue(value);
         }
         cls = class_getSuperclass(cls);
     }
     return NULL;
 }
 
-static double YTKACEDoubleTapDoubleNoArg(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.CustomDoubleTap")) {
-        return YTKACEDoubleTapValue();
+static double YTzoomDoubleTapDoubleNoArg(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.CustomDoubleTap")) {
+        return YTzoomDoubleTapValue();
     }
-    IMP original = YTKACEDoubleTapOriginal(receiver, selector);
+    IMP original = YTzoomDoubleTapOriginal(receiver, selector);
     return original == NULL
         ? 10.0
         : ((double (*)(id, SEL))original)(receiver, selector);
 }
 
-static float YTKACEDoubleTapFloatNoArg(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.CustomDoubleTap")) {
-        return (float)YTKACEDoubleTapValue();
+static float YTzoomDoubleTapFloatNoArg(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.CustomDoubleTap")) {
+        return (float)YTzoomDoubleTapValue();
     }
-    IMP original = YTKACEDoubleTapOriginal(receiver, selector);
+    IMP original = YTzoomDoubleTapOriginal(receiver, selector);
     return original == NULL
         ? 10.0f
         : ((float (*)(id, SEL))original)(receiver, selector);
 }
 
-static NSInteger YTKACEDoubleTapIntegerNoArg(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.CustomDoubleTap")) {
-        return (NSInteger)llround(YTKACEDoubleTapValue());
+static NSInteger YTzoomDoubleTapIntegerNoArg(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.CustomDoubleTap")) {
+        return (NSInteger)llround(YTzoomDoubleTapValue());
     }
-    IMP original = YTKACEDoubleTapOriginal(receiver, selector);
+    IMP original = YTzoomDoubleTapOriginal(receiver, selector);
     return original == NULL
         ? 10
         : ((NSInteger (*)(id, SEL))original)(receiver, selector);
 }
 
-static double YTKACEDoubleTapDouble(id receiver,
+static double YTzoomDoubleTapDouble(id receiver,
                                     SEL selector,
                                     id __unsafe_unretained config) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.CustomDoubleTap")) {
-        return YTKACEDoubleTapValue();
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.CustomDoubleTap")) {
+        return YTzoomDoubleTapValue();
     }
-    IMP original = YTKACEDoubleTapOriginal(receiver, selector);
+    IMP original = YTzoomDoubleTapOriginal(receiver, selector);
     return original == NULL
         ? 10.0
         : ((double (*)(id, SEL, id))original)(receiver, selector, config);
 }
 
-static float YTKACEDoubleTapFloat(id receiver,
+static float YTzoomDoubleTapFloat(id receiver,
                                   SEL selector,
                                   id __unsafe_unretained config) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.CustomDoubleTap")) {
-        return (float)YTKACEDoubleTapValue();
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.CustomDoubleTap")) {
+        return (float)YTzoomDoubleTapValue();
     }
-    IMP original = YTKACEDoubleTapOriginal(receiver, selector);
+    IMP original = YTzoomDoubleTapOriginal(receiver, selector);
     return original == NULL
         ? 10.0f
         : ((float (*)(id, SEL, id))original)(receiver, selector, config);
 }
 
-static NSInteger YTKACEDoubleTapInteger(id receiver,
+static NSInteger YTzoomDoubleTapInteger(id receiver,
                                         SEL selector,
                                         id __unsafe_unretained config) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.CustomDoubleTap")) {
-        return (NSInteger)llround(YTKACEDoubleTapValue());
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.CustomDoubleTap")) {
+        return (NSInteger)llround(YTzoomDoubleTapValue());
     }
-    IMP original = YTKACEDoubleTapOriginal(receiver, selector);
+    IMP original = YTzoomDoubleTapOriginal(receiver, selector);
     return original == NULL
         ? 10
         : ((NSInteger (*)(id, SEL, id))original)(receiver, selector, config);
 }
 
-static BOOL YTKACETapToSeekDisabled(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.TapToSeek")) {
+static BOOL YTzoomTapToSeekDisabled(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.TapToSeek")) {
         return NO;
     }
-    IMP original = YTKACEDoubleTapOriginal(receiver, selector);
+    IMP original = YTzoomDoubleTapOriginal(receiver, selector);
     return original == NULL
         ? NO
         : ((BOOL (*)(id, SEL))original)(receiver, selector);
 }
 
-static BOOL YTKACETapToSeekEnabled(id receiver, SEL selector) {
-    if (YTKACEFeatureEnabled(@"YTKACE.Preference.Playback.TapToSeek")) {
+static BOOL YTzoomTapToSeekEnabled(id receiver, SEL selector) {
+    if (YTzoomFeatureEnabled(@"YTzoom.Preference.Playback.TapToSeek")) {
         return YES;
     }
-    IMP original = YTKACEDoubleTapOriginal(receiver, selector);
+    IMP original = YTzoomDoubleTapOriginal(receiver, selector);
     return original != NULL &&
         ((BOOL (*)(id, SEL))original)(receiver, selector);
 }
 
-static BOOL YTKACEInstallTapToSeekHook(NSString *className,
+static BOOL YTzoomInstallTapToSeekHook(NSString *className,
                                        NSString *selectorName,
                                        IMP replacement,
                                        BOOL classMethod) {
@@ -318,21 +318,21 @@ static BOOL YTKACEInstallTapToSeekHook(NSString *className,
     if (method == NULL) return NO;
     IMP original = NULL;
     BOOL installed = classMethod
-        ? YTKACEInstallClassHook(className, selectorName,
+        ? YTzoomInstallClassHook(className, selectorName,
                                  replacement, &original)
-        : YTKACEInstallInstanceHook(className, selectorName,
+        : YTzoomInstallInstanceHook(className, selectorName,
                                     replacement, &original);
     if (installed && original != NULL) {
-        NSString *key = YTKACEDoubleTapKey(cls, classMethod, selector);
-        if (YTKACEDoubleTapOriginals[key] == nil) {
-            YTKACEDoubleTapOriginals[key] =
-                YTKACEDoubleTapValueForIMP(original);
+        NSString *key = YTzoomDoubleTapKey(cls, classMethod, selector);
+        if (YTzoomDoubleTapOriginals[key] == nil) {
+            YTzoomDoubleTapOriginals[key] =
+                YTzoomDoubleTapValueForIMP(original);
         }
     }
     return installed;
 }
 
-static void YTKACEInstallDoubleTapHook(NSString *className,
+static void YTzoomInstallDoubleTapHook(NSString *className,
                                       NSString *selectorName,
                                       BOOL classMethod) {
     Class cls = NSClassFromString(className);
@@ -351,18 +351,18 @@ static void YTKACEInstallDoubleTapHook(NSString *className,
     IMP replacement = NULL;
     if (strcmp(returnType, @encode(double)) == 0) {
         replacement = takesArgument
-            ? (IMP)YTKACEDoubleTapDouble
-            : (IMP)YTKACEDoubleTapDoubleNoArg;
+            ? (IMP)YTzoomDoubleTapDouble
+            : (IMP)YTzoomDoubleTapDoubleNoArg;
     } else if (strcmp(returnType, @encode(float)) == 0) {
         replacement = takesArgument
-            ? (IMP)YTKACEDoubleTapFloat
-            : (IMP)YTKACEDoubleTapFloatNoArg;
+            ? (IMP)YTzoomDoubleTapFloat
+            : (IMP)YTzoomDoubleTapFloatNoArg;
     } else if (strcmp(returnType, @encode(NSInteger)) == 0 ||
                strcmp(returnType, @encode(NSUInteger)) == 0 ||
                strcmp(returnType, @encode(int)) == 0) {
         replacement = takesArgument
-            ? (IMP)YTKACEDoubleTapInteger
-            : (IMP)YTKACEDoubleTapIntegerNoArg;
+            ? (IMP)YTzoomDoubleTapInteger
+            : (IMP)YTzoomDoubleTapIntegerNoArg;
     }
     if (replacement == NULL) {
         return;
@@ -370,36 +370,36 @@ static void YTKACEInstallDoubleTapHook(NSString *className,
 
     IMP original = NULL;
     BOOL installed = classMethod
-        ? YTKACEInstallClassHook(className, selectorName, replacement, &original)
-        : YTKACEInstallInstanceHook(className, selectorName, replacement, &original);
+        ? YTzoomInstallClassHook(className, selectorName, replacement, &original)
+        : YTzoomInstallInstanceHook(className, selectorName, replacement, &original);
     if (installed && original != NULL) {
         NSString *key =
-            YTKACEDoubleTapKey(cls, classMethod, NSSelectorFromString(selectorName));
-        if (YTKACEDoubleTapOriginals[key] == nil) {
-            YTKACEDoubleTapOriginals[key] =
-                YTKACEDoubleTapValueForIMP(original);
+            YTzoomDoubleTapKey(cls, classMethod, NSSelectorFromString(selectorName));
+        if (YTzoomDoubleTapOriginals[key] == nil) {
+            YTzoomDoubleTapOriginals[key] =
+                YTzoomDoubleTapValueForIMP(original);
         }
     }
 }
 
-void YTKACEInstallDoubleTapHooks(void) {
+void YTzoomInstallDoubleTapHooks(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        YTKACEDoubleTapOriginals = [NSMutableDictionary dictionary];
+        YTzoomDoubleTapOriginals = [NSMutableDictionary dictionary];
     });
 
-    YTKACEInstallDoubleTapHook(@"YTSettings", @"doubleTapSeekDuration", NO);
-    YTKACEInstallDoubleTapHook(@"YTUserDefaults", @"doubleTapSeekDuration", NO);
+    YTzoomInstallDoubleTapHook(@"YTSettings", @"doubleTapSeekDuration", NO);
+    YTzoomInstallDoubleTapHook(@"YTUserDefaults", @"doubleTapSeekDuration", NO);
     for (NSString *selector in @[
         @"doubleTapSeekDurationForVideoPlayerOverlayConfig:",
         @"doubleTapSeekIntervalForVideoPlayerOverlayConfig:"
     ]) {
-        YTKACEInstallDoubleTapHook(
+        YTzoomInstallDoubleTapHook(
             @"YTVideoPlayerOverlayConfigTransformer",
             selector,
             NO
         );
-        YTKACEInstallDoubleTapHook(
+        YTzoomInstallDoubleTapHook(
             @"YTVideoPlayerOverlayConfigTransformer",
             selector,
             YES
@@ -413,12 +413,12 @@ void YTKACEInstallDoubleTapHooks(void) {
     ]) {
         for (NSNumber *classMethodValue in @[@NO, @YES]) {
             BOOL classMethod = classMethodValue.boolValue;
-            YTKACEInstallTapToSeekHook(
+            YTzoomInstallTapToSeekHook(
                 className, @"androidDisableTimeBarTapToSeek",
-                (IMP)YTKACETapToSeekDisabled, classMethod);
-            YTKACEInstallTapToSeekHook(
+                (IMP)YTzoomTapToSeekDisabled, classMethod);
+            YTzoomInstallTapToSeekHook(
                 className, @"iosEnableVideoPlayerScrubber",
-                (IMP)YTKACETapToSeekEnabled, classMethod);
+                (IMP)YTzoomTapToSeekEnabled, classMethod);
         }
     }
 }

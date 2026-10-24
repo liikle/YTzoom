@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 #import "../Interface/NavigationVisibility.h"
@@ -6,22 +6,22 @@
 #import <UIKit/UIKit.h>
 #import <objc/runtime.h>
 
-static NSMutableDictionary<NSString *, NSValue *> *YTKACEOLEDOriginals;
+static NSMutableDictionary<NSString *, NSValue *> *YTzoomOLEDOriginals;
 static IMP OriginalQualitySheetDidAppear;
 static IMP OriginalAppTraitChanged;
 static IMP OriginalAppStatusBarStyle;
 
-static NSValue *YTKACEOLEDValue(IMP implementation) {
+static NSValue *YTzoomOLEDValue(IMP implementation) {
     return [NSValue value:&implementation withObjCType:@encode(IMP)];
 }
 
-static IMP YTKACEOLEDImplementation(NSValue *value) {
+static IMP YTzoomOLEDImplementation(NSValue *value) {
     IMP implementation = NULL;
     [value getValue:&implementation];
     return implementation;
 }
 
-static NSString *YTKACEOLEDOriginalKey(id receiver, SEL selector) {
+static NSString *YTzoomOLEDOriginalKey(id receiver, SEL selector) {
     BOOL classMethod = object_isClass(receiver);
     Class cls = classMethod ? receiver : [receiver class];
     return [NSString stringWithFormat:@"%@|%@|%@",
@@ -30,17 +30,17 @@ static NSString *YTKACEOLEDOriginalKey(id receiver, SEL selector) {
             NSStringFromSelector(selector)];
 }
 
-static UIColor *YTKACEOLEDColor(id receiver, SEL selector) {
-    IMP original = YTKACEOLEDImplementation(
-        YTKACEOLEDOriginals[YTKACEOLEDOriginalKey(receiver, selector)]
+static UIColor *YTzoomOLEDColor(id receiver, SEL selector) {
+    IMP original = YTzoomOLEDImplementation(
+        YTzoomOLEDOriginals[YTzoomOLEDOriginalKey(receiver, selector)]
     );
     UIColor *base = original == NULL
         ? nil
         : ((id (*)(id, SEL))original)(receiver, selector);
-    if (!YTKACEFeatureEnabled(YTKACEOLEDKey)) return base;
+    if (!YTzoomFeatureEnabled(YTzoomOLEDKey)) return base;
     __weak id weakReceiver = receiver;
     return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
-        if (YTKACEOLEDActive(traits)) return UIColor.blackColor;
+        if (YTzoomOLEDActive(traits)) return UIColor.blackColor;
         id target = weakReceiver;
         UIColor *current = target == nil || original == NULL
             ? base
@@ -51,23 +51,23 @@ static UIColor *YTKACEOLEDColor(id receiver, SEL selector) {
     }];
 }
 
-static void YTKACERefreshStatusBars(UIViewController *controller) {
+static void YTzoomRefreshStatusBars(UIViewController *controller) {
     if (controller == nil) return;
     [controller setNeedsStatusBarAppearanceUpdate];
     if ([controller isKindOfClass:UINavigationController.class]) {
-        YTKACERefreshStatusBars(((UINavigationController *)controller).visibleViewController);
+        YTzoomRefreshStatusBars(((UINavigationController *)controller).visibleViewController);
     } else if ([controller isKindOfClass:UITabBarController.class]) {
-        YTKACERefreshStatusBars(((UITabBarController *)controller).selectedViewController);
+        YTzoomRefreshStatusBars(((UITabBarController *)controller).selectedViewController);
     }
-    YTKACERefreshStatusBars(controller.presentedViewController);
+    YTzoomRefreshStatusBars(controller.presentedViewController);
 }
 
-static NSInteger YTKACEAppStatusBarStyle(UIViewController *receiver,
+static NSInteger YTzoomAppStatusBarStyle(UIViewController *receiver,
                                          SEL selector) {
     NSInteger original = OriginalAppStatusBarStyle == NULL
         ? UIStatusBarStyleDefault
         : ((NSInteger (*)(id, SEL))OriginalAppStatusBarStyle)(receiver, selector);
-    if (!YTKACEFeatureEnabled(YTKACEOLEDKey)) return original;
+    if (!YTzoomFeatureEnabled(YTzoomOLEDKey)) return original;
     UIUserInterfaceStyle style = receiver.traitCollection.userInterfaceStyle;
     NSInteger result = style == UIUserInterfaceStyleDark
         ? UIStatusBarStyleLightContent
@@ -75,7 +75,7 @@ static NSInteger YTKACEAppStatusBarStyle(UIViewController *receiver,
     return result;
 }
 
-static void YTKACEAppTraitChanged(UIViewController *receiver,
+static void YTzoomAppTraitChanged(UIViewController *receiver,
                                   SEL selector,
                                   UITraitCollection *previous) {
     if (OriginalAppTraitChanged != NULL) {
@@ -84,35 +84,35 @@ static void YTKACEAppTraitChanged(UIViewController *receiver,
     if (previous != nil &&
         ![receiver.traitCollection
             hasDifferentColorAppearanceComparedToTraitCollection:previous]) return;
-    if (!YTKACEFeatureEnabled(YTKACEOLEDKey)) return;
+    if (!YTzoomFeatureEnabled(YTzoomOLEDKey)) return;
     [receiver setNeedsStatusBarAppearanceUpdate];
     [receiver.view setNeedsLayout];
-    YTKACERefreshNavigationAppearance();
+    YTzoomRefreshNavigationAppearance();
     dispatch_async(dispatch_get_main_queue(), ^{
         for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
             if (![scene isKindOfClass:UIWindowScene.class] ||
                 scene.activationState != UISceneActivationStateForegroundActive) continue;
             for (UIWindow *window in ((UIWindowScene *)scene).windows) {
-                YTKACERefreshStatusBars(window.rootViewController);
+                YTzoomRefreshStatusBars(window.rootViewController);
                 [window setNeedsLayout];
             }
         }
-        YTKACERefreshNavigationAppearance();
+        YTzoomRefreshNavigationAppearance();
     });
 }
 
-static void YTKACEInstallColorHook(NSString *className,
+static void YTzoomInstallColorHook(NSString *className,
                                    NSString *selectorName,
                                    BOOL classMethod) {
     IMP original = NULL;
     BOOL installed = classMethod
-        ? YTKACEInstallClassHook(className,
+        ? YTzoomInstallClassHook(className,
                                 selectorName,
-                                (IMP)YTKACEOLEDColor,
+                                (IMP)YTzoomOLEDColor,
                                 &original)
-        : YTKACEInstallInstanceHook(className,
+        : YTzoomInstallInstanceHook(className,
                                    selectorName,
-                                   (IMP)YTKACEOLEDColor,
+                                   (IMP)YTzoomOLEDColor,
                                    &original);
     if (!installed || original == NULL) {
         return;
@@ -121,12 +121,12 @@ static void YTKACEInstallColorHook(NSString *className,
                      classMethod ? @"+" : @"-",
                      className,
                      selectorName];
-    if (YTKACEOLEDOriginals[key] == nil) {
-        YTKACEOLEDOriginals[key] = YTKACEOLEDValue(original);
+    if (YTzoomOLEDOriginals[key] == nil) {
+        YTzoomOLEDOriginals[key] = YTzoomOLEDValue(original);
     }
 }
 
-static void YTKACECollectQualityLabels(UIView *view,
+static void YTzoomCollectQualityLabels(UIView *view,
                                        NSMutableArray<UILabel *> *labels) {
     if ([view isKindOfClass:UILabel.class]) {
         UILabel *label = (UILabel *)view;
@@ -140,11 +140,11 @@ static void YTKACECollectQualityLabels(UIView *view,
         }
     }
     for (UIView *child in view.subviews) {
-        YTKACECollectQualityLabels(child, labels);
+        YTzoomCollectQualityLabels(child, labels);
     }
 }
 
-static UIView *YTKACECommonAncestor(NSArray<UIView *> *views, UIView *limit) {
+static UIView *YTzoomCommonAncestor(NSArray<UIView *> *views, UIView *limit) {
     UIView *candidate = views.firstObject;
     while (candidate != nil && candidate != limit.superview) {
         BOOL containsAll = YES;
@@ -160,7 +160,7 @@ static UIView *YTKACECommonAncestor(NSArray<UIView *> *views, UIView *limit) {
     return nil;
 }
 
-static void YTKACEBlackenQualitySurface(UIView *view) {
+static void YTzoomBlackenQualitySurface(UIView *view) {
     if ([view isKindOfClass:UIVisualEffectView.class]) {
         UIVisualEffectView *effect = (UIVisualEffectView *)view;
         effect.effect = nil;
@@ -176,28 +176,28 @@ static void YTKACEBlackenQualitySurface(UIView *view) {
         ((UILabel *)view).textColor = UIColor.whiteColor;
     }
     for (UIView *child in view.subviews) {
-        YTKACEBlackenQualitySurface(child);
+        YTzoomBlackenQualitySurface(child);
     }
 }
 
-static void YTKACEQualitySheetDidAppear(id receiver, SEL selector, BOOL animated) {
+static void YTzoomQualitySheetDidAppear(id receiver, SEL selector, BOOL animated) {
     if (OriginalQualitySheetDidAppear != NULL) {
         ((void (*)(id, SEL, BOOL))OriginalQualitySheetDidAppear)(
             receiver, selector, animated);
     }
     if (![receiver isKindOfClass:UIViewController.class] ||
-        !YTKACEOLEDActive(((UIViewController *)receiver).traitCollection)) return;
-    if (YTKACELiquidGlassAvailable() && YTKACEFeatureEnabled(@"YTKACE.Preference.Glass.Menus")) return;
+        !YTzoomOLEDActive(((UIViewController *)receiver).traitCollection)) return;
+    if (YTzoomLiquidGlassAvailable() && YTzoomFeatureEnabled(@"YTzoom.Preference.Glass.Menus")) return;
     UIView *root = ((UIViewController *)receiver).view;
     dispatch_async(dispatch_get_main_queue(), ^{
         NSMutableArray<UILabel *> *labels = [NSMutableArray array];
-        YTKACECollectQualityLabels(root, labels);
+        YTzoomCollectQualityLabels(root, labels);
         NSUInteger qualityRows = 0;
         for (UILabel *label in labels) {
             if ([label.text rangeOfString:@"p"].location != NSNotFound) qualityRows++;
         }
         if (qualityRows < 2) return;
-        UIView *surface = YTKACECommonAncestor(labels, root);
+        UIView *surface = YTzoomCommonAncestor(labels, root);
         if (surface == nil || surface == root) {
             for (UIView *child in root.subviews) {
                 NSUInteger count = 0;
@@ -212,19 +212,19 @@ static void YTKACEQualitySheetDidAppear(id receiver, SEL selector, BOOL animated
         }
         if (surface != nil && surface != root) {
             surface.backgroundColor = UIColor.blackColor;
-            YTKACEBlackenQualitySurface(surface);
+            YTzoomBlackenQualitySurface(surface);
         }
     });
 }
 
-void YTKACEInstallOLEDHooks(void) {
+void YTzoomInstallOLEDHooks(void) {
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        YTKACEOLEDOriginals = [NSMutableDictionary dictionary];
+        YTzoomOLEDOriginals = [NSMutableDictionary dictionary];
     });
 
     for (NSString *selector in @[@"black0", @"black1", @"black2", @"black3", @"black4"]) {
-        YTKACEInstallColorHook(@"YTColor", selector, YES);
+        YTzoomInstallColorHook(@"YTColor", selector, YES);
     }
 
     NSArray<NSString *> *paletteSelectors = @[
@@ -245,21 +245,21 @@ void YTKACEInstallOLEDHooks(void) {
         @"elevatedBackgroundColor"
     ];
     for (NSString *selector in paletteSelectors) {
-        YTKACEInstallColorHook(@"YTCommonColorPalette", selector, NO);
-        YTKACEInstallColorHook(@"YTCommonColorPalette", selector, YES);
+        YTzoomInstallColorHook(@"YTCommonColorPalette", selector, NO);
+        YTzoomInstallColorHook(@"YTCommonColorPalette", selector, YES);
     }
 
-    YTKACEInstallInstanceHook(@"YTActionSheetDialogViewController",
+    YTzoomInstallInstanceHook(@"YTActionSheetDialogViewController",
                               @"viewDidAppear:",
-                              (IMP)YTKACEQualitySheetDidAppear,
+                              (IMP)YTzoomQualitySheetDidAppear,
                               &OriginalQualitySheetDidAppear);
-    YTKACEInstallInstanceHook(@"YTAppViewController",
+    YTzoomInstallInstanceHook(@"YTAppViewController",
                               @"traitCollectionDidChange:",
-                              (IMP)YTKACEAppTraitChanged,
+                              (IMP)YTzoomAppTraitChanged,
                               &OriginalAppTraitChanged);
-    YTKACEInstallInstanceHook(@"YTAppViewController",
+    YTzoomInstallInstanceHook(@"YTAppViewController",
                               @"preferredStatusBarStyle",
-                              (IMP)YTKACEAppStatusBarStyle,
+                              (IMP)YTzoomAppStatusBarStyle,
                               &OriginalAppStatusBarStyle);
 
 }

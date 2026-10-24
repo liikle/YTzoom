@@ -1,5 +1,5 @@
 #import "../Downloads/DownloadLog.h"
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Preferences.h"
 
@@ -9,10 +9,10 @@
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-static NSString * const YTKACEProgressStyleKey = @"YTKACE.Preference.Progress.Style";
-static NSString * const YTKACEProgressMainColorKey = @"YTKACE.Preference.Progress.MainColor";
-static NSString * const YTKACEProgressGradientColorKey = @"YTKACE.Preference.Progress.HighlightColor";
-static NSString * const YTKACEProgressScrubberColorKey = @"YTKACE.Preference.Progress.ScrubberColor";
+static NSString * const YTzoomProgressStyleKey = @"YTzoom.Preference.Progress.Style";
+static NSString * const YTzoomProgressMainColorKey = @"YTzoom.Preference.Progress.MainColor";
+static NSString * const YTzoomProgressGradientColorKey = @"YTzoom.Preference.Progress.HighlightColor";
+static NSString * const YTzoomProgressScrubberColorKey = @"YTzoom.Preference.Progress.ScrubberColor";
 
 static IMP OriginalDecorationViewColor;
 static IMP OriginalDecorationControllerColor;
@@ -23,7 +23,7 @@ static IMP OriginalSetScrubberDotColor;
 static IMP OriginalSetScrubberDotColorV1;
 static IMP OriginalSetScrubberDotColorV2;
 
-static UIColor *YTKACEProgressColorFromHex(NSString *hex, UIColor *fallback) {
+static UIColor *YTzoomProgressColorFromHex(NSString *hex, UIColor *fallback) {
     if (![hex isKindOfClass:NSString.class]) return fallback;
     NSString *value = [[hex stringByTrimmingCharactersInSet:
         NSCharacterSet.whitespaceAndNewlineCharacterSet]
@@ -37,14 +37,14 @@ static UIColor *YTKACEProgressColorFromHex(NSString *hex, UIColor *fallback) {
                            alpha:1.0];
 }
 
-static NSInteger YTKACEStyleCache = -1;
-static NSMutableDictionary<NSString *, UIColor *> *YTKACEPatternCache = nil;
-static NSMutableDictionary<NSString *, UIImage *> *YTKACEStripCache = nil;
-static NSMutableDictionary<NSString *, UIColor *> *YTKACEColorCache = nil;
-static NSUInteger YTKACEProgressGeneration = 0;
-static NSUInteger YTKACECachedGeneration = NSUIntegerMax;
+static NSInteger YTzoomStyleCache = -1;
+static NSMutableDictionary<NSString *, UIColor *> *YTzoomPatternCache = nil;
+static NSMutableDictionary<NSString *, UIImage *> *YTzoomStripCache = nil;
+static NSMutableDictionary<NSString *, UIColor *> *YTzoomColorCache = nil;
+static NSUInteger YTzoomProgressGeneration = 0;
+static NSUInteger YTzoomCachedGeneration = NSUIntegerMax;
 
-static void YTKACERelayoutBars(UIView *view, NSUInteger depth) {
+static void YTzoomRelayoutBars(UIView *view, NSUInteger depth) {
     if (view == nil || depth > 14) return;
     NSString *name = NSStringFromClass(view.class);
     if ([name containsString:@"PlayerBar"] ||
@@ -55,64 +55,64 @@ static void YTKACERelayoutBars(UIView *view, NSUInteger depth) {
         [view setNeedsDisplay];
     }
     for (UIView *subview in view.subviews) {
-        YTKACERelayoutBars(subview, depth + 1);
+        YTzoomRelayoutBars(subview, depth + 1);
     }
 }
 
-static void YTKACEProgressSyncGeneration(void) {
+static void YTzoomProgressSyncGeneration(void) {
     static dispatch_once_t observerToken;
     dispatch_once(&observerToken, ^{
         [NSNotificationCenter.defaultCenter
-            addObserverForName:YTKACEPreferencesDidChangeNotification
+            addObserverForName:YTzoomPreferencesDidChangeNotification
                         object:nil
                          queue:NSOperationQueue.mainQueue
                     usingBlock:^(NSNotification *note) {
             NSString *key = note.userInfo[@"key"];
-            if (![key hasPrefix:@"YTKACE.Preference.Progress."]) return;
-            YTKACEProgressGeneration++;
+            if (![key hasPrefix:@"YTzoom.Preference.Progress."]) return;
+            YTzoomProgressGeneration++;
             for (UIScene *scene in UIApplication.sharedApplication.connectedScenes) {
                 if (![scene isKindOfClass:UIWindowScene.class]) continue;
                 for (UIWindow *window in ((UIWindowScene *)scene).windows) {
-                    YTKACERelayoutBars(window, 0);
+                    YTzoomRelayoutBars(window, 0);
                 }
             }
         }];
     });
-    if (YTKACECachedGeneration == YTKACEProgressGeneration) return;
-    YTKACECachedGeneration = YTKACEProgressGeneration;
-    YTKACEStyleCache = -1;
-    YTKACEColorCache = nil;
-    YTKACEPatternCache = nil;
-    YTKACEStripCache = nil;
+    if (YTzoomCachedGeneration == YTzoomProgressGeneration) return;
+    YTzoomCachedGeneration = YTzoomProgressGeneration;
+    YTzoomStyleCache = -1;
+    YTzoomColorCache = nil;
+    YTzoomPatternCache = nil;
+    YTzoomStripCache = nil;
 }
 
-static NSInteger YTKACEProgressStyle(void) {
-    YTKACEProgressSyncGeneration();
-    if (YTKACEStyleCache >= 0) return YTKACEStyleCache;
-    id value = YTKACEPreferenceObject(YTKACEProgressStyleKey);
-    YTKACEStyleCache =
+static NSInteger YTzoomProgressStyle(void) {
+    YTzoomProgressSyncGeneration();
+    if (YTzoomStyleCache >= 0) return YTzoomStyleCache;
+    id value = YTzoomPreferenceObject(YTzoomProgressStyleKey);
+    YTzoomStyleCache =
         [value respondsToSelector:@selector(integerValue)] ? [value integerValue] : 0;
-    return YTKACEStyleCache;
+    return YTzoomStyleCache;
 }
 
-static UIColor *YTKACEStoredColor(NSString *key, UIColor *fallback) {
-    YTKACEProgressSyncGeneration();
-    UIColor *hit = YTKACEColorCache[key];
+static UIColor *YTzoomStoredColor(NSString *key, UIColor *fallback) {
+    YTzoomProgressSyncGeneration();
+    UIColor *hit = YTzoomColorCache[key];
     if (hit != nil) return hit;
-    UIColor *value = YTKACEProgressColorFromHex(YTKACEPreferenceObject(key), fallback);
-    if (YTKACEColorCache == nil) YTKACEColorCache = [NSMutableDictionary dictionary];
-    if (value != nil) YTKACEColorCache[key] = value;
+    UIColor *value = YTzoomProgressColorFromHex(YTzoomPreferenceObject(key), fallback);
+    if (YTzoomColorCache == nil) YTzoomColorCache = [NSMutableDictionary dictionary];
+    if (value != nil) YTzoomColorCache[key] = value;
     return value;
 }
 
-static UIColor *YTKACEMainColor(void) {
-    return YTKACEStoredColor(YTKACEProgressMainColorKey, UIColor.systemRedColor);
+static UIColor *YTzoomMainColor(void) {
+    return YTzoomStoredColor(YTzoomProgressMainColorKey, UIColor.systemRedColor);
 }
 
-static UIColor *YTKACEPlayedColor(void) {
-    UIColor *main = YTKACEMainColor();
-    if (YTKACEProgressStyle() != 2) return main;
-    UIColor *highlight = YTKACEStoredColor(YTKACEProgressGradientColorKey, main);
+static UIColor *YTzoomPlayedColor(void) {
+    UIColor *main = YTzoomMainColor();
+    if (YTzoomProgressStyle() != 2) return main;
+    UIColor *highlight = YTzoomStoredColor(YTzoomProgressGradientColorKey, main);
     static UIImage *cached = nil;
     static NSString *cachedKey = nil;
     NSString *key = [NSString stringWithFormat:@"%@|%@", main, highlight];
@@ -136,12 +136,12 @@ static UIColor *YTKACEPlayedColor(void) {
     return [UIColor colorWithPatternImage:cached];
 }
 
-static UIImage *YTKACEGradientStrip(CGFloat width, CGFloat height) {
-    UIColor *main = YTKACEMainColor();
-    UIColor *highlight = YTKACEStoredColor(YTKACEProgressGradientColorKey, main);
+static UIImage *YTzoomGradientStrip(CGFloat width, CGFloat height) {
+    UIColor *main = YTzoomMainColor();
+    UIColor *highlight = YTzoomStoredColor(YTzoomProgressGradientColorKey, main);
     NSString *stripKey = [NSString stringWithFormat:@"%.0f|%.0f|%@|%@",
                           width, height, main, highlight];
-    UIImage *cachedStrip = YTKACEStripCache[stripKey];
+    UIImage *cachedStrip = YTzoomStripCache[stripKey];
     if (cachedStrip != nil) return cachedStrip;
     CGSize size = CGSizeMake(MAX(width, 1.0), MAX(height, 1.0));
     UIGraphicsImageRenderer *renderer =
@@ -157,32 +157,32 @@ static UIImage *YTKACEGradientStrip(CGFloat width, CGFloat height) {
         CGGradientRelease(gradient);
         CGColorSpaceRelease(space);
     }];
-    if (YTKACEStripCache == nil) YTKACEStripCache = [NSMutableDictionary dictionary];
-    if (YTKACEStripCache.count > 24) [YTKACEStripCache removeAllObjects];
-    YTKACEStripCache[stripKey] = strip;
+    if (YTzoomStripCache == nil) YTzoomStripCache = [NSMutableDictionary dictionary];
+    if (YTzoomStripCache.count > 24) [YTzoomStripCache removeAllObjects];
+    YTzoomStripCache[stripKey] = strip;
     return strip;
 }
 
-UIImage *YTKACEProgressFillImage(CGFloat width, CGFloat height) {
+UIImage *YTzoomProgressFillImage(CGFloat width, CGFloat height) {
     if (!isfinite(width) || width <= 0.0) width = 1.0;
     if (!isfinite(height) || height <= 0.0) height = 1.0;
     CGSize size = CGSizeMake(MAX(width, 1.0), MAX(height, 1.0));
-    NSInteger style = YTKACEProgressStyle();
+    NSInteger style = YTzoomProgressStyle();
     UIColor *start = nil;
     UIColor *end = nil;
     if (style == 1) {
-        start = YTKACEMainColor();
+        start = YTzoomMainColor();
         end = start;
     } else if (style == 2) {
-        start = YTKACEMainColor();
-        end = YTKACEStoredColor(YTKACEProgressGradientColorKey, start);
+        start = YTzoomMainColor();
+        end = YTzoomStoredColor(YTzoomProgressGradientColorKey, start);
     } else {
         start = [UIColor colorWithRed:1.0 green:0.0 blue:0.0 alpha:1.0];
         end = [UIColor colorWithRed:1.0 green:0.29 blue:0.16 alpha:1.0];
     }
     NSString *key = [NSString stringWithFormat:@"fill|%.0f|%.0f|%ld|%@|%@",
                      size.width, size.height, (long)style, start, end];
-    UIImage *cached = YTKACEStripCache[key];
+    UIImage *cached = YTzoomStripCache[key];
     if (cached != nil) return cached;
     UIGraphicsImageRenderer *renderer =
         [[UIGraphicsImageRenderer alloc] initWithSize:size];
@@ -198,13 +198,13 @@ UIImage *YTKACEProgressFillImage(CGFloat width, CGFloat height) {
         CGGradientRelease(gradient);
         CGColorSpaceRelease(space);
     }];
-    if (YTKACEStripCache == nil) YTKACEStripCache = [NSMutableDictionary dictionary];
-    if (YTKACEStripCache.count > 40) [YTKACEStripCache removeAllObjects];
-    YTKACEStripCache[key] = image;
+    if (YTzoomStripCache == nil) YTzoomStripCache = [NSMutableDictionary dictionary];
+    if (YTzoomStripCache.count > 40) [YTzoomStripCache removeAllObjects];
+    YTzoomStripCache[key] = image;
     return image;
 }
 
-static UIView *YTKACEBarAncestor(UIView *view) {
+static UIView *YTzoomBarAncestor(UIView *view) {
     UIView *node = view;
     while (node != nil) {
         NSString *name = NSStringFromClass(node.class);
@@ -217,15 +217,15 @@ static UIView *YTKACEBarAncestor(UIView *view) {
     return view.superview ?: view;
 }
 
-static UIColor *YTKACEPlayedColorForView(id receiver) {
-    if (YTKACEProgressStyle() != 2) return YTKACEMainColor();
-    if (![receiver isKindOfClass:UIView.class]) return YTKACEPlayedColor();
+static UIColor *YTzoomPlayedColorForView(id receiver) {
+    if (YTzoomProgressStyle() != 2) return YTzoomMainColor();
+    if (![receiver isKindOfClass:UIView.class]) return YTzoomPlayedColor();
     UIView *view = (UIView *)receiver;
-    UIView *bar = YTKACEBarAncestor(view);
+    UIView *bar = YTzoomBarAncestor(view);
     CGFloat barWidth = CGRectGetWidth(bar.bounds);
     CGFloat viewWidth = CGRectGetWidth(view.bounds);
     CGFloat height = MAX(CGRectGetHeight(view.bounds), 2.0);
-    if (barWidth < 2.0 || viewWidth < 1.0) return YTKACEPlayedColor();
+    if (barWidth < 2.0 || viewWidth < 1.0) return YTzoomPlayedColor();
     CGRect inBar = [view convertRect:view.bounds toView:bar];
     CGFloat offset = CGRectGetMinX(inBar);
     if (offset < 0.0) offset = 0.0;
@@ -233,37 +233,37 @@ static UIColor *YTKACEPlayedColorForView(id receiver) {
 
     NSString *patternKey = [NSString stringWithFormat:@"%.0f|%.0f|%.0f|%.0f",
                             offset, viewWidth, height, barWidth];
-    UIColor *cachedPattern = YTKACEPatternCache[patternKey];
+    UIColor *cachedPattern = YTzoomPatternCache[patternKey];
     if (cachedPattern != nil) return cachedPattern;
     CGFloat scale = UIScreen.mainScreen.scale;
-    UIImage *full = YTKACEGradientStrip(barWidth, height);
+    UIImage *full = YTzoomGradientStrip(barWidth, height);
     CGRect crop = CGRectMake(offset * scale, 0.0,
                              viewWidth * scale, height * scale);
     CGImageRef slice = CGImageCreateWithImageInRect(full.CGImage, crop);
-    if (slice == NULL) return YTKACEPlayedColor();
+    if (slice == NULL) return YTzoomPlayedColor();
     UIImage *tile = [UIImage imageWithCGImage:slice
                                         scale:scale
                                   orientation:UIImageOrientationUp];
     CGImageRelease(slice);
     UIColor *pattern = [UIColor colorWithPatternImage:tile];
-    if (YTKACEPatternCache == nil) YTKACEPatternCache = [NSMutableDictionary dictionary];
-    if (YTKACEPatternCache.count > 96) [YTKACEPatternCache removeAllObjects];
-    YTKACEPatternCache[patternKey] = pattern;
+    if (YTzoomPatternCache == nil) YTzoomPatternCache = [NSMutableDictionary dictionary];
+    if (YTzoomPatternCache.count > 96) [YTzoomPatternCache removeAllObjects];
+    YTzoomPatternCache[patternKey] = pattern;
     return pattern;
 }
 
-static UIColor *YTKACEScrubberColor(void) {
-    return YTKACEStoredColor(YTKACEProgressScrubberColorKey, YTKACEMainColor());
+static UIColor *YTzoomScrubberColor(void) {
+    return YTzoomStoredColor(YTzoomProgressScrubberColorKey, YTzoomMainColor());
 }
 
-UIColor *YTKACEProgressScrubberTint(void) {
-    UIColor *tint = YTKACEProgressStyle() != 0 ? YTKACEScrubberColor()
+UIColor *YTzoomProgressScrubberTint(void) {
+    UIColor *tint = YTzoomProgressStyle() != 0 ? YTzoomScrubberColor()
         : [UIColor colorWithRed:1.0 green:0.0 blue:0.0 alpha:1.0];
     static NSString *logged;
     NSString *state = [NSString stringWithFormat:@"style=%ld main=%@ highlight=%@ scrubber=%@",
-                       (long)YTKACEProgressStyle(), YTKACEPreferenceObject(YTKACEProgressMainColorKey),
-                       YTKACEPreferenceObject(YTKACEProgressGradientColorKey),
-                       YTKACEPreferenceObject(YTKACEProgressScrubberColorKey)];
+                       (long)YTzoomProgressStyle(), YTzoomPreferenceObject(YTzoomProgressMainColorKey),
+                       YTzoomPreferenceObject(YTzoomProgressGradientColorKey),
+                       YTzoomPreferenceObject(YTzoomProgressScrubberColorKey)];
     if (![state isEqualToString:logged]) {
         logged = state;
     }
@@ -271,53 +271,53 @@ UIColor *YTKACEProgressScrubberTint(void) {
 }
 
 
-static id YTKACEDecorationViewColor(id receiver, SEL selector) {
-    if (YTKACEProgressStyle() != 0) return YTKACEPlayedColorForView(receiver);
+static id YTzoomDecorationViewColor(id receiver, SEL selector) {
+    if (YTzoomProgressStyle() != 0) return YTzoomPlayedColorForView(receiver);
     return OriginalDecorationViewColor == NULL ? nil :
         ((id (*)(id, SEL))OriginalDecorationViewColor)(receiver, selector);
 }
 
-static id YTKACEDecorationControllerColor(id receiver, SEL selector) {
-    if (YTKACEProgressStyle() != 0) return YTKACEPlayedColor();
+static id YTzoomDecorationControllerColor(id receiver, SEL selector) {
+    if (YTzoomProgressStyle() != 0) return YTzoomPlayedColor();
     return OriginalDecorationControllerColor == NULL ? nil :
         ((id (*)(id, SEL))OriginalDecorationControllerColor)(receiver, selector);
 }
 
-static id YTKACEContainerQuietColor(id receiver, SEL selector) {
-    if (YTKACEProgressStyle() != 0) return YTKACEPlayedColor();
+static id YTzoomContainerQuietColor(id receiver, SEL selector) {
+    if (YTzoomProgressStyle() != 0) return YTzoomPlayedColor();
     return OriginalContainerQuietColor == NULL ? nil :
         ((id (*)(id, SEL))OriginalContainerQuietColor)(receiver, selector);
 }
 
 
-static id YTKACEDotColorV1(id receiver, SEL selector) {
-    if (YTKACEProgressStyle() != 0) return YTKACEScrubberColor();
+static id YTzoomDotColorV1(id receiver, SEL selector) {
+    if (YTzoomProgressStyle() != 0) return YTzoomScrubberColor();
     return OriginalScrubberDotColorV1 == NULL ? nil :
         ((id (*)(id, SEL))OriginalScrubberDotColorV1)(receiver, selector);
 }
 
-static id YTKACEDotColorV2(id receiver, SEL selector) {
-    if (YTKACEProgressStyle() != 0) return YTKACEScrubberColor();
+static id YTzoomDotColorV2(id receiver, SEL selector) {
+    if (YTzoomProgressStyle() != 0) return YTzoomScrubberColor();
     return OriginalScrubberDotColorV2 == NULL ? nil :
         ((id (*)(id, SEL))OriginalScrubberDotColorV2)(receiver, selector);
 }
 
-static void YTKACESetDotColor(id receiver, SEL selector, id color) {
-    id replacement = YTKACEProgressStyle() != 0 ? YTKACEScrubberColor() : color;
+static void YTzoomSetDotColor(id receiver, SEL selector, id color) {
+    id replacement = YTzoomProgressStyle() != 0 ? YTzoomScrubberColor() : color;
     if (OriginalSetScrubberDotColor != NULL) {
         ((void (*)(id, SEL, id))OriginalSetScrubberDotColor)(receiver, selector, replacement);
     }
 }
 
-static void YTKACESetDotColorV1(id receiver, SEL selector, id color) {
-    id replacement = YTKACEProgressStyle() != 0 ? YTKACEScrubberColor() : color;
+static void YTzoomSetDotColorV1(id receiver, SEL selector, id color) {
+    id replacement = YTzoomProgressStyle() != 0 ? YTzoomScrubberColor() : color;
     if (OriginalSetScrubberDotColorV1 != NULL) {
         ((void (*)(id, SEL, id))OriginalSetScrubberDotColorV1)(receiver, selector, replacement);
     }
 }
 
-static void YTKACESetDotColorV2(id receiver, SEL selector, id color) {
-    id replacement = YTKACEProgressStyle() != 0 ? YTKACEScrubberColor() : color;
+static void YTzoomSetDotColorV2(id receiver, SEL selector, id color) {
+    id replacement = YTzoomProgressStyle() != 0 ? YTzoomScrubberColor() : color;
     if (OriginalSetScrubberDotColorV2 != NULL) {
         ((void (*)(id, SEL, id))OriginalSetScrubberDotColorV2)(receiver, selector, replacement);
     }
@@ -331,17 +331,17 @@ static IMP OriginalDrawRectDecorationProgress;
 static IMP OriginalDrawRectDecoration;
 static IMP OriginalSegmentedLayout;
 
-static UIImage *YTKACEThumbBarImage(CGFloat width, CGFloat height,
+static UIImage *YTzoomThumbBarImage(CGFloat width, CGFloat height,
                                     CGFloat trackWidth);
 
-static BOOL YTKACEColorIsYouTubeRed(CGColorRef color) {
+static BOOL YTzoomColorIsYouTubeRed(CGColorRef color) {
     if (color == NULL) return NO;
     const CGFloat *components = CGColorGetComponents(color);
     if (components == NULL || CGColorGetNumberOfComponents(color) < 3) return NO;
     return components[0] > 0.6 && components[1] < 0.4 && components[2] < 0.4;
 }
 
-static void YTKACEApplyLayerFill(CALayer *layer, UIColor *colour,
+static void YTzoomApplyLayerFill(CALayer *layer, UIColor *colour,
                                  CGFloat width, CGFloat height) {
     if (colour == nil) return;
     CGColorRef reference = colour.CGColor;
@@ -351,8 +351,8 @@ static void YTKACEApplyLayerFill(CALayer *layer, UIColor *colour,
     }
     CGFloat track = CGRectGetWidth(layer.superlayer.bounds);
     if (track < width) track = width;
-    UIImage *fill = YTKACEThumbBarImage(width, height, track);
-    layer.backgroundColor = YTKACEMainColor().CGColor;
+    UIImage *fill = YTzoomThumbBarImage(width, height, track);
+    layer.backgroundColor = YTzoomMainColor().CGColor;
     if (fill.CGImage != NULL) {
         layer.contents = (__bridge id)fill.CGImage;
         layer.contentsScale = fill.scale;
@@ -360,51 +360,51 @@ static void YTKACEApplyLayerFill(CALayer *layer, UIColor *colour,
     }
 }
 
-static void YTKACEPaintLayers(CALayer *layer, UIColor *played, UIColor *dot,
+static void YTzoomPaintLayers(CALayer *layer, UIColor *played, UIColor *dot,
                               NSUInteger depth) {
     if (layer == nil || depth > 7) return;
     CGRect bounds = layer.bounds;
     CGFloat width = CGRectGetWidth(bounds);
     CGFloat height = CGRectGetHeight(bounds);
-    if (width > 0.0 && height > 0.0 && YTKACEColorIsYouTubeRed(layer.backgroundColor)) {
-        YTKACEApplyLayerFill(layer, (width <= height + 2.0) ? dot : played,
+    if (width > 0.0 && height > 0.0 && YTzoomColorIsYouTubeRed(layer.backgroundColor)) {
+        YTzoomApplyLayerFill(layer, (width <= height + 2.0) ? dot : played,
                              width, height);
     }
     for (CALayer *sublayer in layer.sublayers) {
-        YTKACEPaintLayers(sublayer, played, dot, depth + 1);
+        YTzoomPaintLayers(sublayer, played, dot, depth + 1);
     }
 }
 
-static void YTKACEModularBarLayout(UIView *receiver, SEL selector) {
+static void YTzoomModularBarLayout(UIView *receiver, SEL selector) {
     if (OriginalModularBarLayout != NULL) {
         ((void (*)(id, SEL))OriginalModularBarLayout)(receiver, selector);
     }
-    if (YTKACEProgressStyle() == 0) return;
-    YTKACEPaintLayers(receiver.layer, YTKACEPlayedColor(), YTKACEScrubberColor(), 0);
+    if (YTzoomProgressStyle() == 0) return;
+    YTzoomPaintLayers(receiver.layer, YTzoomPlayedColor(), YTzoomScrubberColor(), 0);
     UIView *node = receiver;
     while (node != nil) {
         if ([NSStringFromClass(node.class)
                 isEqualToString:@"YTInlinePlayerBarContainerView"]) {
             SEL setter = NSSelectorFromString(@"setPlayedProgressBarColor:");
             if ([node respondsToSelector:setter]) {
-                ((void (*)(id, SEL, id))objc_msgSend)(node, setter, YTKACEPlayedColor());
+                ((void (*)(id, SEL, id))objc_msgSend)(node, setter, YTzoomPlayedColor());
             }
-            YTKACEPaintLayers(node.layer, YTKACEPlayedColor(), YTKACEScrubberColor(), 0);
+            YTzoomPaintLayers(node.layer, YTzoomPlayedColor(), YTzoomScrubberColor(), 0);
             break;
         }
         node = node.superview;
     }
 }
 
-static BOOL YTKACEDrawGradientInRect(id receiver, CGRect rect) {
-    if (YTKACEProgressStyle() != 2) return NO;
+static BOOL YTzoomDrawGradientInRect(id receiver, CGRect rect) {
+    if (YTzoomProgressStyle() != 2) return NO;
     CGContextRef context = UIGraphicsGetCurrentContext();
     if (context == NULL || ![receiver isKindOfClass:UIView.class]) return NO;
     CGFloat height = CGRectGetHeight(rect);
     if (height < 0.5 || CGRectGetWidth(rect) < 0.5) return NO;
 
     UIView *view = (UIView *)receiver;
-    UIView *bar = YTKACEBarAncestor(view);
+    UIView *bar = YTzoomBarAncestor(view);
     CGFloat track = CGRectGetWidth(bar.bounds);
     CGFloat own = CGRectGetWidth(view.bounds);
     if (track < own) track = own;
@@ -414,7 +414,7 @@ static BOOL YTKACEDrawGradientInRect(id receiver, CGRect rect) {
     CGFloat offset = CGRectGetMinX(inBar);
     if (offset < 0.0 || offset > track) offset = 0.0;
 
-    UIImage *strip = YTKACEGradientStrip(track, height);
+    UIImage *strip = YTzoomGradientStrip(track, height);
     if (strip == nil) return NO;
 
     CGContextSaveGState(context);
@@ -424,103 +424,103 @@ static BOOL YTKACEDrawGradientInRect(id receiver, CGRect rect) {
     return YES;
 }
 
-static void YTKACEDrawProgressRectWithColor(id receiver, SEL selector,
+static void YTzoomDrawProgressRectWithColor(id receiver, SEL selector,
                                             CGRect rect, id color) {
-    if (YTKACEDrawGradientInRect(receiver, rect)) return;
-    id replacement = YTKACEProgressStyle() != 0 ? YTKACEMainColor() : color;
+    if (YTzoomDrawGradientInRect(receiver, rect)) return;
+    id replacement = YTzoomProgressStyle() != 0 ? YTzoomMainColor() : color;
     if (OriginalDrawProgressRectWithColor != NULL) {
         ((void (*)(id, SEL, CGRect, id))OriginalDrawProgressRectWithColor)(
             receiver, selector, rect, replacement);
     }
 }
 
-static void YTKACEForceBarColor(id receiver) {
-    if (YTKACEProgressStyle() == 0) return;
+static void YTzoomForceBarColor(id receiver) {
+    if (YTzoomProgressStyle() == 0) return;
     SEL setter = NSSelectorFromString(@"setPlayedProgressBarColor:");
     if (![receiver respondsToSelector:setter]) return;
-    UIColor *colour = YTKACEPlayedColorForView(receiver);
+    UIColor *colour = YTzoomPlayedColorForView(receiver);
     if (CGColorGetPattern(colour.CGColor) != NULL) {
-        colour = YTKACEMainColor();
+        colour = YTzoomMainColor();
     }
     ((void (*)(id, SEL, id))objc_msgSend)(receiver, setter, colour);
 }
 
-static void YTKACEDecorationDrawRect(id receiver, SEL selector, CGRect rect) {
-    YTKACEForceBarColor(receiver);
+static void YTzoomDecorationDrawRect(id receiver, SEL selector, CGRect rect) {
+    YTzoomForceBarColor(receiver);
     if (OriginalDecorationDrawRect != NULL) {
         ((void (*)(id, SEL, CGRect))OriginalDecorationDrawRect)(receiver, selector, rect);
     }
 }
 
-static void YTKACERecolorSegments(id receiver) {
-    if (YTKACEProgressStyle() == 0) return;
+static void YTzoomRecolorSegments(id receiver) {
+    if (YTzoomProgressStyle() == 0) return;
     if (![receiver isKindOfClass:UIView.class]) return;
-    YTKACEPaintLayers(((UIView *)receiver).layer,
-                      YTKACEPlayedColor(), YTKACEScrubberColor(), 0);
+    YTzoomPaintLayers(((UIView *)receiver).layer,
+                      YTzoomPlayedColor(), YTzoomScrubberColor(), 0);
     SEL segments = NSSelectorFromString(@"segmentViews");
     if (![receiver respondsToSelector:segments]) return;
     NSArray *views = ((id (*)(id, SEL))objc_msgSend)(receiver, segments);
     if (![views isKindOfClass:NSArray.class]) return;
     for (id view in views) {
         if ([view isKindOfClass:UIView.class]) {
-            YTKACEPaintLayers(((UIView *)view).layer,
-                              YTKACEPlayedColor(), YTKACEScrubberColor(), 0);
+            YTzoomPaintLayers(((UIView *)view).layer,
+                              YTzoomPlayedColor(), YTzoomScrubberColor(), 0);
         }
     }
 }
 
 
-static void YTKACESegmentedLayout(id receiver, SEL selector) {
+static void YTzoomSegmentedLayout(id receiver, SEL selector) {
     if (OriginalSegmentedLayout != NULL) {
         ((void (*)(id, SEL))OriginalSegmentedLayout)(receiver, selector);
     }
-    YTKACERecolorSegments(receiver);
+    YTzoomRecolorSegments(receiver);
 }
 
 
-static void YTKACEDrawProgressRect(id receiver, SEL selector, CGRect rect) {
-    if (YTKACEDrawGradientInRect(receiver, rect)) return;
-    YTKACEForceBarColor(receiver);
+static void YTzoomDrawProgressRect(id receiver, SEL selector, CGRect rect) {
+    if (YTzoomDrawGradientInRect(receiver, rect)) return;
+    YTzoomForceBarColor(receiver);
     if (OriginalDrawProgressRect != NULL) {
         ((void (*)(id, SEL, CGRect))OriginalDrawProgressRect)(receiver, selector, rect);
     }
 }
 
-static void YTKACEDrawRectDecorationProgress(id receiver, SEL selector, CGRect rect) {
-    YTKACEForceBarColor(receiver);
+static void YTzoomDrawRectDecorationProgress(id receiver, SEL selector, CGRect rect) {
+    YTzoomForceBarColor(receiver);
     if (OriginalDrawRectDecorationProgress != NULL) {
         ((void (*)(id, SEL, CGRect))OriginalDrawRectDecorationProgress)(
             receiver, selector, rect);
     }
 }
 
-static void YTKACEDrawRectDecoration(id receiver, SEL selector, CGRect rect) {
-    YTKACEForceBarColor(receiver);
+static void YTzoomDrawRectDecoration(id receiver, SEL selector, CGRect rect) {
+    YTzoomForceBarColor(receiver);
     if (OriginalDrawRectDecoration != NULL) {
         ((void (*)(id, SEL, CGRect))OriginalDrawRectDecoration)(receiver, selector, rect);
     }
 }
 
-static UIView *YTKACEFindProgressView(UIView *view, NSUInteger depth) {
+static UIView *YTzoomFindProgressView(UIView *view, NSUInteger depth) {
     if (view == nil || depth > 4) return nil;
     if ([NSStringFromClass(view.class) isEqualToString:@"YTProgressView"]) return view;
     for (UIView *subview in view.subviews) {
-        UIView *found = YTKACEFindProgressView(subview, depth + 1);
+        UIView *found = YTzoomFindProgressView(subview, depth + 1);
         if (found != nil) return found;
     }
     return nil;
 }
 
-void YTKACEStyleProgressLayer(CALayer *layer, CGFloat trackWidth) {
+void YTzoomStyleProgressLayer(CALayer *layer, CGFloat trackWidth) {
     if (layer == nil) return;
-    if (YTKACEProgressStyle() == 0) return;
+    if (YTzoomProgressStyle() == 0) return;
     CGFloat width = CGRectGetWidth(layer.bounds);
     CGFloat height = CGRectGetHeight(layer.bounds);
     if (width < 1.0 || height < 1.0) return;
     if (trackWidth < width) trackWidth = width;
-    if (YTKACEProgressStyle() == 2) {
-        UIImage *fill = YTKACEThumbBarImage(width, height, trackWidth);
-        layer.backgroundColor = YTKACEMainColor().CGColor;
+    if (YTzoomProgressStyle() == 2) {
+        UIImage *fill = YTzoomThumbBarImage(width, height, trackWidth);
+        layer.backgroundColor = YTzoomMainColor().CGColor;
         if (fill.CGImage != NULL) {
             layer.contents = (__bridge id)fill.CGImage;
             layer.contentsScale = fill.scale;
@@ -528,13 +528,13 @@ void YTKACEStyleProgressLayer(CALayer *layer, CGFloat trackWidth) {
         }
     } else {
         layer.contents = nil;
-        layer.backgroundColor = YTKACEMainColor().CGColor;
+        layer.backgroundColor = YTzoomMainColor().CGColor;
     }
 }
 
-void YTKACEApplyProgressStyleToBar(UIView *bar) {
-    if (YTKACEProgressStyle() == 0 || ![bar isKindOfClass:UIView.class]) return;
-    UIView *progress = YTKACEFindProgressView(bar, 0);
+void YTzoomApplyProgressStyleToBar(UIView *bar) {
+    if (YTzoomProgressStyle() == 0 || ![bar isKindOfClass:UIView.class]) return;
+    UIView *progress = YTzoomFindProgressView(bar, 0);
     if (progress == nil) return;
 
     SEL brand = NSSelectorFromString(@"setBrandGradientEnabled:");
@@ -542,30 +542,30 @@ void YTKACEApplyProgressStyleToBar(UIView *bar) {
         ((void (*)(id, SEL, BOOL))objc_msgSend)(progress, brand, NO);
     }
 
-    UIColor *color = YTKACEMainColor();
+    UIColor *color = YTzoomMainColor();
     CGFloat width = CGRectGetWidth(bar.bounds);
     CGFloat height = MAX(CGRectGetHeight(progress.bounds), 2.0);
-    if (YTKACEProgressStyle() == 2 && width > 2.0) {
-        color = [UIColor colorWithPatternImage:YTKACEGradientStrip(width, height)];
+    if (YTzoomProgressStyle() == 2 && width > 2.0) {
+        color = [UIColor colorWithPatternImage:YTzoomGradientStrip(width, height)];
     }
     SEL setter = NSSelectorFromString(@"setProgressBarColor:");
     if ([progress respondsToSelector:setter]) {
         ((void (*)(id, SEL, id))objc_msgSend)(progress, setter, color);
     }
-    YTKACEPaintLayers(progress.layer, color, YTKACEScrubberColor(), 0);
+    YTzoomPaintLayers(progress.layer, color, YTzoomScrubberColor(), 0);
 }
 
 static IMP OriginalThumbBarLayout;
 static IMP OriginalThumbContainerLayout;
-static const void *YTKACEThumbBarFillAssociation = &YTKACEThumbBarFillAssociation;
-static const void *YTKACEThumbBarGenerationAssociation =
-    &YTKACEThumbBarGenerationAssociation;
+static const void *YTzoomThumbBarFillAssociation = &YTzoomThumbBarFillAssociation;
+static const void *YTzoomThumbBarGenerationAssociation =
+    &YTzoomThumbBarGenerationAssociation;
 
-static const void *YTKACEThumbGeneratedAssociation =
-    &YTKACEThumbGeneratedAssociation;
-static const void *YTKACEBarTouchedAssociation = &YTKACEBarTouchedAssociation;
+static const void *YTzoomThumbGeneratedAssociation =
+    &YTzoomThumbGeneratedAssociation;
+static const void *YTzoomBarTouchedAssociation = &YTzoomBarTouchedAssociation;
 
-static CGFloat YTKACEThumbTrackWidth(id node, CGFloat fillWidth,
+static CGFloat YTzoomThumbTrackWidth(id node, CGFloat fillWidth,
                                      CGFloat fillHeight) {
     CGFloat track = fillWidth;
     SEL supernode = NSSelectorFromString(@"supernode");
@@ -582,36 +582,36 @@ static CGFloat YTKACEThumbTrackWidth(id node, CGFloat fillWidth,
     return track;
 }
 
-static UIImage *YTKACEThumbBarImage(CGFloat width, CGFloat height,
+static UIImage *YTzoomThumbBarImage(CGFloat width, CGFloat height,
                                     CGFloat trackWidth) {
-    if (YTKACEProgressStyle() == 2) {
-        if (trackWidth <= width + 1.0) return YTKACEGradientStrip(width, height);
+    if (YTzoomProgressStyle() == 2) {
+        if (trackWidth <= width + 1.0) return YTzoomGradientStrip(width, height);
         NSString *sliceKey = [NSString stringWithFormat:@"thumb|%.0f|%.0f|%.0f|%@|%@",
-                              width, height, trackWidth, YTKACEMainColor(),
-                              YTKACEStoredColor(YTKACEProgressGradientColorKey,
-                                                YTKACEMainColor())];
-        UIImage *cachedSlice = YTKACEStripCache[sliceKey];
+                              width, height, trackWidth, YTzoomMainColor(),
+                              YTzoomStoredColor(YTzoomProgressGradientColorKey,
+                                                YTzoomMainColor())];
+        UIImage *cachedSlice = YTzoomStripCache[sliceKey];
         if (cachedSlice != nil) return cachedSlice;
-        UIImage *full = YTKACEGradientStrip(trackWidth, height);
+        UIImage *full = YTzoomGradientStrip(trackWidth, height);
         CGFloat scale = full.scale;
         CGImageRef cropped = CGImageCreateWithImageInRect(
             full.CGImage, CGRectMake(0.0, 0.0, width * scale, height * scale));
-        if (cropped == NULL) return YTKACEGradientStrip(width, height);
+        if (cropped == NULL) return YTzoomGradientStrip(width, height);
         UIImage *slice = [UIImage imageWithCGImage:cropped
                                              scale:scale
                                        orientation:UIImageOrientationUp];
         CGImageRelease(cropped);
-        if (YTKACEStripCache == nil) YTKACEStripCache = [NSMutableDictionary dictionary];
-        if (YTKACEStripCache.count > 24) [YTKACEStripCache removeAllObjects];
-        objc_setAssociatedObject(slice, YTKACEThumbGeneratedAssociation, @YES,
+        if (YTzoomStripCache == nil) YTzoomStripCache = [NSMutableDictionary dictionary];
+        if (YTzoomStripCache.count > 24) [YTzoomStripCache removeAllObjects];
+        objc_setAssociatedObject(slice, YTzoomThumbGeneratedAssociation, @YES,
                                  OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-        YTKACEStripCache[sliceKey] = slice;
+        YTzoomStripCache[sliceKey] = slice;
         return slice;
     }
-    UIColor *main = YTKACEMainColor();
+    UIColor *main = YTzoomMainColor();
     NSString *key = [NSString stringWithFormat:@"solid|%.0f|%.0f|%@",
                      width, height, main];
-    UIImage *cached = YTKACEStripCache[key];
+    UIImage *cached = YTzoomStripCache[key];
     if (cached != nil) return cached;
     CGSize size = CGSizeMake(MAX(width, 1.0), MAX(height, 1.0));
     UIGraphicsImageRenderer *renderer =
@@ -624,16 +624,16 @@ static UIImage *YTKACEThumbBarImage(CGFloat width, CGFloat height,
                                     cornerRadius:size.height / 2.0] fill];
         (void)context;
     }];
-    if (YTKACEStripCache == nil) YTKACEStripCache = [NSMutableDictionary dictionary];
-    if (YTKACEStripCache.count > 24) [YTKACEStripCache removeAllObjects];
-    objc_setAssociatedObject(image, YTKACEThumbGeneratedAssociation, @YES,
+    if (YTzoomStripCache == nil) YTzoomStripCache = [NSMutableDictionary dictionary];
+    if (YTzoomStripCache.count > 24) [YTzoomStripCache removeAllObjects];
+    objc_setAssociatedObject(image, YTzoomThumbGeneratedAssociation, @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    YTKACEStripCache[key] = image;
+    YTzoomStripCache[key] = image;
     return image;
 }
 
-static void YTKACEThumbBarApply(id node) {
-    if (YTKACEProgressStyle() == 0) return;
+static void YTzoomThumbBarApply(id node) {
+    if (YTzoomProgressStyle() == 0) return;
 
     CGRect bounds = ((CGRect (*)(id, SEL))objc_msgSend)(
         node, NSSelectorFromString(@"bounds"));
@@ -652,18 +652,18 @@ static void YTKACEThumbBarApply(id node) {
     if (current == nil) return;
 
     BOOL ours = objc_getAssociatedObject(
-        current, YTKACEThumbGeneratedAssociation) != nil;
+        current, YTzoomThumbGeneratedAssociation) != nil;
     NSNumber *appliedWidth = objc_getAssociatedObject(
-        node, YTKACEThumbBarFillAssociation);
+        node, YTzoomThumbBarFillAssociation);
     NSNumber *applied = objc_getAssociatedObject(
-        node, YTKACEThumbBarGenerationAssociation);
+        node, YTzoomThumbBarGenerationAssociation);
     if (ours && applied != nil &&
-        applied.unsignedIntegerValue == YTKACEProgressGeneration &&
+        applied.unsignedIntegerValue == YTzoomProgressGeneration &&
         appliedWidth != nil &&
         fabs(appliedWidth.doubleValue - width) < 1.0) return;
 
-    UIImage *replacement = YTKACEThumbBarImage(
-        width, height, YTKACEThumbTrackWidth(node, width, height));
+    UIImage *replacement = YTzoomThumbBarImage(
+        width, height, YTzoomThumbTrackWidth(node, width, height));
     if (current == replacement) return;
 
     SEL modifier = NSSelectorFromString(@"imageModificationBlock");
@@ -679,10 +679,10 @@ static void YTKACEThumbBarApply(id node) {
     if ([node respondsToSelector:NSSelectorFromString(@"tintColor")] &&
         [node respondsToSelector:setTint]) {
         ((void (*)(id, SEL, id))objc_msgSend)(
-            node, setTint, YTKACEProgressStyle() == 2
-                ? YTKACEStoredColor(YTKACEProgressGradientColorKey,
-                                    YTKACEMainColor())
-                : YTKACEMainColor());
+            node, setTint, YTzoomProgressStyle() == 2
+                ? YTzoomStoredColor(YTzoomProgressGradientColorKey,
+                                    YTzoomMainColor())
+                : YTzoomMainColor());
     }
 
     ((void (*)(id, SEL, id))objc_msgSend)(node, imageSetter, replacement);
@@ -695,57 +695,57 @@ static void YTKACEThumbBarApply(id node) {
             UIImage *shown = ((id (*)(id, SEL))objc_msgSend)(
                 strongNode, NSSelectorFromString(@"image"));
             if (objc_getAssociatedObject(
-                    shown, YTKACEThumbGeneratedAssociation) == nil) return;
+                    shown, YTzoomThumbGeneratedAssociation) == nil) return;
             ((void (*)(id, SEL))objc_msgSend)(strongNode, redisplay);
         });
     }
-    objc_setAssociatedObject(node, YTKACEThumbBarFillAssociation, @(width),
+    objc_setAssociatedObject(node, YTzoomThumbBarFillAssociation, @(width),
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    objc_setAssociatedObject(node, YTKACEThumbBarGenerationAssociation,
-                             @(YTKACEProgressGeneration),
+    objc_setAssociatedObject(node, YTzoomThumbBarGenerationAssociation,
+                             @(YTzoomProgressGeneration),
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 
 }
 
-static void YTKACEThumbBarLayout(id node, SEL selector) {
+static void YTzoomThumbBarLayout(id node, SEL selector) {
     if (OriginalThumbBarLayout != NULL) {
         ((void (*)(id, SEL))OriginalThumbBarLayout)(node, selector);
     }
-    YTKACEThumbBarApply(node);
+    YTzoomThumbBarApply(node);
 }
 
 static IMP OriginalThumbVisible;
 static IMP OriginalThumbDisplayWillStart;
 
-static void YTKACEThumbDisplayWillStart(id node, SEL selector) {
+static void YTzoomThumbDisplayWillStart(id node, SEL selector) {
     if (OriginalThumbDisplayWillStart != NULL) {
         ((void (*)(id, SEL))OriginalThumbDisplayWillStart)(node, selector);
     }
-    YTKACEThumbBarApply(node);
+    YTzoomThumbBarApply(node);
 }
 
-static void YTKACEThumbDidEnterVisible(id node, SEL selector) {
+static void YTzoomThumbDidEnterVisible(id node, SEL selector) {
     if (OriginalThumbVisible != NULL) {
         ((void (*)(id, SEL))OriginalThumbVisible)(node, selector);
     }
-    YTKACEThumbBarApply(node);
+    YTzoomThumbBarApply(node);
 }
 
-static void YTKACEThumbContainerLayout(id node, SEL selector) {
+static void YTzoomThumbContainerLayout(id node, SEL selector) {
     if (OriginalThumbContainerLayout != NULL) {
         ((void (*)(id, SEL))OriginalThumbContainerLayout)(node, selector);
     }
-    YTKACEThumbBarApply(node);
+    YTzoomThumbBarApply(node);
 }
 
 static IMP OriginalInlineScrubberLayout;
 static IMP OriginalInlinePostScrubberLayout;
 
-static void YTKACETintInlineSliders(UIView *view, NSUInteger depth) {
+static void YTzoomTintInlineSliders(UIView *view, NSUInteger depth) {
     if (view == nil || depth > 4) return;
     if ([view isKindOfClass:UISlider.class]) {
         UISlider *slider = (UISlider *)view;
-        UIColor *dot = YTKACEScrubberColor();
+        UIColor *dot = YTzoomScrubberColor();
         UIImage *thumb = [slider thumbImageForState:UIControlStateNormal];
         if (thumb == nil) {
             if (CGColorGetPattern(dot.CGColor) == NULL) slider.thumbTintColor = dot;
@@ -757,81 +757,81 @@ static void YTKACETintInlineSliders(UIView *view, NSUInteger depth) {
             }
             slider.tintColor = dot;
         }
-        UIColor *played = YTKACEMainColor();
+        UIColor *played = YTzoomMainColor();
         if (CGColorGetPattern(played.CGColor) == NULL) {
             slider.minimumTrackTintColor = played;
         }
     }
     for (UIView *subview in view.subviews) {
-        YTKACETintInlineSliders(subview, depth + 1);
+        YTzoomTintInlineSliders(subview, depth + 1);
     }
 }
 
-static void YTKACEInlineScrubberLayout(UIView *receiver, SEL selector) {
+static void YTzoomInlineScrubberLayout(UIView *receiver, SEL selector) {
     if (OriginalInlineScrubberLayout != NULL) {
         ((void (*)(id, SEL))OriginalInlineScrubberLayout)(receiver, selector);
     }
-    if (YTKACEProgressStyle() == 0) return;
-    YTKACETintInlineSliders(receiver, 0);
+    if (YTzoomProgressStyle() == 0) return;
+    YTzoomTintInlineSliders(receiver, 0);
 }
 
-static void YTKACEInlinePostScrubberLayout(UIView *receiver, SEL selector) {
+static void YTzoomInlinePostScrubberLayout(UIView *receiver, SEL selector) {
     if (OriginalInlinePostScrubberLayout != NULL) {
         ((void (*)(id, SEL))OriginalInlinePostScrubberLayout)(receiver, selector);
     }
-    if (YTKACEProgressStyle() == 0) return;
-    YTKACETintInlineSliders(receiver, 0);
+    if (YTzoomProgressStyle() == 0) return;
+    YTzoomTintInlineSliders(receiver, 0);
 }
 
-static NSUInteger YTKACEInstallProgressHookSet(void) {
+static NSUInteger YTzoomInstallProgressHookSet(void) {
     NSUInteger landed = 0;
     struct { const char *cls; const char *sel; IMP replacement; IMP *storage; } entries[] = {
         {"YTPlayerBarProgressDecorationView", "playedProgressBarColor",
-         (IMP)YTKACEDecorationViewColor, &OriginalDecorationViewColor},
+         (IMP)YTzoomDecorationViewColor, &OriginalDecorationViewColor},
         {"YTPlayerBarProgressDecorationController", "playedProgressBarColor",
-         (IMP)YTKACEDecorationControllerColor, &OriginalDecorationControllerColor},
+         (IMP)YTzoomDecorationControllerColor, &OriginalDecorationControllerColor},
         {"YTInlinePlayerBarContainerView", "quietProgressBarColor",
-         (IMP)YTKACEContainerQuietColor, &OriginalContainerQuietColor},
+         (IMP)YTzoomContainerQuietColor, &OriginalContainerQuietColor},
         {"YTPlayerBarScrubberDotDecorationViewV1", "scrubberDotColor",
-         (IMP)YTKACEDotColorV1, &OriginalScrubberDotColorV1},
+         (IMP)YTzoomDotColorV1, &OriginalScrubberDotColorV1},
         {"YTPlayerBarScrubberDotDecorationViewV2", "scrubberDotColor",
-         (IMP)YTKACEDotColorV2, &OriginalScrubberDotColorV2},
+         (IMP)YTzoomDotColorV2, &OriginalScrubberDotColorV2},
         {"YTPlayerBarScrubberDotDecorationView", "setScrubberDotColor:",
-         (IMP)YTKACESetDotColor, &OriginalSetScrubberDotColor},
+         (IMP)YTzoomSetDotColor, &OriginalSetScrubberDotColor},
         {"YTPlayerBarScrubberDotDecorationViewV1", "setScrubberDotColor:",
-         (IMP)YTKACESetDotColorV1, &OriginalSetScrubberDotColorV1},
+         (IMP)YTzoomSetDotColorV1, &OriginalSetScrubberDotColorV1},
         {"YTPlayerBarScrubberDotDecorationViewV2", "setScrubberDotColor:",
-         (IMP)YTKACESetDotColorV2, &OriginalSetScrubberDotColorV2},
+         (IMP)YTzoomSetDotColorV2, &OriginalSetScrubberDotColorV2},
         {"YTModularPlayerBarView", "layoutSubviews",
-         (IMP)YTKACEModularBarLayout, &OriginalModularBarLayout},
+         (IMP)YTzoomModularBarLayout, &OriginalModularBarLayout},
         {"YTPlayerBarProgressDecorationView", "drawProgressRect:withColor:",
-         (IMP)YTKACEDrawProgressRectWithColor, &OriginalDrawProgressRectWithColor},
+         (IMP)YTzoomDrawProgressRectWithColor, &OriginalDrawProgressRectWithColor},
         {"YTPlayerBarProgressDecorationView", "drawRect:",
-         (IMP)YTKACEDecorationDrawRect, &OriginalDecorationDrawRect},
+         (IMP)YTzoomDecorationDrawRect, &OriginalDecorationDrawRect},
         {"YTPlayerBarScrubberDotDecorationViewV1", "layoutSubviews",
-         (IMP)YTKACESegmentedLayout, &OriginalSegmentedLayout},
+         (IMP)YTzoomSegmentedLayout, &OriginalSegmentedLayout},
         {"YTPlayerBarProgressDecorationView", "drawProgressRect:",
-         (IMP)YTKACEDrawProgressRect, &OriginalDrawProgressRect},
+         (IMP)YTzoomDrawProgressRect, &OriginalDrawProgressRect},
         {"YTPlayerBarProgressDecorationView", "drawRectangleDecorationWithProgress:",
-         (IMP)YTKACEDrawRectDecorationProgress, &OriginalDrawRectDecorationProgress},
+         (IMP)YTzoomDrawRectDecorationProgress, &OriginalDrawRectDecorationProgress},
         {"YTPlayerBarProgressDecorationView", "drawRectangleDecoration:",
-         (IMP)YTKACEDrawRectDecoration, &OriginalDrawRectDecoration},
+         (IMP)YTzoomDrawRectDecoration, &OriginalDrawRectDecoration},
         {"YTInlineMutedPlaybackScrubberView", "layoutSubviews",
-         (IMP)YTKACEInlineScrubberLayout, &OriginalInlineScrubberLayout},
+         (IMP)YTzoomInlineScrubberLayout, &OriginalInlineScrubberLayout},
         {"YTInlineMutedPlaybackPostVideoScrubberView", "layoutSubviews",
-         (IMP)YTKACEInlinePostScrubberLayout, &OriginalInlinePostScrubberLayout}
+         (IMP)YTzoomInlinePostScrubberLayout, &OriginalInlinePostScrubberLayout}
     };
     for (size_t i = 0; i < sizeof(entries) / sizeof(entries[0]); i++) {
         NSString *cls = @(entries[i].cls);
         NSString *sel = @(entries[i].sel);
-        BOOL ok = YTKACEInstallInstanceHook(cls, sel, entries[i].replacement,
+        BOOL ok = YTzoomInstallInstanceHook(cls, sel, entries[i].replacement,
                                             entries[i].storage);
         if (ok) landed++;
     }
     return landed;
 }
 
-static BOOL YTKACECGImageIsRed(CGImageRef bitmap) {
+static BOOL YTzoomCGImageIsRed(CGImageRef bitmap) {
     if (bitmap == NULL) return NO;
     size_t pixelWidth = CGImageGetWidth(bitmap);
     size_t pixelHeight = CGImageGetHeight(bitmap);
@@ -853,7 +853,7 @@ static BOOL YTKACECGImageIsRed(CGImageRef bitmap) {
            pixel[1] < 100 && pixel[2] < 100;
 }
 
-static BOOL YTKACEColourIsRed(CGColorRef colour) {
+static BOOL YTzoomColourIsRed(CGColorRef colour) {
     if (colour == NULL) return NO;
     size_t count = CGColorGetNumberOfComponents(colour);
     const CGFloat *parts = CGColorGetComponents(colour);
@@ -861,28 +861,28 @@ static BOOL YTKACEColourIsRed(CGColorRef colour) {
     return parts[3] > 0.4 && parts[0] > 0.5 && parts[1] < 0.4 && parts[2] < 0.4;
 }
 
-static void YTKACERecolourRedBars(CALayer *layer, NSUInteger depth,
+static void YTzoomRecolourRedBars(CALayer *layer, NSUInteger depth,
                                   UIView *host, NSString *trail) {
     if (layer == nil || depth > 8) return;
     CGFloat width = CGRectGetWidth(layer.bounds);
     CGFloat height = CGRectGetHeight(layer.bounds);
     if (height >= 1.0 && height <= 6.0 && width >= 6.0) {
-        BOOL redBackground = YTKACEColourIsRed(layer.backgroundColor);
+        BOOL redBackground = YTzoomColourIsRed(layer.backgroundColor);
         CGImageRef drawn = (__bridge CGImageRef)layer.contents;
         BOOL redContents = drawn != NULL &&
             CFGetTypeID(drawn) == CGImageGetTypeID() &&
-            YTKACECGImageIsRed(drawn);
+            YTzoomCGImageIsRed(drawn);
         NSNumber *touched = objc_getAssociatedObject(
-            layer, YTKACEBarTouchedAssociation);
+            layer, YTzoomBarTouchedAssociation);
         BOOL stale = touched != nil &&
-            touched.unsignedIntegerValue != YTKACEProgressGeneration;
+            touched.unsignedIntegerValue != YTzoomProgressGeneration;
         if (redBackground || redContents || stale) {
             CGFloat track = CGRectGetWidth(layer.superlayer.bounds);
             if (track < width) track = width;
-            UIImage *fill = YTKACEThumbBarImage(width, height, track);
-            layer.backgroundColor = YTKACEMainColor().CGColor;
+            UIImage *fill = YTzoomThumbBarImage(width, height, track);
+            layer.backgroundColor = YTzoomMainColor().CGColor;
             layer.cornerRadius = height / 2.0;
-            if (YTKACEProgressStyle() == 2 && fill.CGImage != NULL) {
+            if (YTzoomProgressStyle() == 2 && fill.CGImage != NULL) {
                 layer.contents = (__bridge id)fill.CGImage;
                 layer.contentsScale = fill.scale;
                 layer.contentsGravity = kCAGravityResize;
@@ -891,24 +891,24 @@ static void YTKACERecolourRedBars(CALayer *layer, NSUInteger depth,
                 layer.contentsScale = fill.scale;
             }
             if (host != nil && host.layer == layer) {
-                host.backgroundColor = YTKACEMainColor();
+                host.backgroundColor = YTzoomMainColor();
             }
-            objc_setAssociatedObject(layer, YTKACEBarTouchedAssociation,
-                                     @(YTKACEProgressGeneration),
+            objc_setAssociatedObject(layer, YTzoomBarTouchedAssociation,
+                                     @(YTzoomProgressGeneration),
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
         }
     }
     for (CALayer *sublayer in layer.sublayers) {
-        YTKACERecolourRedBars(sublayer, depth + 1, host, trail);
+        YTzoomRecolourRedBars(sublayer, depth + 1, host, trail);
     }
 }
 
 static IMP OriginalThumbSetImage;
 
-static void YTKACEThumbSetImage(id node, SEL selector, UIImage *image) {
+static void YTzoomThumbSetImage(id node, SEL selector, UIImage *image) {
     UIImage *use = image;
-    if (image != nil && YTKACEProgressStyle() != 0 &&
-        objc_getAssociatedObject(image, YTKACEThumbGeneratedAssociation) == nil) {
+    if (image != nil && YTzoomProgressStyle() != 0 &&
+        objc_getAssociatedObject(image, YTzoomThumbGeneratedAssociation) == nil) {
         CGRect bounds = ((CGRect (*)(id, SEL))objc_msgSend)(
             node, NSSelectorFromString(@"bounds"));
         CGFloat width = CGRectGetWidth(bounds);
@@ -919,8 +919,8 @@ static void YTKACEThumbSetImage(id node, SEL selector, UIImage *image) {
             height = image.size.height / (scale > 1.0 ? 1.0 : 2.0);
         }
         if (height >= 1.0 && height <= 4.0 && width >= 8.0) {
-            use = YTKACEThumbBarImage(
-                width, height, YTKACEThumbTrackWidth(node, width, height));
+            use = YTzoomThumbBarImage(
+                width, height, YTzoomThumbTrackWidth(node, width, height));
         }
     }
     if (OriginalThumbSetImage != NULL) {
@@ -931,12 +931,12 @@ static void YTKACEThumbSetImage(id node, SEL selector, UIImage *image) {
 static IMP OriginalGridCellLayout;
 static IMP OriginalBrandGradientDraw;
 
-static void YTKACEBrandGradientDraw(UIView *receiver, SEL selector, CGRect rect) {
+static void YTzoomBrandGradientDraw(UIView *receiver, SEL selector, CGRect rect) {
     CGRect bounds = receiver.bounds;
     CGFloat width = CGRectGetWidth(bounds);
     CGFloat height = CGRectGetHeight(bounds);
     CGContextRef context = UIGraphicsGetCurrentContext();
-    BOOL eligible = YTKACEProgressStyle() != 0 && context != NULL &&
+    BOOL eligible = YTzoomProgressStyle() != 0 && context != NULL &&
                     height >= 1.0 && height <= 6.0 && width >= 4.0;
 
     if (!eligible) {
@@ -956,93 +956,93 @@ static void YTKACEBrandGradientDraw(UIView *receiver, SEL selector, CGRect rect)
         }
         ancestor = ancestor.superview;
     }
-    UIImage *fill = YTKACEThumbBarImage(width, height, track);
+    UIImage *fill = YTzoomThumbBarImage(width, height, track);
     [fill drawInRect:bounds];
 }
 
-static void YTKACERefreshBrandGradients(UIView *view, NSUInteger depth) {
+static void YTzoomRefreshBrandGradients(UIView *view, NSUInteger depth) {
     if (view == nil || depth > 10) return;
     if ([NSStringFromClass(view.class) isEqualToString:@"YTBrandGradientView"]) {
         NSNumber *drawn = objc_getAssociatedObject(
-            view, YTKACEBarTouchedAssociation);
+            view, YTzoomBarTouchedAssociation);
         if (drawn == nil ||
-            drawn.unsignedIntegerValue != YTKACEProgressGeneration) {
-            objc_setAssociatedObject(view, YTKACEBarTouchedAssociation,
-                                     @(YTKACEProgressGeneration),
+            drawn.unsignedIntegerValue != YTzoomProgressGeneration) {
+            objc_setAssociatedObject(view, YTzoomBarTouchedAssociation,
+                                     @(YTzoomProgressGeneration),
                                      OBJC_ASSOCIATION_RETAIN_NONATOMIC);
             [view setNeedsDisplay];
         }
         return;
     }
     for (UIView *subview in view.subviews) {
-        YTKACERefreshBrandGradients(subview, depth + 1);
+        YTzoomRefreshBrandGradients(subview, depth + 1);
     }
 }
 
-static BOOL YTKACEHasBrandGradient(UIView *view, NSUInteger depth) {
+static BOOL YTzoomHasBrandGradient(UIView *view, NSUInteger depth) {
     if (view == nil || depth > 10) return NO;
     if ([NSStringFromClass(view.class) isEqualToString:@"YTBrandGradientView"]) {
         return YES;
     }
     for (UIView *subview in view.subviews) {
-        if (YTKACEHasBrandGradient(subview, depth + 1)) return YES;
+        if (YTzoomHasBrandGradient(subview, depth + 1)) return YES;
     }
     return NO;
 }
 
-static void YTKACEGridCellLayout(UIView *receiver, SEL selector) {
+static void YTzoomGridCellLayout(UIView *receiver, SEL selector) {
     if (OriginalGridCellLayout != NULL) {
         ((void (*)(id, SEL))OriginalGridCellLayout)(receiver, selector);
     }
-    if (YTKACEProgressStyle() == 0) return;
-    BOOL brand = YTKACEHasBrandGradient(receiver, 0);
+    if (YTzoomProgressStyle() == 0) return;
+    BOOL brand = YTzoomHasBrandGradient(receiver, 0);
     if (brand) {
-        YTKACERefreshBrandGradients(receiver, 0);
+        YTzoomRefreshBrandGradients(receiver, 0);
         return;
     }
-    YTKACERecolourRedBars(receiver.layer, 0, receiver,
+    YTzoomRecolourRedBars(receiver.layer, 0, receiver,
                           NSStringFromClass(receiver.class));
 }
 
-void YTKACEInstallProgressBarHooks(void) {
+void YTzoomInstallProgressBarHooks(void) {
     static dispatch_once_t sweepToken;
     dispatch_once(&sweepToken, ^{
-        BOOL grid = YTKACEInstallInstanceHook(@"YTGridVideoCell", @"layoutSubviews",
-                                              (IMP)YTKACEGridCellLayout,
+        BOOL grid = YTzoomInstallInstanceHook(@"YTGridVideoCell", @"layoutSubviews",
+                                              (IMP)YTzoomGridCellLayout,
                                               &OriginalGridCellLayout);
-        BOOL brand = YTKACEInstallInstanceHook(@"YTBrandGradientView", @"drawRect:",
-                                               (IMP)YTKACEBrandGradientDraw,
+        BOOL brand = YTzoomInstallInstanceHook(@"YTBrandGradientView", @"drawRect:",
+                                               (IMP)YTzoomBrandGradientDraw,
                                                &OriginalBrandGradientDraw);
         (void)grid;
         (void)brand;
     });
     static dispatch_once_t thumbToken;
     dispatch_once(&thumbToken, ^{
-        BOOL image = YTKACEInstallInstanceHook(@"ELMImageNode", @"layoutDidFinish",
-                                               (IMP)YTKACEThumbBarLayout,
+        BOOL image = YTzoomInstallInstanceHook(@"ELMImageNode", @"layoutDidFinish",
+                                               (IMP)YTzoomThumbBarLayout,
                                                &OriginalThumbBarLayout);
-        BOOL container = YTKACEInstallInstanceHook(@"ELMContainerNode",
+        BOOL container = YTzoomInstallInstanceHook(@"ELMContainerNode",
                                                    @"layoutDidFinish",
-                                                   (IMP)YTKACEThumbContainerLayout,
+                                                   (IMP)YTzoomThumbContainerLayout,
                                                    &OriginalThumbContainerLayout);
-        YTKACEInstallInstanceHook(@"ELMImageNode", @"displayWillStart",
-                                  (IMP)YTKACEThumbDisplayWillStart,
+        YTzoomInstallInstanceHook(@"ELMImageNode", @"displayWillStart",
+                                  (IMP)YTzoomThumbDisplayWillStart,
                                   &OriginalThumbDisplayWillStart);
-        YTKACEInstallInstanceHook(@"ELMImageNode", @"didEnterVisibleState",
-                                  (IMP)YTKACEThumbDidEnterVisible,
+        YTzoomInstallInstanceHook(@"ELMImageNode", @"didEnterVisibleState",
+                                  (IMP)YTzoomThumbDidEnterVisible,
                                   &OriginalThumbVisible);
-        YTKACEInstallInstanceHook(@"ELMImageNode", @"setImage:",
-                                  (IMP)YTKACEThumbSetImage,
+        YTzoomInstallInstanceHook(@"ELMImageNode", @"setImage:",
+                                  (IMP)YTzoomThumbSetImage,
                                   &OriginalThumbSetImage);
         (void)image;
         (void)container;
     });
     static NSUInteger attempt = 0;
-    NSUInteger landed = YTKACEInstallProgressHookSet();
+    NSUInteger landed = YTzoomInstallProgressHookSet();
     attempt++;
     if (landed >= 15 || attempt >= 20) return;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(NSEC_PER_SEC)),
                    dispatch_get_main_queue(), ^{
-        YTKACEInstallProgressBarHooks();
+        YTzoomInstallProgressBarHooks();
     });
 }

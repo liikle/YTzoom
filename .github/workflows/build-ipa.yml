@@ -55,7 +55,7 @@ jobs:
 
       - uses: actions/download-artifact@v8
         with:
-          name: YTKACE-deb-rootless
+          name: YTzoom-deb-rootless
           path: packages
 
       - uses: levibostian/action-hide-sensitive-inputs@v1
@@ -99,16 +99,16 @@ jobs:
           PY
           )"
           if [ "${{ matrix.target.label }}" = "ios16" ]; then
-            output="YTKACE_${tweak_version}_YouTube_iOS16_${youtube_version}.ipa"
+            output="YTzoom_${tweak_version}_YouTube_iOS16_${youtube_version}.ipa"
           else
-            output="YTKACE_${tweak_version}_YouTube_${youtube_version}.ipa"
+            output="YTzoom_${tweak_version}_YouTube_${youtube_version}.ipa"
           fi
-          bash Scripts/sideload-repack.sh YouTube.ipa deb-root/var/jb/Library/MobileSubstrate/DynamicLibraries/YTKACE.dylib "$output"
-          bash Tools/verify-artifacts.sh deb-root/var/jb/Library/MobileSubstrate/DynamicLibraries/YTKACE.dylib "$output"
+          bash Scripts/sideload-repack.sh YouTube.ipa deb-root/var/jb/Library/MobileSubstrate/DynamicLibraries/YTzoom.dylib "$output"
+          bash Tools/verify-artifacts.sh deb-root/var/jb/Library/MobileSubstrate/DynamicLibraries/YTzoom.dylib "$output"
           echo "ipa=$output" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v7
         with:
-          name: YTKACE-IPA-${{ matrix.target.label }}
+          name: YTzoom-IPA-${{ matrix.target.label }}
           path: ${{ steps.inject.outputs.ipa }}
           if-no-files-found: error

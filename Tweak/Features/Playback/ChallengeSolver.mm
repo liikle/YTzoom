@@ -1,27 +1,27 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../UI/Assets.h"
 #import "../Downloads/DownloadLog.h"
 
 #import <Foundation/Foundation.h>
 #import <JavaScriptCore/JavaScriptCore.h>
 
-static NSString *YTKACEChallengeScript(NSString *name) {
-    NSString *path = [YTKACEAssetsBundle() pathForResource:name ofType:@"js" inDirectory:@"ejs"];
+static NSString *YTzoomChallengeScript(NSString *name) {
+    NSString *path = [YTzoomAssetsBundle() pathForResource:name ofType:@"js" inDirectory:@"ejs"];
     return path ? [NSString stringWithContentsOfFile:path encoding:NSUTF8StringEncoding error:nil] : nil;
 }
 
-static NSURL *YTKACEChallengeCacheURL(NSString *playerID) {
+static NSURL *YTzoomChallengeCacheURL(NSString *playerID) {
     NSURL *caches = [NSFileManager.defaultManager URLsForDirectory:NSCachesDirectory
                                                          inDomains:NSUserDomainMask].firstObject;
     return [caches URLByAppendingPathComponent:
-        [NSString stringWithFormat:@"YTKACE-player-%@.js", playerID]];
+        [NSString stringWithFormat:@"YTzoom-player-%@.js", playerID]];
 }
 
-NSDictionary<NSString *, NSString *> *YTKACESolveChallenges(NSString *playerID, NSString *playerJS,
+NSDictionary<NSString *, NSString *> *YTzoomSolveChallenges(NSString *playerID, NSString *playerJS,
                                                             NSString *type, NSArray<NSString *> *challenges) {
     static dispatch_queue_t queue;
     static dispatch_once_t once;
-    dispatch_once(&once, ^{ queue = dispatch_queue_create("ytkace.challenge", DISPATCH_QUEUE_SERIAL); });
+    dispatch_once(&once, ^{ queue = dispatch_queue_create("ytzoom.challenge", DISPATCH_QUEUE_SERIAL); });
     __block NSDictionary *result = nil;
     dispatch_sync(queue, ^{ @autoreleasepool {
         static JSContext *context;
@@ -30,10 +30,10 @@ NSDictionary<NSString *, NSString *> *YTKACESolveChallenges(NSString *playerID, 
         static NSString *preparedPlayer;
         if (challenges.count == 0) return;
         if (context == nil) {
-            NSString *library = YTKACEChallengeScript(@"yt.solver.lib.min");
-            NSString *core = YTKACEChallengeScript(@"yt.solver.core.min");
+            NSString *library = YTzoomChallengeScript(@"yt.solver.lib.min");
+            NSString *core = YTzoomChallengeScript(@"yt.solver.core.min");
             if (library.length == 0 || core.length == 0) {
-                YTKACEDownloadLog(@"nsolver", @"missing solver files lib=%lu core=%lu",
+                YTzoomDownloadLog(@"nsolver", @"missing solver files lib=%lu core=%lu",
                                   (unsigned long)library.length, (unsigned long)core.length);
                 return;
             }
@@ -46,7 +46,7 @@ NSDictionary<NSString *, NSString *> *YTKACESolveChallenges(NSString *playerID, 
             [context evaluateScript:core];
         }
         failure = nil;
-        NSURL *cacheURL = playerID.length ? YTKACEChallengeCacheURL(playerID) : nil;
+        NSURL *cacheURL = playerID.length ? YTzoomChallengeCacheURL(playerID) : nil;
         NSString *prepared = nil;
         if (playerID.length != 0 && [preparedID isEqualToString:playerID]) {
             prepared = preparedPlayer;
@@ -74,7 +74,7 @@ NSDictionary<NSString *, NSString *> *YTKACESolveChallenges(NSString *playerID, 
         }
         NSDictionary *response = [value[@"responses"] firstObject];
         if ([response[@"type"] isEqual:@"result"]) result = response[@"data"];
-        YTKACEDownloadLog(@"nsolver", @"%@ solved=%lu/%lu cached=%d ms=%.0f error=%@", type,
+        YTzoomDownloadLog(@"nsolver", @"%@ solved=%lu/%lu cached=%d ms=%.0f error=%@", type,
                           (unsigned long)result.count, (unsigned long)challenges.count, prepared.length != 0,
                           (CFAbsoluteTimeGetCurrent() - start) * 1000.0,
                           failure ?: response[@"error"] ?: @"none");
@@ -82,14 +82,14 @@ NSDictionary<NSString *, NSString *> *YTKACESolveChallenges(NSString *playerID, 
     return result;
 }
 
-NSString *YTKACESolveURLParameterN(NSString *playerID, NSString *playerJS, NSString *URLString) {
+NSString *YTzoomSolveURLParameterN(NSString *playerID, NSString *playerJS, NSString *URLString) {
     NSRegularExpression *pattern = [NSRegularExpression regularExpressionWithPattern:@"([?&])n=([^&]+)"
                                                                              options:0 error:nil];
     NSTextCheckingResult *match = [pattern firstMatchInString:URLString options:0
                                                         range:NSMakeRange(0, URLString.length)];
     if (match == nil) return URLString;
     NSString *challenge = [URLString substringWithRange:[match rangeAtIndex:2]].stringByRemovingPercentEncoding;
-    NSString *solved = YTKACESolveChallenges(playerID, playerJS, @"n", @[challenge ?: @""])[challenge];
+    NSString *solved = YTzoomSolveChallenges(playerID, playerJS, @"n", @[challenge ?: @""])[challenge];
     if (solved.length == 0) return URLString;
     NSString *encoded = [solved stringByAddingPercentEncodingWithAllowedCharacters:
                          NSCharacterSet.URLQueryAllowedCharacterSet];

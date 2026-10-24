@@ -9,10 +9,10 @@
 #import <stdlib.h>
 #import <string.h>
 
-@implementation YTKACEStreamOption
+@implementation YTzoomStreamOption
 @end
 
-static id YTKACEStreamObject(id receiver, NSArray<NSString *> *selectors) {
+static id YTzoomStreamObject(id receiver, NSArray<NSString *> *selectors) {
     for (NSString *name in selectors) {
         SEL selector = NSSelectorFromString(name);
         if ([receiver respondsToSelector:selector]) {
@@ -25,7 +25,7 @@ static id YTKACEStreamObject(id receiver, NSArray<NSString *> *selectors) {
     return nil;
 }
 
-static NSInteger YTKACEStreamInteger(id receiver, NSArray<NSString *> *selectors) {
+static NSInteger YTzoomStreamInteger(id receiver, NSArray<NSString *> *selectors) {
     for (NSString *name in selectors) {
         SEL selector = NSSelectorFromString(name);
         if ([receiver respondsToSelector:selector]) {
@@ -35,12 +35,12 @@ static NSInteger YTKACEStreamInteger(id receiver, NSArray<NSString *> *selectors
     return 0;
 }
 
-static NSArray *YTKACEArrayValue(id receiver, NSArray<NSString *> *selectors) {
-    id value = YTKACEStreamObject(receiver, selectors);
+static NSArray *YTzoomArrayValue(id receiver, NSArray<NSString *> *selectors) {
+    id value = YTzoomStreamObject(receiver, selectors);
     return [value isKindOfClass:NSArray.class] ? value : @[];
 }
 
-static NSURL *YTKACEURLValue(id value) {
+static NSURL *YTzoomURLValue(id value) {
     if ([value isKindOfClass:NSURL.class]) {
         return value;
     }
@@ -50,7 +50,7 @@ static NSURL *YTKACEURLValue(id value) {
     return nil;
 }
 
-static id YTKACEFindNestedObject(id object,
+static id YTzoomFindNestedObject(id object,
                                  NSString *target,
                                  NSHashTable *visited,
                                  NSUInteger depth) {
@@ -58,15 +58,15 @@ static id YTKACEFindNestedObject(id object,
         return nil;
     }
     [visited addObject:object];
-    id value = YTKACEStreamObject(object, @[target]);
+    id value = YTzoomStreamObject(object, @[target]);
     if (value != nil) {
         return value;
     }
     for (NSString *name in @[@"playerData", @"contentPlayerResponse",
                               @"playerResponse", @"playbackData", @"video",
                               @"response", @"shortsPlayerData"]) {
-        id nested = YTKACEStreamObject(object, @[name]);
-        id found = YTKACEFindNestedObject(nested, target, visited, depth + 1);
+        id nested = YTzoomStreamObject(object, @[name]);
+        id found = YTzoomFindNestedObject(nested, target, visited, depth + 1);
         if (found != nil) {
             return found;
         }
@@ -74,18 +74,18 @@ static id YTKACEFindNestedObject(id object,
     return nil;
 }
 
-static id YTKACENestedObject(id object, NSString *target) {
+static id YTzoomNestedObject(id object, NSString *target) {
     NSHashTable *visited = [NSHashTable hashTableWithOptions:
         NSPointerFunctionsObjectPointerPersonality];
-    return YTKACEFindNestedObject(object, target, visited, 0);
+    return YTzoomFindNestedObject(object, target, visited, 0);
 }
 
-static NSString *YTKACEStringValue(id value) {
+static NSString *YTzoomStringValue(id value) {
     if ([value isKindOfClass:NSString.class]) {
         return value;
     }
     for (NSString *name in @[@"text", @"string", @"simpleText"]) {
-        id nested = YTKACEStreamObject(value, @[name]);
+        id nested = YTzoomStreamObject(value, @[name]);
         if ([nested isKindOfClass:NSString.class]) {
             return nested;
         }
@@ -93,13 +93,13 @@ static NSString *YTKACEStringValue(id value) {
     return nil;
 }
 
-static NSInteger YTKACEQualityHeight(NSString *label) {
+static NSInteger YTzoomQualityHeight(NSString *label) {
     NSScanner *scanner = [NSScanner scannerWithString:label ?: @""];
     NSInteger height = 0;
     return [scanner scanInteger:&height] ? height : 0;
 }
 
-static NSInteger YTKACEVideoPreference(YTKACEStreamOption *option) {
+static NSInteger YTzoomVideoPreference(YTzoomStreamOption *option) {
     NSString *mime = option.mimeType.lowercaseString;
     if ([mime containsString:@"avc1"]) return 4;
     if ([mime containsString:@"av01"] || [mime containsString:@"av1"]) return 3;
@@ -108,7 +108,7 @@ static NSInteger YTKACEVideoPreference(YTKACEStreamOption *option) {
     return 0;
 }
 
-static BOOL YTKACEHighResolutionSupported(YTKACEStreamOption *option) {
+static BOOL YTzoomHighResolutionSupported(YTzoomStreamOption *option) {
     if (option.height <= 1080) return YES;
     NSString *mime = option.mimeType.lowercaseString;
     if ([mime containsString:@"av01"] || [mime containsString:@"av1"]) {
@@ -127,7 +127,7 @@ static BOOL YTKACEHighResolutionSupported(YTKACEStreamOption *option) {
     return NO;
 }
 
-static NSString *YTKACEVideoRejectReason(YTKACEStreamOption *option) {
+static NSString *YTzoomVideoRejectReason(YTzoomStreamOption *option) {
     if (![option.mimeType hasPrefix:@"video/"]) return @"not video";
     if (option.itag <= 0) return @"no itag";
     if (![option.mimeType containsString:@"video/mp4"] &&
@@ -135,54 +135,54 @@ static NSString *YTKACEVideoRejectReason(YTKACEStreamOption *option) {
         return @"container unsupported";
     }
     if (option.height <= 0) return @"no height";
-    if (!YTKACEHighResolutionSupported(option)) return @"no hardware decode";
+    if (!YTzoomHighResolutionSupported(option)) return @"no hardware decode";
     return nil;
 }
 
-static id YTKACEPlayerData(id playerResponse) {
-    return YTKACENestedObject(playerResponse, @"playerData") ?: playerResponse;
+static id YTzoomPlayerData(id playerResponse) {
+    return YTzoomNestedObject(playerResponse, @"playerData") ?: playerResponse;
 }
 
-static id YTKACEVideoDetails(id playerResponse) {
-    return YTKACENestedObject(playerResponse, @"videoDetails") ?:
-        YTKACEPlayerData(playerResponse);
+static id YTzoomVideoDetails(id playerResponse) {
+    return YTzoomNestedObject(playerResponse, @"videoDetails") ?:
+        YTzoomPlayerData(playerResponse);
 }
 
-static id YTKACEStreamingData(id playerResponse) {
-    id direct = YTKACEStreamObject(playerResponse, @[@"streamingData"]);
-    return direct ?: YTKACEStreamObject(YTKACEPlayerData(playerResponse),
+static id YTzoomStreamingData(id playerResponse) {
+    id direct = YTzoomStreamObject(playerResponse, @[@"streamingData"]);
+    return direct ?: YTzoomStreamObject(YTzoomPlayerData(playerResponse),
                                          @[@"streamingData"]);
 }
 
 
-static YTKACEStreamOption *YTKACEOptionFromFormat(id format, BOOL adaptive) {
-    NSURL *url = YTKACEURLValue(YTKACEStreamObject(format, @[@"URL", @"url"]));
+static YTzoomStreamOption *YTzoomOptionFromFormat(id format, BOOL adaptive) {
+    NSURL *url = YTzoomURLValue(YTzoomStreamObject(format, @[@"URL", @"url"]));
     if (url != nil && ![url.scheme.lowercaseString hasPrefix:@"http"]) {
         url = nil;
     }
 
-    NSString *mime = YTKACEStreamObject(format, @[@"mimeType"]);
+    NSString *mime = YTzoomStreamObject(format, @[@"mimeType"]);
     if (![mime isKindOfClass:NSString.class]) {
         mime = @"application/octet-stream";
     }
 
-    YTKACEStreamOption *option = [YTKACEStreamOption new];
+    YTzoomStreamOption *option = [YTzoomStreamOption new];
     option.URL = url;
     option.mimeType = mime;
-    option.qualityLabel = YTKACEStreamObject(format, @[@"qualityLabel", @"audioQuality"]) ?: @"";
-    option.xtags = YTKACEStreamObject(format, @[@"xtags"]) ?: @"";
-    option.bitrate = YTKACEStreamInteger(format, @[@"bitrate"]);
-    option.itag = YTKACEStreamInteger(format, @[@"itag"]);
-    option.contentLength = YTKACEStreamInteger(format, @[@"contentLength"]);
-    option.lastModified = YTKACEStreamInteger(format, @[@"lastModified"]);
-    option.width = YTKACEStreamInteger(format, @[@"width"]);
-    option.height = YTKACEStreamInteger(format, @[@"height"]);
+    option.qualityLabel = YTzoomStreamObject(format, @[@"qualityLabel", @"audioQuality"]) ?: @"";
+    option.xtags = YTzoomStreamObject(format, @[@"xtags"]) ?: @"";
+    option.bitrate = YTzoomStreamInteger(format, @[@"bitrate"]);
+    option.itag = YTzoomStreamInteger(format, @[@"itag"]);
+    option.contentLength = YTzoomStreamInteger(format, @[@"contentLength"]);
+    option.lastModified = YTzoomStreamInteger(format, @[@"lastModified"]);
+    option.width = YTzoomStreamInteger(format, @[@"width"]);
+    option.height = YTzoomStreamInteger(format, @[@"height"]);
     option.audioOnly = [mime hasPrefix:@"audio/"] ||
         (adaptive && ![mime hasPrefix:@"video/"]);
     option.adaptive = adaptive;
     option.rawFormat = format;
-    id audioTrack = YTKACEStreamObject(format, @[@"audioTrack"]);
-    NSString *language = YTKACEStringValue(YTKACEStreamObject(
+    id audioTrack = YTzoomStreamObject(format, @[@"audioTrack"]);
+    NSString *language = YTzoomStringValue(YTzoomStreamObject(
         audioTrack, @[@"displayName", @"display_name", @"name"]));
     if (language.length == 0) {
         NSString *description = [audioTrack description];
@@ -197,8 +197,8 @@ static YTKACEStreamOption *YTKACEOptionFromFormat(id format, BOOL adaptive) {
             }
         }
     }
-    option.languageLabel = language.length != 0 ? language : YTKACELocalized(@"Original audio");
-    NSString *trackID = YTKACEStringValue(YTKACEStreamObject(
+    option.languageLabel = language.length != 0 ? language : YTzoomLocalized(@"Original audio");
+    NSString *trackID = YTzoomStringValue(YTzoomStreamObject(
         audioTrack, @[@"id_p", @"audioTrackId", @"audioTrackID"]));
     if (trackID.length == 0) {
         NSString *description = [audioTrack description];
@@ -214,29 +214,29 @@ static YTKACEStreamOption *YTKACEOptionFromFormat(id format, BOOL adaptive) {
         }
     }
     option.audioTrackID = trackID ?: @"";
-    option.defaultAudio = YTKACEStreamInteger(
+    option.defaultAudio = YTzoomStreamInteger(
         audioTrack, @[@"audioIsDefault", @"isDefault", @"defaultAudio"]) != 0;
     return option;
 }
 
-@implementation YTKACEStreamResolver
+@implementation YTzoomStreamResolver
 
-+ (NSArray<YTKACEStreamOption *> *)optionsFromPlayerResponse:(id)playerResponse {
-    id streamingData = YTKACEStreamingData(playerResponse);
++ (NSArray<YTzoomStreamOption *> *)optionsFromPlayerResponse:(id)playerResponse {
+    id streamingData = YTzoomStreamingData(playerResponse);
     if (streamingData == nil) {
         return @[];
     }
-    NSMutableArray<YTKACEStreamOption *> *result = [NSMutableArray array];
-    for (id format in YTKACEArrayValue(streamingData, @[@"formatsArray", @"formats"])) {
-        YTKACEStreamOption *option = YTKACEOptionFromFormat(format, NO);
+    NSMutableArray<YTzoomStreamOption *> *result = [NSMutableArray array];
+    for (id format in YTzoomArrayValue(streamingData, @[@"formatsArray", @"formats"])) {
+        YTzoomStreamOption *option = YTzoomOptionFromFormat(format, NO);
         if (option != nil) {
             [result addObject:option];
         }
     }
-    for (id format in YTKACEArrayValue(
+    for (id format in YTzoomArrayValue(
              streamingData,
              @[@"adaptiveFormatsArray", @"adaptiveFormats"])) {
-        YTKACEStreamOption *option = YTKACEOptionFromFormat(format, YES);
+        YTzoomStreamOption *option = YTzoomOptionFromFormat(format, YES);
         if (option != nil) {
             [result addObject:option];
         }
@@ -244,25 +244,25 @@ static YTKACEStreamOption *YTKACEOptionFromFormat(id format, BOOL adaptive) {
     return result;
 }
 
-+ (NSArray<YTKACEStreamOption *> *)videoOptionsFromPlayerResponse:(id)playerResponse {
++ (NSArray<YTzoomStreamOption *> *)videoOptionsFromPlayerResponse:(id)playerResponse {
     NSArray *options = [self optionsFromPlayerResponse:playerResponse];
-    NSMutableDictionary<NSString *, YTKACEStreamOption *> *byQuality =
+    NSMutableDictionary<NSString *, YTzoomStreamOption *> *byQuality =
         [NSMutableDictionary dictionary];
-    YTKACEDownloadLog(@"quality", @"formats=%lu video=%@ decode avc1=%d hevc=%d vp9=%d av1=%d",
+    YTzoomDownloadLog(@"quality", @"formats=%lu video=%@ decode avc1=%d hevc=%d vp9=%d av1=%d",
         (unsigned long)options.count,
         [self videoIDFromPlayerResponse:playerResponse] ?: @"?",
         VTIsHardwareDecodeSupported(kCMVideoCodecType_H264),
         VTIsHardwareDecodeSupported(kCMVideoCodecType_HEVC),
         VTIsHardwareDecodeSupported('vp09'),
         VTIsHardwareDecodeSupported('av01'));
-    for (YTKACEStreamOption *option in options) {
+    for (YTzoomStreamOption *option in options) {
         if (option.height <= 0) {
-            option.height = YTKACEQualityHeight(option.qualityLabel);
+            option.height = YTzoomQualityHeight(option.qualityLabel);
         }
-        NSString *reason = YTKACEVideoRejectReason(option);
+        NSString *reason = YTzoomVideoRejectReason(option);
         if (reason != nil) {
             if (option.height >= 1080) {
-                YTKACEDownloadLog(@"quality", @"dropped itag=%ld %@ %@ -> %@",
+                YTzoomDownloadLog(@"quality", @"dropped itag=%ld %@ %@ -> %@",
                     (long)option.itag,
                     option.qualityLabel.length != 0 ? option.qualityLabel : @"-",
                     option.mimeType, reason);
@@ -271,19 +271,19 @@ static YTKACEStreamOption *YTKACEOptionFromFormat(id format, BOOL adaptive) {
         }
         NSString *key = option.qualityLabel.length != 0
             ? option.qualityLabel : [NSString stringWithFormat:@"%ldp", (long)option.height];
-        YTKACEStreamOption *current = byQuality[key];
-        NSInteger preference = YTKACEVideoPreference(option);
-        NSInteger currentPreference = YTKACEVideoPreference(current);
+        YTzoomStreamOption *current = byQuality[key];
+        NSInteger preference = YTzoomVideoPreference(option);
+        NSInteger currentPreference = YTzoomVideoPreference(current);
         if (current == nil || preference > currentPreference ||
             (preference == currentPreference && option.bitrate > current.bitrate)) {
             byQuality[key] = option;
         }
     }
-    YTKACEDownloadLog(@"quality", @"offering %@",
+    YTzoomDownloadLog(@"quality", @"offering %@",
         [[byQuality.allKeys sortedArrayUsingSelector:@selector(compare:)]
             componentsJoinedByString:@", "]);
     return [byQuality.allValues sortedArrayUsingComparator:
-        ^NSComparisonResult(YTKACEStreamOption *left, YTKACEStreamOption *right) {
+        ^NSComparisonResult(YTzoomStreamOption *left, YTzoomStreamOption *right) {
             if (left.height == right.height) {
                 return left.bitrate > right.bitrate ? NSOrderedAscending : NSOrderedDescending;
             }
@@ -291,23 +291,23 @@ static YTKACEStreamOption *YTKACEOptionFromFormat(id format, BOOL adaptive) {
         }];
 }
 
-+ (NSArray<YTKACEStreamOption *> *)audioOptionsFromPlayerResponse:(id)playerResponse {
++ (NSArray<YTzoomStreamOption *> *)audioOptionsFromPlayerResponse:(id)playerResponse {
     NSArray *options = [self optionsFromPlayerResponse:playerResponse];
-    NSMutableDictionary<NSString *, YTKACEStreamOption *> *byLanguage =
+    NSMutableDictionary<NSString *, YTzoomStreamOption *> *byLanguage =
         [NSMutableDictionary dictionary];
-    for (YTKACEStreamOption *option in options) {
+    for (YTzoomStreamOption *option in options) {
         if (![option.mimeType hasPrefix:@"audio/mp4"]) {
             continue;
         }
         NSString *key = option.languageLabel.length != 0
-            ? option.languageLabel : YTKACELocalized(@"Original audio");
-        YTKACEStreamOption *current = byLanguage[key];
+            ? option.languageLabel : YTzoomLocalized(@"Original audio");
+        YTzoomStreamOption *current = byLanguage[key];
         if (current == nil || option.isDefaultAudio || option.bitrate > current.bitrate) {
             byLanguage[key] = option;
         }
     }
     return [byLanguage.allValues sortedArrayUsingComparator:
-        ^NSComparisonResult(YTKACEStreamOption *left, YTKACEStreamOption *right) {
+        ^NSComparisonResult(YTzoomStreamOption *left, YTzoomStreamOption *right) {
             if (left.isDefaultAudio != right.isDefaultAudio) {
                 return left.isDefaultAudio ? NSOrderedAscending : NSOrderedDescending;
             }
@@ -315,14 +315,14 @@ static YTKACEStreamOption *YTKACEOptionFromFormat(id format, BOOL adaptive) {
         }];
 }
 
-+ (YTKACEStreamOption *)bestPiPVideoFromPlayerResponse:(id)playerResponse {
-    id streamingData = YTKACEStreamingData(playerResponse);
-    NSURL *hls = YTKACEURLValue(YTKACEStreamObject(
++ (YTzoomStreamOption *)bestPiPVideoFromPlayerResponse:(id)playerResponse {
+    id streamingData = YTzoomStreamingData(playerResponse);
+    NSURL *hls = YTzoomURLValue(YTzoomStreamObject(
         streamingData,
         @[@"hlsManifestURL", @"hlsManifestUrl"]
     ));
     if (hls != nil) {
-        YTKACEStreamOption *option = [YTKACEStreamOption new];
+        YTzoomStreamOption *option = [YTzoomStreamOption new];
         option.URL = hls;
         option.mimeType = @"application/x-mpegURL";
         option.qualityLabel = @"HLS";
@@ -331,18 +331,18 @@ static YTKACEStreamOption *YTKACEOptionFromFormat(id format, BOOL adaptive) {
     return [self bestVideoFromPlayerResponse:playerResponse];
 }
 
-+ (YTKACEStreamOption *)bestVideoFromPlayerResponse:(id)playerResponse {
-    NSArray<YTKACEStreamOption *> *options = [self optionsFromPlayerResponse:playerResponse];
++ (YTzoomStreamOption *)bestVideoFromPlayerResponse:(id)playerResponse {
+    NSArray<YTzoomStreamOption *> *options = [self optionsFromPlayerResponse:playerResponse];
     NSPredicate *video = [NSPredicate predicateWithBlock:
-        ^BOOL(YTKACEStreamOption *option, NSDictionary *bindings) {
+        ^BOOL(YTzoomStreamOption *option, NSDictionary *bindings) {
             (void)bindings;
             return !option.isAdaptive &&
                 !option.isAudioOnly &&
                 [option.mimeType hasPrefix:@"video/"];
         }];
     return [[options filteredArrayUsingPredicate:video]
-        sortedArrayUsingComparator:^NSComparisonResult(YTKACEStreamOption *left,
-                                                        YTKACEStreamOption *right) {
+        sortedArrayUsingComparator:^NSComparisonResult(YTzoomStreamOption *left,
+                                                        YTzoomStreamOption *right) {
             if (left.bitrate == right.bitrate) {
                 return NSOrderedSame;
             }
@@ -350,16 +350,16 @@ static YTKACEStreamOption *YTKACEOptionFromFormat(id format, BOOL adaptive) {
         }].firstObject;
 }
 
-+ (YTKACEStreamOption *)bestAudioFromPlayerResponse:(id)playerResponse {
-    NSArray<YTKACEStreamOption *> *options = [self optionsFromPlayerResponse:playerResponse];
++ (YTzoomStreamOption *)bestAudioFromPlayerResponse:(id)playerResponse {
+    NSArray<YTzoomStreamOption *> *options = [self optionsFromPlayerResponse:playerResponse];
     NSPredicate *audio = [NSPredicate predicateWithBlock:
-        ^BOOL(YTKACEStreamOption *option, NSDictionary *bindings) {
+        ^BOOL(YTzoomStreamOption *option, NSDictionary *bindings) {
             (void)bindings;
             return option.isAudioOnly || [option.mimeType hasPrefix:@"audio/"];
         }];
     return [[options filteredArrayUsingPredicate:audio]
-        sortedArrayUsingComparator:^NSComparisonResult(YTKACEStreamOption *left,
-                                                        YTKACEStreamOption *right) {
+        sortedArrayUsingComparator:^NSComparisonResult(YTzoomStreamOption *left,
+                                                        YTzoomStreamOption *right) {
             if (left.bitrate == right.bitrate) {
                 return NSOrderedSame;
             }
@@ -368,8 +368,8 @@ static YTKACEStreamOption *YTKACEOptionFromFormat(id format, BOOL adaptive) {
 }
 
 + (NSString *)titleFromPlayerResponse:(id)playerResponse {
-    id details = YTKACEVideoDetails(playerResponse);
-    NSString *title = YTKACEStringValue(YTKACEStreamObject(
+    id details = YTzoomVideoDetails(playerResponse);
+    NSString *title = YTzoomStringValue(YTzoomStreamObject(
         details, @[@"title", @"videoTitle", @"headline"]));
     return title.length != 0
         ? title
@@ -377,36 +377,36 @@ static YTKACEStreamOption *YTKACEOptionFromFormat(id format, BOOL adaptive) {
 }
 
 + (NSString *)authorFromPlayerResponse:(id)playerResponse {
-    id details = YTKACEVideoDetails(playerResponse);
-    NSString *author = YTKACEStringValue(YTKACEStreamObject(
+    id details = YTzoomVideoDetails(playerResponse);
+    NSString *author = YTzoomStringValue(YTzoomStreamObject(
         details, @[@"author", @"channelTitle", @"ownerChannelName"]));
     return author.length != 0
         ? author : @"YouTube";
 }
 
 + (NSString *)descriptionFromPlayerResponse:(id)playerResponse {
-    id details = YTKACEVideoDetails(playerResponse);
-    id description = YTKACEStreamObject(details,
+    id details = YTzoomVideoDetails(playerResponse);
+    id description = YTzoomStreamObject(details,
         @[@"shortDescription", @"videoDescription", @"descriptionText"]);
     return [description isKindOfClass:NSString.class]
         ? description : @"";
 }
 
 + (NSString *)videoIDFromPlayerResponse:(id)playerResponse {
-    id details = YTKACEVideoDetails(playerResponse);
-    id videoID = YTKACEStreamObject(details, @[@"videoId", @"videoID"]);
+    id details = YTzoomVideoDetails(playerResponse);
+    id videoID = YTzoomStreamObject(details, @[@"videoId", @"videoID"]);
     if (![videoID isKindOfClass:NSString.class] || [videoID length] == 0) {
-        videoID = YTKACEStreamObject(playerResponse, @[@"videoId", @"videoID"]);
+        videoID = YTzoomStreamObject(playerResponse, @[@"videoId", @"videoID"]);
     }
     return [videoID isKindOfClass:NSString.class] ? videoID : nil;
 }
 
 + (NSURL *)thumbnailURLFromPlayerResponse:(id)playerResponse {
-    id details = YTKACEVideoDetails(playerResponse);
-    id thumbnail = YTKACEStreamObject(details, @[@"thumbnail"]);
-    NSArray *items = YTKACEArrayValue(thumbnail, @[@"thumbnailsArray", @"thumbnails"]);
+    id details = YTzoomVideoDetails(playerResponse);
+    id thumbnail = YTzoomStreamObject(details, @[@"thumbnail"]);
+    NSArray *items = YTzoomArrayValue(thumbnail, @[@"thumbnailsArray", @"thumbnails"]);
     id candidate = items.lastObject;
-    return YTKACEURLValue(YTKACEStreamObject(candidate, @[@"URL", @"url"]));
+    return YTzoomURLValue(YTzoomStreamObject(candidate, @[@"URL", @"url"]));
 }
 
 @end

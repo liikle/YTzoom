@@ -2,7 +2,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface YTKACEStreamOption : NSObject
+@interface YTzoomStreamOption : NSObject
 @property(nonatomic, strong, nullable) NSURL *URL;
 @property(nonatomic, copy) NSString *mimeType;
 @property(nonatomic, copy) NSString *qualityLabel;
@@ -21,13 +21,13 @@ NS_ASSUME_NONNULL_BEGIN
 @property(nonatomic, strong) id rawFormat;
 @end
 
-@interface YTKACEStreamResolver : NSObject
-+ (NSArray<YTKACEStreamOption *> *)optionsFromPlayerResponse:(id)playerResponse;
-+ (NSArray<YTKACEStreamOption *> *)videoOptionsFromPlayerResponse:(id)playerResponse;
-+ (NSArray<YTKACEStreamOption *> *)audioOptionsFromPlayerResponse:(id)playerResponse;
-+ (nullable YTKACEStreamOption *)bestVideoFromPlayerResponse:(id)playerResponse;
-+ (nullable YTKACEStreamOption *)bestPiPVideoFromPlayerResponse:(id)playerResponse;
-+ (nullable YTKACEStreamOption *)bestAudioFromPlayerResponse:(id)playerResponse;
+@interface YTzoomStreamResolver : NSObject
++ (NSArray<YTzoomStreamOption *> *)optionsFromPlayerResponse:(id)playerResponse;
++ (NSArray<YTzoomStreamOption *> *)videoOptionsFromPlayerResponse:(id)playerResponse;
++ (NSArray<YTzoomStreamOption *> *)audioOptionsFromPlayerResponse:(id)playerResponse;
++ (nullable YTzoomStreamOption *)bestVideoFromPlayerResponse:(id)playerResponse;
++ (nullable YTzoomStreamOption *)bestPiPVideoFromPlayerResponse:(id)playerResponse;
++ (nullable YTzoomStreamOption *)bestAudioFromPlayerResponse:(id)playerResponse;
 + (NSString *)titleFromPlayerResponse:(id)playerResponse;
 + (NSString *)authorFromPlayerResponse:(id)playerResponse;
 + (NSString *)descriptionFromPlayerResponse:(id)playerResponse;

@@ -1,40 +1,40 @@
-#import "../YTKACE.h"
+#import "../YTzoom.h"
 #import "../Runtime/Hooking.h"
 #import "../Features/Interface/NavigationVisibility.h"
 #import "../UI/Assets.h"
-#import "YTKACERootOptionsController.h"
+#import "YTzoomRootOptionsController.h"
 
 #import <objc/runtime.h>
 
 static IMP OriginalPivotViewDidAppear;
 static IMP OriginalRightButtonsLayoutSubviews;
-static const void *YTKACESettingsButtonAssociation = &YTKACESettingsButtonAssociation;
+static const void *YTzoomSettingsButtonAssociation = &YTzoomSettingsButtonAssociation;
 
-static UIViewController *YTKACETopViewController(UIViewController *controller) {
+static UIViewController *YTzoomTopViewController(UIViewController *controller) {
     if (controller.presentedViewController != nil) {
-        return YTKACETopViewController(controller.presentedViewController);
+        return YTzoomTopViewController(controller.presentedViewController);
     }
     if ([controller isKindOfClass:UINavigationController.class]) {
-        return YTKACETopViewController(((UINavigationController *)controller).visibleViewController);
+        return YTzoomTopViewController(((UINavigationController *)controller).visibleViewController);
     }
     if ([controller isKindOfClass:UITabBarController.class]) {
-        return YTKACETopViewController(((UITabBarController *)controller).selectedViewController);
+        return YTzoomTopViewController(((UITabBarController *)controller).selectedViewController);
     }
     return controller;
 }
 
-@interface YTKACESettingsPresenter : NSObject
+@interface YTzoomSettingsPresenter : NSObject
 + (instancetype)sharedPresenter;
 - (void)openSettings;
 @end
 
-@implementation YTKACESettingsPresenter
+@implementation YTzoomSettingsPresenter
 
 + (instancetype)sharedPresenter {
-    static YTKACESettingsPresenter *presenter;
+    static YTzoomSettingsPresenter *presenter;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        presenter = [YTKACESettingsPresenter new];
+        presenter = [YTzoomSettingsPresenter new];
     });
     return presenter;
 }
@@ -59,29 +59,29 @@ static UIViewController *YTKACETopViewController(UIViewController *controller) {
             break;
         }
     }
-    UIViewController *presenter = YTKACETopViewController(window.rootViewController);
+    UIViewController *presenter = YTzoomTopViewController(window.rootViewController);
     if ([presenter.presentedViewController isKindOfClass:UINavigationController.class] &&
         [((UINavigationController *)presenter.presentedViewController).viewControllers.firstObject
-            isKindOfClass:YTKACERootOptionsController.class]) {
+            isKindOfClass:YTzoomRootOptionsController.class]) {
         return;
     }
-    [presenter presentViewController:YTKACEMakeSettingsNavigationController()
+    [presenter presentViewController:YTzoomMakeSettingsNavigationController()
                             animated:YES
                           completion:nil];
 }
 
 @end
 
-static UIBarButtonItem *YTKACESettingsBarButton(void) {
-    UIImage *image = [YTKACEGearImage()
+static UIBarButtonItem *YTzoomSettingsBarButton(void) {
+    UIImage *image = [YTzoomGearImage()
         imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate];
     return [[UIBarButtonItem alloc] initWithImage:image
                                            style:UIBarButtonItemStylePlain
-                                          target:YTKACESettingsPresenter.sharedPresenter
+                                          target:YTzoomSettingsPresenter.sharedPresenter
                                           action:@selector(openSettings)];
 }
 
-static void YTKACEPivotViewDidAppear(id receiver, SEL selector, BOOL animated) {
+static void YTzoomPivotViewDidAppear(id receiver, SEL selector, BOOL animated) {
     if (OriginalPivotViewDidAppear != NULL) {
         ((void (*)(id, SEL, BOOL))OriginalPivotViewDidAppear)(receiver, selector, animated);
     }
@@ -90,27 +90,27 @@ static void YTKACEPivotViewDidAppear(id receiver, SEL selector, BOOL animated) {
         return;
     }
     UIViewController *controller = receiver;
-    if (objc_getAssociatedObject(controller, YTKACESettingsButtonAssociation) != nil) {
+    if (objc_getAssociatedObject(controller, YTzoomSettingsButtonAssociation) != nil) {
         return;
     }
 
     NSMutableArray<UIBarButtonItem *> *items =
         [controller.navigationItem.rightBarButtonItems mutableCopy] ?: [NSMutableArray array];
-    [items insertObject:YTKACESettingsBarButton() atIndex:0];
+    [items insertObject:YTzoomSettingsBarButton() atIndex:0];
     controller.navigationItem.rightBarButtonItems = items;
     objc_setAssociatedObject(controller,
-                             YTKACESettingsButtonAssociation,
+                             YTzoomSettingsButtonAssociation,
                              @YES,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
-static void YTKACERightButtonsLayoutSubviews(UIView *receiver, SEL selector) {
+static void YTzoomRightButtonsLayoutSubviews(UIView *receiver, SEL selector) {
     if (OriginalRightButtonsLayoutSubviews != NULL) {
         ((void (*)(id, SEL))OriginalRightButtonsLayoutSubviews)(receiver, selector);
     }
-    if (objc_getAssociatedObject(receiver, YTKACESettingsButtonAssociation) != nil) {
-        YTKACEApplyRightNavigationVisibility(receiver);
-        YTKACEApplyTopNavigationGlass(receiver);
+    if (objc_getAssociatedObject(receiver, YTzoomSettingsButtonAssociation) != nil) {
+        YTzoomApplyRightNavigationVisibility(receiver);
+        YTzoomApplyTopNavigationGlass(receiver);
         return;
     }
 
@@ -122,16 +122,16 @@ static void YTKACERightButtonsLayoutSubviews(UIView *receiver, SEL selector) {
         }
     }
     if (stack == nil) {
-        YTKACEApplyTopNavigationGlass(receiver);
+        YTzoomApplyTopNavigationGlass(receiver);
         return;
     }
 
     UIButton *button = [UIButton buttonWithType:UIButtonTypeSystem];
-    [button setImage:[YTKACEGearImage()
+    [button setImage:[YTzoomGearImage()
         imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
              forState:UIControlStateNormal];
-    button.accessibilityLabel = @"YTKACE Settings";
-    [button addTarget:YTKACESettingsPresenter.sharedPresenter
+    button.accessibilityLabel = @"YTzoom Settings";
+    [button addTarget:YTzoomSettingsPresenter.sharedPresenter
                action:@selector(openSettings)
      forControlEvents:UIControlEventTouchUpInside];
     [button.widthAnchor constraintEqualToConstant:32.0].active = YES;
@@ -139,20 +139,20 @@ static void YTKACERightButtonsLayoutSubviews(UIView *receiver, SEL selector) {
     [stack insertArrangedSubview:button atIndex:0];
 
     objc_setAssociatedObject(receiver,
-                             YTKACESettingsButtonAssociation,
+                             YTzoomSettingsButtonAssociation,
                              button,
                              OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    YTKACEApplyRightNavigationVisibility(receiver);
-    YTKACEApplyTopNavigationGlass(receiver);
+    YTzoomApplyRightNavigationVisibility(receiver);
+    YTzoomApplyTopNavigationGlass(receiver);
 }
 
-void YTKACEInstallSettingsEntryHooks(void) {
-    YTKACEInstallInstanceHook(@"YTPivotBarViewController",
+void YTzoomInstallSettingsEntryHooks(void) {
+    YTzoomInstallInstanceHook(@"YTPivotBarViewController",
                               @"viewDidAppear:",
-                              (IMP)YTKACEPivotViewDidAppear,
+                              (IMP)YTzoomPivotViewDidAppear,
                               &OriginalPivotViewDidAppear);
-    YTKACEInstallInstanceHook(@"YTRightNavigationButtons",
+    YTzoomInstallInstanceHook(@"YTRightNavigationButtons",
                               @"layoutSubviews",
-                              (IMP)YTKACERightButtonsLayoutSubviews,
+                              (IMP)YTzoomRightButtonsLayoutSubviews,
                               &OriginalRightButtonsLayoutSubviews);
 }

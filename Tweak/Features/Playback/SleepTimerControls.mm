@@ -1,4 +1,4 @@
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 #import "../../Runtime/Hooking.h"
 #import "../../Runtime/Localization.h"
 #import "../../Runtime/Preferences.h"
@@ -9,30 +9,30 @@
 #import <math.h>
 #import <objc/message.h>
 
-static double YTKACEPlayerDouble(id receiver, NSString *name) {
+static double YTzoomPlayerDouble(id receiver, NSString *name) {
     SEL selector = NSSelectorFromString(name);
     if (![receiver respondsToSelector:selector]) return 0.0;
     double value = ((double (*)(id, SEL))objc_msgSend)(receiver, selector);
     return isfinite(value) ? value : 0.0;
 }
 
-static NSString *YTKACEPadUnit(void) {
+static NSString *YTzoomPadUnit(void) {
     unichar space = 0x2007;
     return [NSString stringWithCharacters:&space length:1];
 }
 
-static NSString *YTKACEPaddedTitle(NSString *title) {
+static NSString *YTzoomPaddedTitle(NSString *title) {
     NSMutableString *padded = [title mutableCopy];
     for (NSUInteger index = 0; index < 6; index++) {
-        [padded appendString:YTKACEPadUnit()];
+        [padded appendString:YTzoomPadUnit()];
     }
     return padded;
 }
 
-static NSString *YTKACESelectedRowTitle;
-static const NSInteger YTKACECheckmarkTag = 0x5943484B;
+static NSString *YTzoomSelectedRowTitle;
+static const NSInteger YTzoomCheckmarkTag = 0x5943484B;
 
-static void YTKACEShowSleepTimerEndedAlert(void) {
+static void YTzoomShowSleepTimerEndedAlert(void) {
     Class alertClass = NSClassFromString(@"YTAlertView");
     if (alertClass == Nil) return;
     id alert = [[alertClass alloc] init];
@@ -47,19 +47,19 @@ static void YTKACEShowSleepTimerEndedAlert(void) {
     }
     if ([alert respondsToSelector:setTitle]) {
         ((void (*)(id, SEL, id))objc_msgSend)(
-            alert, setTitle, YTKACELocalized(@"Sleep timer"));
+            alert, setTitle, YTzoomLocalized(@"Sleep timer"));
     }
     ((void (*)(id, SEL, id))objc_msgSend)(
         alert, setMessage,
-        YTKACELocalized(@"Sleep timer ended. Playback has been paused."));
+        YTzoomLocalized(@"Sleep timer ended. Playback has been paused."));
     if ([alert respondsToSelector:addTitle]) {
         ((void (*)(id, SEL, id, id, int, id, dispatch_block_t))objc_msgSend)(
-            alert, addTitle, YTKACELocalized(@"OK"), nil, 0, nil, ^{});
+            alert, addTitle, YTzoomLocalized(@"OK"), nil, 0, nil, ^{});
     }
     ((void (*)(id, SEL))objc_msgSend)(alert, show);
 }
 
-static NSString *YTKACEClockText(double seconds) {
+static NSString *YTzoomClockText(double seconds) {
     NSInteger total = (NSInteger)round(seconds);
     if (total < 0) total = 0;
     if (total >= 3600) {
@@ -70,7 +70,7 @@ static NSString *YTKACEClockText(double seconds) {
         (long)(total / 60), (long)(total % 60)];
 }
 
-@interface YTKACESleepTimerCoordinator : NSObject
+@interface YTzoomSleepTimerCoordinator : NSObject
 + (instancetype)sharedCoordinator;
 @property(nonatomic, weak) UIView *overlay;
 @property(nonatomic, weak) UIButton *button;
@@ -86,13 +86,13 @@ static NSString *YTKACEClockText(double seconds) {
 - (void)updateButton;
 @end
 
-@implementation YTKACESleepTimerCoordinator
+@implementation YTzoomSleepTimerCoordinator
 
 + (instancetype)sharedCoordinator {
-    static YTKACESleepTimerCoordinator *coordinator;
+    static YTzoomSleepTimerCoordinator *coordinator;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
-        coordinator = [YTKACESleepTimerCoordinator new];
+        coordinator = [YTzoomSleepTimerCoordinator new];
     });
     return coordinator;
 }
@@ -103,7 +103,7 @@ static NSString *YTKACEClockText(double seconds) {
         [NSNotificationCenter.defaultCenter
             addObserver:self
                selector:@selector(playbackTimeChanged:)
-                   name:@"YTKACEPlaybackTimeDidChange"
+                   name:@"YTzoomPlaybackTimeDidChange"
                  object:nil];
         [NSNotificationCenter.defaultCenter
             addObserver:self
@@ -120,8 +120,8 @@ static NSString *YTKACEClockText(double seconds) {
 
 - (double)videoTimeRemaining {
     id controller = self.playerController;
-    double total = YTKACEPlayerDouble(controller, @"currentVideoTotalMediaTime");
-    double current = YTKACEPlayerDouble(controller, @"currentVideoMediaTime");
+    double total = YTzoomPlayerDouble(controller, @"currentVideoTotalMediaTime");
+    double current = YTzoomPlayerDouble(controller, @"currentVideoMediaTime");
     return total > 0.0 ? total - current : 0.0;
 }
 
@@ -129,11 +129,11 @@ static NSString *YTKACEClockText(double seconds) {
     if (self.stopAtEndOfVideo) {
         double left = [self videoTimeRemaining];
         return left > 0.0
-            ? YTKACEClockText(left)
-            : YTKACELocalized(@"End of video");
+            ? YTzoomClockText(left)
+            : YTzoomLocalized(@"End of video");
     }
     if (self.remaining <= 0.0) return nil;
-    return YTKACEClockText(self.remaining);
+    return YTzoomClockText(self.remaining);
 }
 
 - (void)refreshStatusBar {
@@ -171,7 +171,7 @@ static NSString *YTKACEClockText(double seconds) {
 
 - (void)updateButton {
     self.button.tintColor = [self isActive]
-        ? YTKACEAccentColor()
+        ? YTzoomAccentColor()
         : UIColor.whiteColor;
 }
 
@@ -202,7 +202,7 @@ static NSString *YTKACEClockText(double seconds) {
 - (void)finish {
     [self pausePlayback];
     [self cancelTimer];
-    YTKACEShowSleepTimerEndedAlert();
+    YTzoomShowSleepTimerEndedAlert();
 }
 
 - (void)cancelTimer {
@@ -241,12 +241,12 @@ static NSString *YTKACEClockText(double seconds) {
 
 - (NSArray<NSDictionary *> *)optionEntries {
     NSMutableArray<NSDictionary *> *entries = [NSMutableArray array];
-    __weak YTKACESleepTimerCoordinator *weakSelf = self;
-    YTKACESelectedRowTitle = nil;
+    __weak YTzoomSleepTimerCoordinator *weakSelf = self;
+    YTzoomSelectedRowTitle = nil;
     NSInteger activeMinutes = self.stopAtEndOfVideo
         ? -1 : (NSInteger)ceil(self.remaining / 60.0);
     NSMutableDictionary *off = [@{
-        @"title": YTKACEPaddedTitle(YTKACELocalized(@"Off")),
+        @"title": YTzoomPaddedTitle(YTzoomLocalized(@"Off")),
         @"selected": @(![self isActive]),
         @"handler": [^{ [weakSelf cancelTimer]; } copy]
     } mutableCopy];
@@ -254,27 +254,27 @@ static NSString *YTKACEClockText(double seconds) {
     for (NSNumber *value in @[@10, @15, @20, @30, @45, @60]) {
         NSInteger count = value.integerValue;
         NSString *title = count == 60
-            ? YTKACELocalized(@"1 hour")
+            ? YTzoomLocalized(@"1 hour")
             : [NSString stringWithFormat:@"%ld %@", (long)count,
-               YTKACELocalized(@"minutes")];
+               YTzoomLocalized(@"minutes")];
         NSMutableDictionary *entry = [@{
-            @"title": YTKACEPaddedTitle(title),
+            @"title": YTzoomPaddedTitle(title),
             @"selected": @(activeMinutes == count),
             @"handler": [^{ [weakSelf startForSeconds:count * 60.0]; } copy]
         } mutableCopy];
         [entries addObject:entry];
     }
     NSMutableDictionary *endOfVideo = [@{
-        @"title": YTKACEPaddedTitle(YTKACELocalized(@"End of video")),
+        @"title": YTzoomPaddedTitle(YTzoomLocalized(@"End of video")),
         @"selected": @(self.stopAtEndOfVideo),
         @"handler": [^{ [weakSelf startForEndOfVideo]; } copy]
     } mutableCopy];
     double left = [self videoTimeRemaining];
-    if (left > 0.0) endOfVideo[@"subtitle"] = YTKACEClockText(left);
+    if (left > 0.0) endOfVideo[@"subtitle"] = YTzoomClockText(left);
     [entries addObject:endOfVideo];
     for (NSDictionary *entry in entries) {
         if ([entry[@"selected"] boolValue]) {
-            YTKACESelectedRowTitle = entry[@"title"];
+            YTzoomSelectedRowTitle = entry[@"title"];
             break;
         }
     }
@@ -282,7 +282,7 @@ static NSString *YTKACEClockText(double seconds) {
 }
 
 - (void)presentSleepTimer {
-    YTKACEPresentNativeSheet(YTKACELocalized(@"Sleep Timer"), nil,
+    YTzoomPresentNativeSheet(YTzoomLocalized(@"Sleep Timer"), nil,
                              self.button, [self optionEntries]);
 }
 
@@ -292,31 +292,31 @@ static IMP OriginalShouldShowSleepStatus;
 static IMP OriginalSleepStatusText;
 static IMP OriginalSubtitledLayout;
 
-static void YTKACESubtitledRowLayout(UIView *receiver, SEL selector) {
+static void YTzoomSubtitledRowLayout(UIView *receiver, SEL selector) {
     if (OriginalSubtitledLayout != NULL) {
         ((void (*)(id, SEL))OriginalSubtitledLayout)(receiver, selector);
     }
     UILabel *title = nil;
     UIImageView *check = nil;
     for (UIView *subview in receiver.subviews) {
-        if (subview.tag == YTKACECheckmarkTag &&
+        if (subview.tag == YTzoomCheckmarkTag &&
             [subview isKindOfClass:UIImageView.class]) {
             check = (UIImageView *)subview;
         } else if ([subview isKindOfClass:UILabel.class] &&
-                   [((UILabel *)subview).text containsString:YTKACEPadUnit()]) {
+                   [((UILabel *)subview).text containsString:YTzoomPadUnit()]) {
             title = (UILabel *)subview;
         }
     }
     if (title == nil) return;
-    BOOL selected = YTKACESelectedRowTitle.length != 0 &&
-        [title.text isEqualToString:YTKACESelectedRowTitle];
+    BOOL selected = YTzoomSelectedRowTitle.length != 0 &&
+        [title.text isEqualToString:YTzoomSelectedRowTitle];
     if (check == nil) {
         if (!selected) return;
-        UIImage *glyph = YTKACEYouTubeImage(@[@"yt_outline_check_24pt"],
+        UIImage *glyph = YTzoomYouTubeImage(@[@"yt_outline_check_24pt"],
                                             @"checkmark");
         check = [[UIImageView alloc] initWithImage:
             [glyph imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]];
-        check.tag = YTKACECheckmarkTag;
+        check.tag = YTzoomCheckmarkTag;
         check.contentMode = UIViewContentModeScaleAspectFit;
         [receiver addSubview:check];
     }
@@ -328,9 +328,9 @@ static void YTKACESubtitledRowLayout(UIView *receiver, SEL selector) {
                              side, side);
 }
 
-static BOOL YTKACEShouldShowSleepStatus(id receiver, SEL selector) {
-    YTKACESleepTimerCoordinator *coordinator =
-        YTKACESleepTimerCoordinator.sharedCoordinator;
+static BOOL YTzoomShouldShowSleepStatus(id receiver, SEL selector) {
+    YTzoomSleepTimerCoordinator *coordinator =
+        YTzoomSleepTimerCoordinator.sharedCoordinator;
     coordinator.statusBarController = receiver;
     if ([coordinator isActive]) return YES;
     return OriginalShouldShowSleepStatus == NULL
@@ -338,35 +338,35 @@ static BOOL YTKACEShouldShowSleepStatus(id receiver, SEL selector) {
         : ((BOOL (*)(id, SEL))OriginalShouldShowSleepStatus)(receiver, selector);
 }
 
-static id YTKACESleepStatusText(id receiver, SEL selector) {
-    NSString *text = [YTKACESleepTimerCoordinator.sharedCoordinator statusText];
+static id YTzoomSleepStatusText(id receiver, SEL selector) {
+    NSString *text = [YTzoomSleepTimerCoordinator.sharedCoordinator statusText];
     if (text.length != 0) return text;
     return OriginalSleepStatusText == NULL
         ? nil
         : ((id (*)(id, SEL))OriginalSleepStatusText)(receiver, selector);
 }
 
-void YTKACEInstallSleepTimerHooks(void) {
-    YTKACEInstallInstanceHook(@"YTSlimStatusBarControllerImpl",
+void YTzoomInstallSleepTimerHooks(void) {
+    YTzoomInstallInstanceHook(@"YTSlimStatusBarControllerImpl",
                               @"shouldShowSleepTimerActiveStatus",
-                              (IMP)YTKACEShouldShowSleepStatus,
+                              (IMP)YTzoomShouldShowSleepStatus,
                               &OriginalShouldShowSleepStatus);
-    YTKACEInstallInstanceHook(@"YTWatchSleepTimerController",
+    YTzoomInstallInstanceHook(@"YTWatchSleepTimerController",
                               @"sleepTimerStatusText",
-                              (IMP)YTKACESleepStatusText,
+                              (IMP)YTzoomSleepStatusText,
                               &OriginalSleepStatusText);
-    YTKACEInstallInstanceHook(@"YTSubtitledDialogActionButton",
+    YTzoomInstallInstanceHook(@"YTSubtitledDialogActionButton",
                               @"layoutSubviews",
-                              (IMP)YTKACESubtitledRowLayout,
+                              (IMP)YTzoomSubtitledRowLayout,
                               &OriginalSubtitledLayout);
-    YTKACERegisterOverlayConfigurator(@"sleeptimer",
+    YTzoomRegisterOverlayConfigurator(@"sleeptimer",
         ^(UIView *overlay, UIStackView *stack) {
-        YTKACESleepTimerCoordinator *coordinator =
-            YTKACESleepTimerCoordinator.sharedCoordinator;
+        YTzoomSleepTimerCoordinator *coordinator =
+            YTzoomSleepTimerCoordinator.sharedCoordinator;
         coordinator.overlay = overlay;
-        UIButton *button = YTKACEOverlayButton(
+        UIButton *button = YTzoomOverlayButton(
             stack,
-            @"YTKACE Sleep Timer",
+            @"YTzoom Sleep Timer",
             @"moon.zzz",
             coordinator,
             @selector(presentSleepTimer)
@@ -374,7 +374,7 @@ void YTKACEInstallSleepTimerHooks(void) {
         UIImageSymbolConfiguration *configuration =
             [UIImageSymbolConfiguration configurationWithPointSize:21.0
                                                             weight:UIImageSymbolWeightMedium];
-        UIImage *glyph = YTKACEYouTubeImage(@[
+        UIImage *glyph = YTzoomYouTubeImage(@[
             @"yt_outline_experimental_sleep_timer_vd_theme_24",
             @"yt_outline_experimental_sleep_timer_black_24",
             @"yt_outline_sleep_timer_24pt",
@@ -384,7 +384,7 @@ void YTKACEInstallSleepTimerHooks(void) {
             imageWithRenderingMode:UIImageRenderingModeAlwaysTemplate]
                 forState:UIControlStateNormal];
         coordinator.button = button;
-        button.hidden = !YTKACEFeatureEnabled(YTKACESleepTimerKey);
+        button.hidden = !YTzoomFeatureEnabled(YTzoomSleepTimerKey);
         [coordinator updateButton];
     });
 }

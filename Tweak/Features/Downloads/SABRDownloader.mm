@@ -3,42 +3,42 @@
 #import "StreamResolver.h"
 #import "DirectDownloader.h"
 #import "../../Runtime/Preferences.h"
-#import "../../YTKACE.h"
+#import "../../YTzoom.h"
 
 #import <UIKit/UIKit.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 
-#ifndef YTKACE_COMBINED_SABR
-#define YTKACE_COMBINED_SABR 0
+#ifndef YTzoom_COMBINED_SABR
+#define YTzoom_COMBINED_SABR 0
 #endif
 
-static NSString *const YTKACESABRErrorDomain = @"YTKACESABR";
-static NSData *YTKACESABRPoToken;
-static NSDictionary<NSString *, NSString *> *YTKACESABRNativeHeaders;
-static NSData *YTKACESABRNativeBody;
-static NSString *YTKACESABRCurrentVideoID;
-static NSMutableDictionary<NSString *, NSDictionary<NSString *, NSString *> *> *YTKACESABRHeadersByVideo;
-static NSMutableDictionary<NSString *, NSData *> *YTKACESABRBodiesByVideo;
-static NSMutableDictionary<NSData *, NSDictionary<NSString *, NSString *> *> *YTKACESABRHeadersByConfig;
-static NSMutableDictionary<NSData *, NSData *> *YTKACESABRBodiesByConfig;
-static NSString *YTKACEPBFieldSummary(NSData *data);
-static BOOL YTKACESABRIsPlaybackBody(NSData *data);
-static NSData *YTKACEPBDataField(NSData *data, NSUInteger wanted);
+static NSString *const YTzoomSABRErrorDomain = @"YTzoomSABR";
+static NSData *YTzoomSABRPoToken;
+static NSDictionary<NSString *, NSString *> *YTzoomSABRNativeHeaders;
+static NSData *YTzoomSABRNativeBody;
+static NSString *YTzoomSABRCurrentVideoID;
+static NSMutableDictionary<NSString *, NSDictionary<NSString *, NSString *> *> *YTzoomSABRHeadersByVideo;
+static NSMutableDictionary<NSString *, NSData *> *YTzoomSABRBodiesByVideo;
+static NSMutableDictionary<NSData *, NSDictionary<NSString *, NSString *> *> *YTzoomSABRHeadersByConfig;
+static NSMutableDictionary<NSData *, NSData *> *YTzoomSABRBodiesByConfig;
+static NSString *YTzoomPBFieldSummary(NSData *data);
+static BOOL YTzoomSABRIsPlaybackBody(NSData *data);
+static NSData *YTzoomPBDataField(NSData *data, NSUInteger wanted);
 
-void YTKACESABRSetCurrentVideoID(NSString *videoID) {
+void YTzoomSABRSetCurrentVideoID(NSString *videoID) {
     if (videoID.length == 0) return;
-    @synchronized (YTKACESABRDownloader.class) {
-        YTKACESABRCurrentVideoID = [videoID copy];
+    @synchronized (YTzoomSABRDownloader.class) {
+        YTzoomSABRCurrentVideoID = [videoID copy];
     }
 }
 
-static NSURL *YTKACESABRSeedURL(void) {
-    NSURL *directory = YTKACEApplicationSupportDirectory();
+static NSURL *YTzoomSABRSeedURL(void) {
+    NSURL *directory = YTzoomApplicationSupportDirectory();
     return [directory URLByAppendingPathComponent:@"sabr-seed.plist"];
 }
 
-static void YTKACESABRPersistSeed(NSData *body, NSDictionary *headers) {
+static void YTzoomSABRPersistSeed(NSData *body, NSDictionary *headers) {
     static NSTimeInterval lastWrite;
     static BOOL wroteWithHeaders;
     NSTimeInterval now = NSDate.date.timeIntervalSinceReferenceDate;
@@ -46,7 +46,7 @@ static void YTKACESABRPersistSeed(NSData *body, NSDictionary *headers) {
     if (!upgrade && now - lastWrite < 30.0) return;
     if (headers.count != 0) wroteWithHeaders = YES;
     if (body.length == 0) {
-        YTKACEDownloadLog(@"resolve", @"seed skip body=0");
+        YTzoomDownloadLog(@"resolve", @"seed skip body=0");
         return;
     }
     lastWrite = now;
@@ -55,20 +55,20 @@ static void YTKACESABRPersistSeed(NSData *body, NSDictionary *headers) {
     NSError *error = nil;
     NSData *encoded = [NSPropertyListSerialization dataWithPropertyList:seed
         format:NSPropertyListBinaryFormat_v1_0 options:0 error:&error];
-    NSURL *url = YTKACESABRSeedURL();
+    NSURL *url = YTzoomSABRSeedURL();
     BOOL wrote = encoded.length != 0 &&
         [encoded writeToURL:url atomically:YES];
-    YTKACEDownloadLog(@"resolve",
+    YTzoomDownloadLog(@"resolve",
         @"seed write ok=%d bytes=%lu headers=%lu error=%@ path=%@",
         wrote, (unsigned long)encoded.length, (unsigned long)headers.count,
         error.localizedDescription ?: @"none", url.path);
 }
 
-void YTKACESABRRestoreSeed(void) {
-    @synchronized (YTKACESABRDownloader.class) {
-        if (YTKACESABRNativeBody.length != 0) return;
+void YTzoomSABRRestoreSeed(void) {
+    @synchronized (YTzoomSABRDownloader.class) {
+        if (YTzoomSABRNativeBody.length != 0) return;
     }
-    NSData *encoded = [NSData dataWithContentsOfURL:YTKACESABRSeedURL()];
+    NSData *encoded = [NSData dataWithContentsOfURL:YTzoomSABRSeedURL()];
     if (encoded.length == 0) return;
     NSDictionary *seed = [NSPropertyListSerialization
         propertyListWithData:encoded options:NSPropertyListImmutable
@@ -76,40 +76,40 @@ void YTKACESABRRestoreSeed(void) {
     NSData *body = seed[@"body"];
     NSDictionary *headers = seed[@"headers"];
     if (![body isKindOfClass:NSData.class]) return;
-    @synchronized (YTKACESABRDownloader.class) {
-        YTKACESABRNativeBody = [body copy];
+    @synchronized (YTzoomSABRDownloader.class) {
+        YTzoomSABRNativeBody = [body copy];
         if ([headers isKindOfClass:NSDictionary.class] && headers.count != 0) {
-            YTKACESABRNativeHeaders = [headers copy];
+            YTzoomSABRNativeHeaders = [headers copy];
         }
     }
-    YTKACEDownloadLog(@"resolve", @"restored sabr seed body=%lu headers=%lu",
+    YTzoomDownloadLog(@"resolve", @"restored sabr seed body=%lu headers=%lu",
         (unsigned long)body.length, (unsigned long)headers.count);
 }
 
-NSString *YTKACESABRCurrentVideoIDValue(void) {
-    @synchronized (YTKACESABRDownloader.class) {
-        return [YTKACESABRCurrentVideoID copy];
+NSString *YTzoomSABRCurrentVideoIDValue(void) {
+    @synchronized (YTzoomSABRDownloader.class) {
+        return [YTzoomSABRCurrentVideoID copy];
     }
 }
 
-void YTKACESABRSetNativeHeaders(NSDictionary<NSString *, NSString *> *headers) {
+void YTzoomSABRSetNativeHeaders(NSDictionary<NSString *, NSString *> *headers) {
     if (headers.count == 0) return;
     dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
         NSData *body = nil;
         NSDictionary *current = nil;
-        @synchronized (YTKACESABRDownloader.class) {
-            body = [YTKACESABRNativeBody copy];
+        @synchronized (YTzoomSABRDownloader.class) {
+            body = [YTzoomSABRNativeBody copy];
             current = [headers copy];
         }
-        if (body.length != 0) YTKACESABRPersistSeed(body, current);
+        if (body.length != 0) YTzoomSABRPersistSeed(body, current);
     });
-    @synchronized (YTKACESABRDownloader.class) {
-        YTKACESABRNativeHeaders = [headers copy];
-        if (YTKACESABRCurrentVideoID.length != 0) {
-            if (YTKACESABRHeadersByVideo == nil) {
-                YTKACESABRHeadersByVideo = [NSMutableDictionary dictionary];
+    @synchronized (YTzoomSABRDownloader.class) {
+        YTzoomSABRNativeHeaders = [headers copy];
+        if (YTzoomSABRCurrentVideoID.length != 0) {
+            if (YTzoomSABRHeadersByVideo == nil) {
+                YTzoomSABRHeadersByVideo = [NSMutableDictionary dictionary];
             }
-            YTKACESABRHeadersByVideo[YTKACESABRCurrentVideoID] = [headers copy];
+            YTzoomSABRHeadersByVideo[YTzoomSABRCurrentVideoID] = [headers copy];
         }
     }
     NSMutableArray<NSString *> *summary = [NSMutableArray array];
@@ -119,78 +119,78 @@ void YTKACESABRSetNativeHeaders(NSDictionary<NSString *, NSString *> *headers) {
     }
 }
 
-static NSDictionary<NSString *, NSString *> *YTKACESABRCurrentNativeHeaders(
+static NSDictionary<NSString *, NSString *> *YTzoomSABRCurrentNativeHeaders(
     NSString *videoID, NSData *config) {
-    @synchronized (YTKACESABRDownloader.class) {
+    @synchronized (YTzoomSABRDownloader.class) {
         NSDictionary *matched = config.length != 0
-            ? YTKACESABRHeadersByConfig[config] : nil;
+            ? YTzoomSABRHeadersByConfig[config] : nil;
         if (matched.count != 0) return [matched copy];
         NSDictionary *byVideo = videoID.length != 0
-            ? YTKACESABRHeadersByVideo[videoID] : nil;
+            ? YTzoomSABRHeadersByVideo[videoID] : nil;
         if (byVideo.count != 0) return [byVideo copy];
-        return [YTKACESABRNativeHeaders copy];
+        return [YTzoomSABRNativeHeaders copy];
     }
 }
 
-void YTKACESABRSetNativeRequest(NSURLRequest *request) {
+void YTzoomSABRSetNativeRequest(NSURLRequest *request) {
     if (request == nil) return;
-    BOOL usable = YTKACESABRIsPlaybackBody(request.HTTPBody);
+    BOOL usable = YTzoomSABRIsPlaybackBody(request.HTTPBody);
     if (!usable) {
         return;
     }
-    YTKACESABRSetNativeHeaders(request.allHTTPHeaderFields);
-    @synchronized (YTKACESABRDownloader.class) {
-        YTKACESABRNativeBody = [request.HTTPBody copy];
-        if (YTKACESABRCurrentVideoID.length != 0 && request.HTTPBody.length != 0) {
-            if (YTKACESABRBodiesByVideo == nil) {
-                YTKACESABRBodiesByVideo = [NSMutableDictionary dictionary];
+    YTzoomSABRSetNativeHeaders(request.allHTTPHeaderFields);
+    @synchronized (YTzoomSABRDownloader.class) {
+        YTzoomSABRNativeBody = [request.HTTPBody copy];
+        if (YTzoomSABRCurrentVideoID.length != 0 && request.HTTPBody.length != 0) {
+            if (YTzoomSABRBodiesByVideo == nil) {
+                YTzoomSABRBodiesByVideo = [NSMutableDictionary dictionary];
             }
-            YTKACESABRBodiesByVideo[YTKACESABRCurrentVideoID] = [request.HTTPBody copy];
+            YTzoomSABRBodiesByVideo[YTzoomSABRCurrentVideoID] = [request.HTTPBody copy];
         }
-        NSData *config = YTKACEPBDataField(request.HTTPBody, 5);
+        NSData *config = YTzoomPBDataField(request.HTTPBody, 5);
         NSData *seedBody = [request.HTTPBody copy];
-        NSDictionary *seedHeaders = [YTKACESABRNativeHeaders copy];
+        NSDictionary *seedHeaders = [YTzoomSABRNativeHeaders copy];
         dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_LOW, 0), ^{
-            YTKACESABRPersistSeed(seedBody, seedHeaders);
+            YTzoomSABRPersistSeed(seedBody, seedHeaders);
         });
         if (config.length != 0) {
-            if (YTKACESABRBodiesByConfig == nil) {
-                YTKACESABRBodiesByConfig = [NSMutableDictionary dictionary];
-                YTKACESABRHeadersByConfig = [NSMutableDictionary dictionary];
+            if (YTzoomSABRBodiesByConfig == nil) {
+                YTzoomSABRBodiesByConfig = [NSMutableDictionary dictionary];
+                YTzoomSABRHeadersByConfig = [NSMutableDictionary dictionary];
             }
-            if (YTKACESABRBodiesByConfig.count >= 32) {
-                [YTKACESABRBodiesByConfig removeAllObjects];
-                [YTKACESABRHeadersByConfig removeAllObjects];
+            if (YTzoomSABRBodiesByConfig.count >= 32) {
+                [YTzoomSABRBodiesByConfig removeAllObjects];
+                [YTzoomSABRHeadersByConfig removeAllObjects];
             }
-            YTKACESABRBodiesByConfig[config] = [request.HTTPBody copy];
-            YTKACESABRHeadersByConfig[config] = [request.allHTTPHeaderFields copy];
+            YTzoomSABRBodiesByConfig[config] = [request.HTTPBody copy];
+            YTzoomSABRHeadersByConfig[config] = [request.allHTTPHeaderFields copy];
         }
     }
 }
 
-static BOOL YTKACESABRHasExactNativeBody(NSString *videoID, NSData *config) {
-    @synchronized (YTKACESABRDownloader.class) {
-        if (config.length != 0 && YTKACESABRBodiesByConfig[config].length != 0) {
+static BOOL YTzoomSABRHasExactNativeBody(NSString *videoID, NSData *config) {
+    @synchronized (YTzoomSABRDownloader.class) {
+        if (config.length != 0 && YTzoomSABRBodiesByConfig[config].length != 0) {
             return YES;
         }
-        if (videoID.length != 0 && YTKACESABRBodiesByVideo[videoID].length != 0) {
+        if (videoID.length != 0 && YTzoomSABRBodiesByVideo[videoID].length != 0) {
             return YES;
         }
         return NO;
     }
 }
 
-static NSData *YTKACESABRCurrentNativeBody(NSString *videoID, NSData *config) {
-    @synchronized (YTKACESABRDownloader.class) {
-        NSData *matched = config.length != 0 ? YTKACESABRBodiesByConfig[config] : nil;
+static NSData *YTzoomSABRCurrentNativeBody(NSString *videoID, NSData *config) {
+    @synchronized (YTzoomSABRDownloader.class) {
+        NSData *matched = config.length != 0 ? YTzoomSABRBodiesByConfig[config] : nil;
         if (matched.length != 0) return [matched copy];
-        NSData *byVideo = videoID.length != 0 ? YTKACESABRBodiesByVideo[videoID] : nil;
+        NSData *byVideo = videoID.length != 0 ? YTzoomSABRBodiesByVideo[videoID] : nil;
         if (byVideo.length != 0) return [byVideo copy];
-        return [YTKACESABRNativeBody copy];
+        return [YTzoomSABRNativeBody copy];
     }
 }
 
-static NSData *YTKACESABRDecodeTokenString(NSString *value) {
+static NSData *YTzoomSABRDecodeTokenString(NSString *value) {
     if (value.length == 0) return nil;
     NSString *decoded = [value stringByRemovingPercentEncoding] ?: value;
     NSMutableString *base64 = [decoded mutableCopy];
@@ -202,7 +202,7 @@ static NSData *YTKACESABRDecodeTokenString(NSString *value) {
     return [[NSData alloc] initWithBase64EncodedString:base64 options:0];
 }
 
-void YTKACESABRSetPoToken(id token) {
+void YTzoomSABRSetPoToken(id token) {
     NSData *data = nil;
     if ([token isKindOfClass:NSData.class]) {
         data = token;
@@ -211,35 +211,35 @@ void YTKACESABRSetPoToken(id token) {
             NSCharacterSet *invalid = [[NSCharacterSet characterSetWithCharactersInString:
                 @"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_=%"] invertedSet];
             if ([text rangeOfCharacterFromSet:invalid].location == NSNotFound) {
-                NSData *decoded = YTKACESABRDecodeTokenString(text);
+                NSData *decoded = YTzoomSABRDecodeTokenString(text);
                 if (decoded.length != 0) {
                     data = decoded;
                 }
             }
         }
     } else if ([token isKindOfClass:NSString.class]) {
-        data = YTKACESABRDecodeTokenString(token);
+        data = YTzoomSABRDecodeTokenString(token);
     } else if ([token respondsToSelector:NSSelectorFromString(@"poToken")]) {
         id value = ((id (*)(id, SEL))objc_msgSend)(token, NSSelectorFromString(@"poToken"));
-        if (value != token) YTKACESABRSetPoToken(value);
+        if (value != token) YTzoomSABRSetPoToken(value);
         return;
     }
     if (data.length == 0) return;
-    @synchronized (YTKACESABRDownloader.class) {
-        YTKACESABRPoToken = [data copy];
+    @synchronized (YTzoomSABRDownloader.class) {
+        YTzoomSABRPoToken = [data copy];
     }
 }
 
-NSUInteger YTKACESABRPoTokenLength(void) {
-    @synchronized (YTKACESABRDownloader.class) {
-        return YTKACESABRPoToken.length;
+NSUInteger YTzoomSABRPoTokenLength(void) {
+    @synchronized (YTzoomSABRDownloader.class) {
+        return YTzoomSABRPoToken.length;
     }
 }
 
-NSString *YTKACESABRPoTokenString(void) {
+NSString *YTzoomSABRPoTokenString(void) {
     NSData *token = nil;
-    @synchronized (YTKACESABRDownloader.class) {
-        token = [YTKACESABRPoToken copy];
+    @synchronized (YTzoomSABRDownloader.class) {
+        token = [YTzoomSABRPoToken copy];
     }
     if (token.length == 0) return nil;
     NSMutableString *text = [[token base64EncodedStringWithOptions:0] mutableCopy];
@@ -253,13 +253,13 @@ NSString *YTKACESABRPoTokenString(void) {
     return text;
 }
 
-static NSData *YTKACESABRCurrentPoToken(void) {
-    @synchronized (YTKACESABRDownloader.class) {
-        return [YTKACESABRPoToken copy];
+static NSData *YTzoomSABRCurrentPoToken(void) {
+    @synchronized (YTzoomSABRDownloader.class) {
+        return [YTzoomSABRPoToken copy];
     }
 }
 
-static id YTKACESABRObject(id receiver, NSArray<NSString *> *names) {
+static id YTzoomSABRObject(id receiver, NSArray<NSString *> *names) {
     for (NSString *name in names) {
         SEL selector = NSSelectorFromString(name);
         if ([receiver respondsToSelector:selector]) {
@@ -272,29 +272,29 @@ static id YTKACESABRObject(id receiver, NSArray<NSString *> *names) {
     return nil;
 }
 
-static id YTKACESABRFindPlayerData(id object,
+static id YTzoomSABRFindPlayerData(id object,
                                    NSHashTable *visited,
                                    NSUInteger depth) {
     if (object == nil || depth > 8 || [visited containsObject:object]) return nil;
     [visited addObject:object];
-    if (YTKACESABRObject(object, @[@"streamingData"]) != nil) return object;
+    if (YTzoomSABRObject(object, @[@"streamingData"]) != nil) return object;
     for (NSString *name in @[@"playerData", @"playerResponse", @"playbackData",
                               @"contentPlaybackData", @"contentPlayerResponse",
                               @"response", @"video", @"shortsPlayerData"]) {
-        id nested = YTKACESABRObject(object, @[name]);
-        id found = YTKACESABRFindPlayerData(nested, visited, depth + 1);
+        id nested = YTzoomSABRObject(object, @[name]);
+        id found = YTzoomSABRFindPlayerData(nested, visited, depth + 1);
         if (found != nil) return found;
     }
     return nil;
 }
 
-static id YTKACESABRPlayerData(id response) {
+static id YTzoomSABRPlayerData(id response) {
     NSHashTable *visited = [NSHashTable hashTableWithOptions:
         NSPointerFunctionsObjectPointerPersonality];
-    return YTKACESABRFindPlayerData(response, visited, 0) ?: response;
+    return YTzoomSABRFindPlayerData(response, visited, 0) ?: response;
 }
 
-static void YTKACEPBVarint(NSMutableData *data, uint64_t value) {
+static void YTzoomPBVarint(NSMutableData *data, uint64_t value) {
     while (value >= 0x80) {
         uint8_t byte = (uint8_t)(value | 0x80);
         [data appendBytes:&byte length:1];
@@ -304,34 +304,34 @@ static void YTKACEPBVarint(NSMutableData *data, uint64_t value) {
     [data appendBytes:&byte length:1];
 }
 
-static void YTKACEPBKey(NSMutableData *data, NSUInteger field, uint8_t wire) {
-    YTKACEPBVarint(data, ((uint64_t)field << 3) | wire);
+static void YTzoomPBKey(NSMutableData *data, NSUInteger field, uint8_t wire) {
+    YTzoomPBVarint(data, ((uint64_t)field << 3) | wire);
 }
 
-static void YTKACEPBInteger(NSMutableData *data, NSUInteger field, uint64_t value) {
-    YTKACEPBKey(data, field, 0);
-    YTKACEPBVarint(data, value);
+static void YTzoomPBInteger(NSMutableData *data, NSUInteger field, uint64_t value) {
+    YTzoomPBKey(data, field, 0);
+    YTzoomPBVarint(data, value);
 }
 
-static void YTKACEPBBytes(NSMutableData *data, NSUInteger field, NSData *value) {
+static void YTzoomPBBytes(NSMutableData *data, NSUInteger field, NSData *value) {
     if (value.length == 0) {
         return;
     }
-    YTKACEPBKey(data, field, 2);
-    YTKACEPBVarint(data, value.length);
+    YTzoomPBKey(data, field, 2);
+    YTzoomPBVarint(data, value.length);
     [data appendData:value];
 }
 
-static void YTKACEPBString(NSMutableData *data, NSUInteger field, NSString *value) {
-    YTKACEPBBytes(data, field, [value dataUsingEncoding:NSUTF8StringEncoding]);
+static void YTzoomPBString(NSMutableData *data, NSUInteger field, NSString *value) {
+    YTzoomPBBytes(data, field, [value dataUsingEncoding:NSUTF8StringEncoding]);
 }
 
-static void YTKACEPBFloat(NSMutableData *data, NSUInteger field, float value) {
-    YTKACEPBKey(data, field, 5);
+static void YTzoomPBFloat(NSMutableData *data, NSUInteger field, float value) {
+    YTzoomPBKey(data, field, 5);
     [data appendBytes:&value length:sizeof(value)];
 }
 
-static BOOL YTKACEPBReadVarint(NSData *data, NSUInteger *offset, uint64_t *value) {
+static BOOL YTzoomPBReadVarint(NSData *data, NSUInteger *offset, uint64_t *value) {
     const uint8_t *bytes = (const uint8_t *)data.bytes;
     uint64_t result = 0;
     NSUInteger shift = 0;
@@ -347,10 +347,10 @@ static BOOL YTKACEPBReadVarint(NSData *data, NSUInteger *offset, uint64_t *value
     return NO;
 }
 
-static BOOL YTKACEPBSkip(NSData *data, NSUInteger *offset, uint8_t wire) {
+static BOOL YTzoomPBSkip(NSData *data, NSUInteger *offset, uint8_t wire) {
     if (wire == 0) {
         uint64_t value = 0;
-        return YTKACEPBReadVarint(data, offset, &value);
+        return YTzoomPBReadVarint(data, offset, &value);
     }
     if (wire == 1) {
         if (*offset + 8 > data.length) return NO;
@@ -359,7 +359,7 @@ static BOOL YTKACEPBSkip(NSData *data, NSUInteger *offset, uint8_t wire) {
     }
     if (wire == 2) {
         uint64_t length = 0;
-        if (!YTKACEPBReadVarint(data, offset, &length) || *offset + length > data.length) {
+        if (!YTzoomPBReadVarint(data, offset, &length) || *offset + length > data.length) {
             return NO;
         }
         *offset += (NSUInteger)length;
@@ -373,32 +373,32 @@ static BOOL YTKACEPBSkip(NSData *data, NSUInteger *offset, uint8_t wire) {
     return NO;
 }
 
-static uint64_t YTKACEPBIntegerField(NSData *data, NSUInteger wanted, uint64_t fallback) {
+static uint64_t YTzoomPBIntegerField(NSData *data, NSUInteger wanted, uint64_t fallback) {
     NSUInteger offset = 0;
     while (offset < data.length) {
         uint64_t key = 0;
-        if (!YTKACEPBReadVarint(data, &offset, &key)) break;
+        if (!YTzoomPBReadVarint(data, &offset, &key)) break;
         NSUInteger field = (NSUInteger)(key >> 3);
         uint8_t wire = (uint8_t)(key & 7);
         if (field == wanted && wire == 0) {
             uint64_t value = 0;
-            return YTKACEPBReadVarint(data, &offset, &value) ? value : fallback;
+            return YTzoomPBReadVarint(data, &offset, &value) ? value : fallback;
         }
-        if (!YTKACEPBSkip(data, &offset, wire)) break;
+        if (!YTzoomPBSkip(data, &offset, wire)) break;
     }
     return fallback;
 }
 
-static NSData *YTKACEPBDataField(NSData *data, NSUInteger wanted) {
+static NSData *YTzoomPBDataField(NSData *data, NSUInteger wanted) {
     NSUInteger offset = 0;
     while (offset < data.length) {
         uint64_t key = 0;
-        if (!YTKACEPBReadVarint(data, &offset, &key)) break;
+        if (!YTzoomPBReadVarint(data, &offset, &key)) break;
         NSUInteger field = (NSUInteger)(key >> 3);
         uint8_t wire = (uint8_t)(key & 7);
         if (wire == 2) {
             uint64_t length = 0;
-            if (!YTKACEPBReadVarint(data, &offset, &length) || offset + length > data.length) {
+            if (!YTzoomPBReadVarint(data, &offset, &length) || offset + length > data.length) {
                 break;
             }
             NSData *value = [data subdataWithRange:NSMakeRange(offset, (NSUInteger)length)];
@@ -408,47 +408,47 @@ static NSData *YTKACEPBDataField(NSData *data, NSUInteger wanted) {
             offset += (NSUInteger)length;
             continue;
         }
-        if (!YTKACEPBSkip(data, &offset, wire)) break;
+        if (!YTzoomPBSkip(data, &offset, wire)) break;
     }
     return nil;
 }
 
-static BOOL YTKACESABRIsPlaybackBody(NSData *data) {
-    return YTKACEPBDataField(data, 1).length != 0 &&
-        YTKACEPBDataField(data, 5).length != 0 &&
-        YTKACEPBDataField(data, 19).length != 0;
+static BOOL YTzoomSABRIsPlaybackBody(NSData *data) {
+    return YTzoomPBDataField(data, 1).length != 0 &&
+        YTzoomPBDataField(data, 5).length != 0 &&
+        YTzoomPBDataField(data, 19).length != 0;
 }
 
-static NSString *YTKACEPBFieldSummary(NSData *data) {
+static NSString *YTzoomPBFieldSummary(NSData *data) {
     if (data.length == 0) return @"empty";
     NSMutableArray<NSString *> *fields = [NSMutableArray array];
     NSUInteger offset = 0;
     while (offset < data.length && fields.count < 40) {
         uint64_t key = 0;
-        if (!YTKACEPBReadVarint(data, &offset, &key)) break;
+        if (!YTzoomPBReadVarint(data, &offset, &key)) break;
         NSUInteger field = (NSUInteger)(key >> 3);
         uint8_t wire = (uint8_t)(key & 7);
         if (wire == 2) {
             uint64_t length = 0;
-            if (!YTKACEPBReadVarint(data, &offset, &length) || offset + length > data.length) break;
+            if (!YTzoomPBReadVarint(data, &offset, &length) || offset + length > data.length) break;
             [fields addObject:[NSString stringWithFormat:@"%lu:%llu",
                 (unsigned long)field, length]];
             offset += (NSUInteger)length;
         } else {
             [fields addObject:[NSString stringWithFormat:@"%lu/w%u",
                 (unsigned long)field, wire]];
-            if (!YTKACEPBSkip(data, &offset, wire)) break;
+            if (!YTzoomPBSkip(data, &offset, wire)) break;
         }
     }
     return fields.count != 0 ? [fields componentsJoinedByString:@","] : @"unparsed";
 }
 
-static NSString *YTKACEPBStringField(NSData *data, NSUInteger field) {
-    NSData *value = YTKACEPBDataField(data, field);
+static NSString *YTzoomPBStringField(NSData *data, NSUInteger field) {
+    NSData *value = YTzoomPBDataField(data, field);
     return value != nil ? [[NSString alloc] initWithData:value encoding:NSUTF8StringEncoding] : nil;
 }
 
-static NSString *YTKACESABRHex(NSData *data, NSUInteger limit) {
+static NSString *YTzoomSABRHex(NSData *data, NSUInteger limit) {
     if (data.length == 0) return @"";
     const uint8_t *bytes = (const uint8_t *)data.bytes;
     NSUInteger length = MIN(data.length, limit);
@@ -459,7 +459,7 @@ static NSString *YTKACESABRHex(NSData *data, NSUInteger limit) {
     return result;
 }
 
-static BOOL YTKACEUMPValue(NSData *data, NSUInteger *offset, uint32_t *result) {
+static BOOL YTzoomUMPValue(NSData *data, NSUInteger *offset, uint32_t *result) {
     const uint8_t *bytes = (const uint8_t *)data.bytes;
     if (*offset >= data.length) return NO;
     uint8_t first = bytes[*offset];
@@ -483,41 +483,41 @@ static BOOL YTKACEUMPValue(NSData *data, NSUInteger *offset, uint32_t *result) {
     return YES;
 }
 
-static NSData *YTKACESABRFormatID(YTKACEStreamOption *option) {
+static NSData *YTzoomSABRFormatID(YTzoomStreamOption *option) {
     NSMutableData *data = [NSMutableData data];
-    YTKACEPBInteger(data, 1, (uint64_t)option.itag);
+    YTzoomPBInteger(data, 1, (uint64_t)option.itag);
     if (option.lastModified > 0) {
-        YTKACEPBInteger(data, 2, (uint64_t)option.lastModified);
+        YTzoomPBInteger(data, 2, (uint64_t)option.lastModified);
     }
     if (option.xtags.length != 0) {
-        YTKACEPBString(data, 3, option.xtags);
+        YTzoomPBString(data, 3, option.xtags);
     } else {
-        YTKACEPBKey(data, 3, 2);
-        YTKACEPBVarint(data, 0);
+        YTzoomPBKey(data, 3, 2);
+        YTzoomPBVarint(data, 0);
     }
     return data;
 }
 
-static NSMutableDictionary<NSString *, NSDictionary *> *YTKACESABRStandalone;
+static NSMutableDictionary<NSString *, NSDictionary *> *YTzoomSABRStandalone;
 
-void YTKACESABRSetStandaloneClient(NSString *identifier, NSData *clientInfo,
+void YTzoomSABRSetStandaloneClient(NSString *identifier, NSData *clientInfo,
                                    NSDictionary<NSString *, NSString *> *headers) {
     if (identifier.length == 0) return;
-    @synchronized (NSStringFromClass(YTKACESABRDownloader.class)) {
-        if (YTKACESABRStandalone == nil) YTKACESABRStandalone = [NSMutableDictionary dictionary];
-        if (clientInfo == nil) [YTKACESABRStandalone removeObjectForKey:identifier];
-        else YTKACESABRStandalone[identifier] = @{@"client": clientInfo, @"headers": headers ?: @{}};
+    @synchronized (NSStringFromClass(YTzoomSABRDownloader.class)) {
+        if (YTzoomSABRStandalone == nil) YTzoomSABRStandalone = [NSMutableDictionary dictionary];
+        if (clientInfo == nil) [YTzoomSABRStandalone removeObjectForKey:identifier];
+        else YTzoomSABRStandalone[identifier] = @{@"client": clientInfo, @"headers": headers ?: @{}};
     }
 }
 
-static NSDictionary *YTKACESABRStandaloneFor(NSString *identifier) {
+static NSDictionary *YTzoomSABRStandaloneFor(NSString *identifier) {
     if (identifier.length == 0) return nil;
-    @synchronized (NSStringFromClass(YTKACESABRDownloader.class)) {
-        return YTKACESABRStandalone[identifier];
+    @synchronized (NSStringFromClass(YTzoomSABRDownloader.class)) {
+        return YTzoomSABRStandalone[identifier];
     }
 }
 
-static NSData *YTKACESABRClientInfo(void) {
+static NSData *YTzoomSABRClientInfo(void) {
     NSMutableData *data = [NSMutableData data];
     UIDevice *device = UIDevice.currentDevice;
     NSDictionary *info = NSBundle.mainBundle.infoDictionary;
@@ -525,23 +525,23 @@ static NSData *YTKACESABRClientInfo(void) {
     NSString *language = NSLocale.preferredLanguages.firstObject ?: @"en-US";
     NSString *region = NSLocale.currentLocale.countryCode ?: @"US";
     CGSize points = UIScreen.mainScreen.bounds.size;
-    YTKACEPBString(data, 12, @"Apple");
-    YTKACEPBString(data, 13, device.model ?: @"iOS");
-    YTKACEPBInteger(data, 16, 5);
-    YTKACEPBString(data, 17, version);
-    YTKACEPBString(data, 18, @"IOS");
-    YTKACEPBString(data, 19, device.systemVersion ?: @"16.0");
-    YTKACEPBString(data, 21, language);
-    YTKACEPBString(data, 22, region);
-    YTKACEPBInteger(data, 37, (uint64_t)llround(points.width));
-    YTKACEPBInteger(data, 38, (uint64_t)llround(points.height));
-    YTKACEPBInteger(data, 41, (uint64_t)llround(UIScreen.mainScreen.scale));
-    YTKACEPBInteger(data, 46, device.userInterfaceIdiom == UIUserInterfaceIdiomPad ? 2 : 1);
-    YTKACEPBString(data, 80, NSTimeZone.localTimeZone.name ?: @"UTC");
+    YTzoomPBString(data, 12, @"Apple");
+    YTzoomPBString(data, 13, device.model ?: @"iOS");
+    YTzoomPBInteger(data, 16, 5);
+    YTzoomPBString(data, 17, version);
+    YTzoomPBString(data, 18, @"IOS");
+    YTzoomPBString(data, 19, device.systemVersion ?: @"16.0");
+    YTzoomPBString(data, 21, language);
+    YTzoomPBString(data, 22, region);
+    YTzoomPBInteger(data, 37, (uint64_t)llround(points.width));
+    YTzoomPBInteger(data, 38, (uint64_t)llround(points.height));
+    YTzoomPBInteger(data, 41, (uint64_t)llround(UIScreen.mainScreen.scale));
+    YTzoomPBInteger(data, 46, device.userInterfaceIdiom == UIUserInterfaceIdiomPad ? 2 : 1);
+    YTzoomPBString(data, 80, NSTimeZone.localTimeZone.name ?: @"UTC");
     return data;
 }
 
-@interface YTKACESABRHeader : NSObject
+@interface YTzoomSABRHeader : NSObject
 @property(nonatomic, assign) NSInteger headerID;
 @property(nonatomic, assign) NSInteger itag;
 @property(nonatomic, copy) NSString *xtags;
@@ -553,11 +553,11 @@ static NSData *YTKACESABRClientInfo(void) {
 @property(nonatomic, strong) NSMutableData *data;
 @end
 
-@implementation YTKACESABRHeader
+@implementation YTzoomSABRHeader
 @end
 
-@interface YTKACESABRTrack : NSObject
-@property(nonatomic, strong) YTKACEStreamOption *option;
+@interface YTzoomSABRTrack : NSObject
+@property(nonatomic, strong) YTzoomStreamOption *option;
 @property(nonatomic, strong) NSURL *URL;
 @property(nonatomic, strong) NSFileHandle *handle;
 @property(nonatomic, strong) NSMutableSet<NSString *> *segments;
@@ -575,25 +575,25 @@ static NSData *YTKACESABRClientInfo(void) {
 @property(nonatomic, assign) NSInteger roundEndSequence;
 @end
 
-@implementation YTKACESABRTrack
+@implementation YTzoomSABRTrack
 @end
 
-@interface YTKACESABRSession : NSObject <NSURLSessionDataDelegate>
+@interface YTzoomSABRSession : NSObject <NSURLSessionDataDelegate>
 @property(nonatomic, strong) id playerResponse;
 @property(nonatomic, strong) id streamingData;
 @property(nonatomic, strong) NSData *ustreamerConfig;
 @property(nonatomic, copy) NSString *serverURL;
-@property(nonatomic, strong) YTKACESABRTrack *video;
-@property(nonatomic, strong) YTKACESABRTrack *audio;
+@property(nonatomic, strong) YTzoomSABRTrack *video;
+@property(nonatomic, strong) YTzoomSABRTrack *audio;
 @property(nonatomic, strong) NSURLSession *session;
-@property(nonatomic, strong) NSMutableDictionary<NSNumber *, YTKACESABRHeader *> *headers;
+@property(nonatomic, strong) NSMutableDictionary<NSNumber *, YTzoomSABRHeader *> *headers;
 @property(nonatomic, strong) NSMutableDictionary<NSNumber *, NSData *> *contexts;
 @property(nonatomic, strong, nullable) NSData *playbackCookie;
 @property(nonatomic, assign) NSInteger requestNumber;
 @property(nonatomic, assign) NSInteger stalledRequests;
 @property(nonatomic, assign) NSInteger backoffMilliseconds;
-@property(nonatomic, copy, nullable) YTKACESABRProgress progress;
-@property(nonatomic, copy) YTKACESABRCompletion completion;
+@property(nonatomic, copy, nullable) YTzoomSABRProgress progress;
+@property(nonatomic, copy) YTzoomSABRCompletion completion;
 @property(nonatomic, copy) NSString *identifier;
 @property(nonatomic, copy) NSString *videoID;
 @property(nonatomic, assign) NSInteger retryCount;
@@ -640,14 +640,14 @@ static NSData *YTKACESABRClientInfo(void) {
 - (BOOL)switchToSequentialFallback:(NSString *)reason;
 @end
 
-@implementation YTKACESABRSession
+@implementation YTzoomSABRSession
 
 - (NSError *)error:(NSString *)message code:(NSInteger)code {
-    return [NSError errorWithDomain:YTKACESABRErrorDomain code:code
+    return [NSError errorWithDomain:YTzoomSABRErrorDomain code:code
         userInfo:@{NSLocalizedDescriptionKey: message ?: @"SABR failed"}];
 }
 
-- (YTKACESABRTrack *)trackForItag:(NSInteger)itag xtags:(NSString *)xtags {
+- (YTzoomSABRTrack *)trackForItag:(NSInteger)itag xtags:(NSString *)xtags {
     if (self.video.option.itag == itag &&
         (xtags.length == 0 || self.video.option.xtags.length == 0 ||
          [self.video.option.xtags isEqualToString:xtags])) {
@@ -661,11 +661,11 @@ static NSData *YTKACESABRClientInfo(void) {
     return nil;
 }
 
-- (YTKACESABRTrack *)makeTrack:(YTKACEStreamOption *)option
+- (YTzoomSABRTrack *)makeTrack:(YTzoomStreamOption *)option
                            name:(NSString *)name
                       directory:(NSURL *)directory
                          error:(NSError **)error {
-    YTKACESABRTrack *track = [YTKACESABRTrack new];
+    YTzoomSABRTrack *track = [YTzoomSABRTrack new];
     track.option = option;
     track.segments = [NSMutableSet set];
     track.endSequence = NSIntegerMax;
@@ -681,14 +681,14 @@ static NSData *YTKACESABRClientInfo(void) {
 }
 
 - (BOOL)applyPlayerResponse:(id)response error:(NSError **)error {
-    id playerData = YTKACESABRPlayerData(response);
-    id streamingData = YTKACESABRObject(playerData, @[@"streamingData"]);
-    id playerConfig = YTKACESABRObject(playerData, @[@"playerConfig"]);
-    id common = YTKACESABRObject(playerConfig, @[@"mediaCommonConfig"]);
-    id requestConfig = YTKACESABRObject(common, @[@"mediaUstreamerRequestConfig"]);
-    NSData *ustreamerConfig = YTKACESABRObject(requestConfig,
+    id playerData = YTzoomSABRPlayerData(response);
+    id streamingData = YTzoomSABRObject(playerData, @[@"streamingData"]);
+    id playerConfig = YTzoomSABRObject(playerData, @[@"playerConfig"]);
+    id common = YTzoomSABRObject(playerConfig, @[@"mediaCommonConfig"]);
+    id requestConfig = YTzoomSABRObject(common, @[@"mediaUstreamerRequestConfig"]);
+    NSData *ustreamerConfig = YTzoomSABRObject(requestConfig,
         @[@"videoPlaybackUstreamerConfig"]);
-    NSString *serverURL = YTKACESABRObject(streamingData, @[@"serverAbrStreamingURL"]);
+    NSString *serverURL = YTzoomSABRObject(streamingData, @[@"serverAbrStreamingURL"]);
     if (![ustreamerConfig isKindOfClass:NSData.class] || ustreamerConfig.length == 0 ||
         ![serverURL isKindOfClass:NSString.class] || serverURL.length == 0) {
         if (error != NULL) *error = [self error:@"YouTube did not provide SABR session data." code:1];
@@ -698,12 +698,12 @@ static NSData *YTKACESABRClientInfo(void) {
     self.streamingData = streamingData;
     self.ustreamerConfig = ustreamerConfig;
     self.serverURL = serverURL;
-    NSArray<YTKACEStreamOption *> *options =
-        [YTKACEStreamResolver optionsFromPlayerResponse:playerData];
-    for (YTKACEStreamOption *option in options) {
-        YTKACESABRTrack *track = [self trackForItag:option.itag xtags:option.xtags];
+    NSArray<YTzoomStreamOption *> *options =
+        [YTzoomStreamResolver optionsFromPlayerResponse:playerData];
+    for (YTzoomStreamOption *option in options) {
+        YTzoomSABRTrack *track = [self trackForItag:option.itag xtags:option.xtags];
         if (track == nil) continue;
-        YTKACEDownloadLog(self.identifier,
+        YTzoomDownloadLog(self.identifier,
             @"refreshed itag=%ld lmt=%ld->%ld xtags=%@->%@",
             (long)option.itag, (long)track.option.lastModified,
             (long)option.lastModified, track.option.xtags, option.xtags);
@@ -714,7 +714,7 @@ static NSData *YTKACESABRClientInfo(void) {
     return YES;
 }
 
-NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
+NSUInteger YTzoomPurgeDownloadScratch(BOOL includeActive) {
     NSFileManager *manager = NSFileManager.defaultManager;
     NSURL *root = [NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES];
     NSArray<NSURL *> *entries = [manager contentsOfDirectoryAtURL:root
@@ -726,8 +726,8 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     NSDate *cutoff = [NSDate dateWithTimeIntervalSinceNow:-600.0];
     for (NSURL *entry in entries) {
         NSString *name = entry.lastPathComponent;
-        BOOL scratch = [name hasPrefix:@"YTKACE-"];
-        BOOL dump = [name hasPrefix:@"ytkace-"] && [name hasSuffix:@".pb"];
+        BOOL scratch = [name hasPrefix:@"YTzoom-"];
+        BOOL dump = [name hasPrefix:@"ytzoom-"] && [name hasSuffix:@".pb"];
         if (!scratch && !dump) continue;
         if (!includeActive) {
             NSDate *modified = nil;
@@ -754,7 +754,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         }
     }
     if (freed != 0) {
-        YTKACEDownloadLog(@"cache", @"purged scratch bytes=%lu",
+        YTzoomDownloadLog(@"cache", @"purged scratch bytes=%lu",
             (unsigned long)freed);
     }
     return freed;
@@ -764,7 +764,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     if (![self applyPlayerResponse:self.playerResponse error:error]) return NO;
     NSURL *directory = [NSURL fileURLWithPath:NSTemporaryDirectory() isDirectory:YES];
     directory = [directory URLByAppendingPathComponent:
-        [NSString stringWithFormat:@"YTKACE-%@", NSUUID.UUID.UUIDString]
+        [NSString stringWithFormat:@"YTzoom-%@", NSUUID.UUID.UUIDString]
         isDirectory:YES];
     if (![NSFileManager.defaultManager createDirectoryAtURL:directory
         withIntermediateDirectories:YES attributes:nil error:error]) {
@@ -776,25 +776,25 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     return self.audio.handle != nil;
 }
 
-- (NSData *)bufferedRangeForTrack:(YTKACESABRTrack *)track {
+- (NSData *)bufferedRangeForTrack:(YTzoomSABRTrack *)track {
     if (!track.hasRound || track.roundDuration <= 0) {
         return nil;
     }
     NSMutableData *timeRange = [NSMutableData data];
-    YTKACEPBInteger(timeRange, 1, (uint64_t)MAX(track.roundStart, 0));
-    YTKACEPBInteger(timeRange, 2, (uint64_t)track.roundDuration);
-    YTKACEPBInteger(timeRange, 3, 1000);
+    YTzoomPBInteger(timeRange, 1, (uint64_t)MAX(track.roundStart, 0));
+    YTzoomPBInteger(timeRange, 2, (uint64_t)track.roundDuration);
+    YTzoomPBInteger(timeRange, 3, 1000);
     NSMutableData *range = [NSMutableData data];
-    YTKACEPBBytes(range, 1, YTKACESABRFormatID(track.option));
-    YTKACEPBInteger(range, 2, (uint64_t)MAX(track.roundStart, 0));
-    YTKACEPBInteger(range, 3, (uint64_t)track.roundDuration);
-    YTKACEPBInteger(range, 4, (uint64_t)MAX(track.roundStartSequence, 0));
-    YTKACEPBInteger(range, 5, (uint64_t)MAX(track.roundEndSequence, 0));
-    YTKACEPBBytes(range, 6, timeRange);
+    YTzoomPBBytes(range, 1, YTzoomSABRFormatID(track.option));
+    YTzoomPBInteger(range, 2, (uint64_t)MAX(track.roundStart, 0));
+    YTzoomPBInteger(range, 3, (uint64_t)track.roundDuration);
+    YTzoomPBInteger(range, 4, (uint64_t)MAX(track.roundStartSequence, 0));
+    YTzoomPBInteger(range, 5, (uint64_t)MAX(track.roundEndSequence, 0));
+    YTzoomPBBytes(range, 6, timeRange);
     return range;
 }
 
-- (void)clearRound:(YTKACESABRTrack *)track {
+- (void)clearRound:(YTzoomSABRTrack *)track {
     track.hasRound = NO;
     track.roundStart = 0;
     track.roundDuration = 0;
@@ -812,83 +812,83 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     int64_t playerTime = (self.mediaPhase == 2 || self.combinedMode)
         ? self.video.downloadedDuration : self.audio.downloadedDuration;
     NSInteger resolution = MAX(self.video.option.height, 360);
-    NSDictionary *standalone = YTKACESABRStandaloneFor(self.identifier);
+    NSDictionary *standalone = YTzoomSABRStandaloneFor(self.identifier);
     NSData *nativeBody = standalone ? nil
-        : YTKACESABRCurrentNativeBody(self.videoID, self.ustreamerConfig);
-    NSData *nativeState = !standalone && YTKACESABRHasExactNativeBody(self.videoID,
+        : YTzoomSABRCurrentNativeBody(self.videoID, self.ustreamerConfig);
+    NSData *nativeState = !standalone && YTzoomSABRHasExactNativeBody(self.videoID,
                                                        self.ustreamerConfig)
-        ? YTKACEPBDataField(nativeBody, 1) : nil;
+        ? YTzoomPBDataField(nativeBody, 1) : nil;
     NSMutableData *state = [NSMutableData data];
     if (nativeState.length != 0) {
         [state appendData:nativeState];
-        YTKACEPBInteger(state, 16, (uint64_t)resolution);
-        YTKACEPBInteger(state, 28, (uint64_t)MAX(playerTime, 0));
-        YTKACEPBInteger(state, 40, (uint64_t)trackMode);
+        YTzoomPBInteger(state, 16, (uint64_t)resolution);
+        YTzoomPBInteger(state, 28, (uint64_t)MAX(playerTime, 0));
+        YTzoomPBInteger(state, 40, (uint64_t)trackMode);
     } else {
-        YTKACEPBInteger(state, 16, (uint64_t)resolution);
-        YTKACEPBInteger(state, 21, (uint64_t)resolution);
-        YTKACEPBInteger(state, 22, 0);
-        YTKACEPBInteger(state, 28, (uint64_t)MAX(playerTime, 0));
-        YTKACEPBInteger(state, 34, 1);
-        YTKACEPBFloat(state, 35, 1.0f);
-        YTKACEPBInteger(state, 40, (uint64_t)trackMode);
-        YTKACEPBInteger(state, 46, 0);
+        YTzoomPBInteger(state, 16, (uint64_t)resolution);
+        YTzoomPBInteger(state, 21, (uint64_t)resolution);
+        YTzoomPBInteger(state, 22, 0);
+        YTzoomPBInteger(state, 28, (uint64_t)MAX(playerTime, 0));
+        YTzoomPBInteger(state, 34, 1);
+        YTzoomPBFloat(state, 35, 1.0f);
+        YTzoomPBInteger(state, 40, (uint64_t)trackMode);
+        YTzoomPBInteger(state, 46, 0);
     }
     if (self.audio.option.audioTrackID.length != 0) {
-        YTKACEPBString(state, 69, self.audio.option.audioTrackID);
+        YTzoomPBString(state, 69, self.audio.option.audioTrackID);
     }
 
-    NSData *nativeContext = YTKACEPBDataField(nativeBody, 19);
+    NSData *nativeContext = YTzoomPBDataField(nativeBody, 19);
     NSMutableData *context = [NSMutableData data];
     if (nativeContext.length != 0) {
         [context appendData:nativeContext];
     } else {
-        YTKACEPBBytes(context, 1, standalone ? standalone[@"client"] : YTKACESABRClientInfo());
-        NSData *poToken = standalone ? nil : YTKACESABRCurrentPoToken();
+        YTzoomPBBytes(context, 1, standalone ? standalone[@"client"] : YTzoomSABRClientInfo());
+        NSData *poToken = standalone ? nil : YTzoomSABRCurrentPoToken();
         if (poToken.length != 0) {
-            YTKACEPBBytes(context, 2, poToken);
+            YTzoomPBBytes(context, 2, poToken);
         }
     }
     if (self.playbackCookie.length != 0) {
-        YTKACEPBBytes(context, 3, self.playbackCookie);
+        YTzoomPBBytes(context, 3, self.playbackCookie);
     }
     for (NSNumber *type in self.contexts) {
         NSMutableData *item = [NSMutableData data];
-        YTKACEPBInteger(item, 1, type.unsignedIntegerValue);
-        YTKACEPBBytes(item, 2, self.contexts[type]);
-        YTKACEPBBytes(context, 5, item);
+        YTzoomPBInteger(item, 1, type.unsignedIntegerValue);
+        YTzoomPBBytes(item, 2, self.contexts[type]);
+        YTzoomPBBytes(context, 5, item);
     }
 
     NSMutableData *request = [NSMutableData data];
-    YTKACEPBBytes(request, 1, state);
-    NSData *videoID = YTKACESABRFormatID(self.video.option);
-    NSData *audioID = YTKACESABRFormatID(self.audio.option);
+    YTzoomPBBytes(request, 1, state);
+    NSData *videoID = YTzoomSABRFormatID(self.video.option);
+    NSData *audioID = YTzoomSABRFormatID(self.audio.option);
     if (formatsInitialized) {
         if (self.combinedMode) {
-            YTKACEPBBytes(request, 2, videoID);
-            YTKACEPBBytes(request, 2, audioID);
+            YTzoomPBBytes(request, 2, videoID);
+            YTzoomPBBytes(request, 2, audioID);
         } else if (self.mediaPhase == 1) {
-            YTKACEPBBytes(request, 2, audioID);
+            YTzoomPBBytes(request, 2, audioID);
         } else {
-            YTKACEPBBytes(request, 2, videoID);
+            YTzoomPBBytes(request, 2, videoID);
         }
     }
     NSData *videoRange = [self bufferedRangeForTrack:self.video];
     NSData *audioRange = [self bufferedRangeForTrack:self.audio];
-    if (videoRange != nil) YTKACEPBBytes(request, 3, videoRange);
-    if (audioRange != nil) YTKACEPBBytes(request, 3, audioRange);
-    YTKACEPBBytes(request, 5, self.ustreamerConfig);
-    YTKACEPBBytes(request, 16, audioID);
-    YTKACEPBBytes(request, 17, videoID);
-    YTKACEPBBytes(request, 19, context);
+    if (videoRange != nil) YTzoomPBBytes(request, 3, videoRange);
+    if (audioRange != nil) YTzoomPBBytes(request, 3, audioRange);
+    YTzoomPBBytes(request, 5, self.ustreamerConfig);
+    YTzoomPBBytes(request, 16, audioID);
+    YTzoomPBBytes(request, 17, videoID);
+    YTzoomPBBytes(request, 19, context);
     [self clearRound:self.video];
     [self clearRound:self.audio];
     if (self.requestNumber == 0) {
-        NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"ytkace-outgoing.pb"];
+        NSString *path = [NSTemporaryDirectory() stringByAppendingPathComponent:@"ytzoom-outgoing.pb"];
         [request writeToFile:path atomically:YES];
-        YTKACEDownloadLog(self.identifier, @"request fields native=%lu outgoing=%lu summary=%@ dump=%@",
+        YTzoomDownloadLog(self.identifier, @"request fields native=%lu outgoing=%lu summary=%@ dump=%@",
             (unsigned long)nativeBody.length, (unsigned long)request.length,
-            YTKACEPBFieldSummary(request), path);
+            YTzoomPBFieldSummary(request), path);
     }
     return request;
 }
@@ -909,8 +909,8 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
 
 - (void)start {
     if (self.finished) return;
-    if (!self.triedTVClient && YTKACETVDownloadsEnabled()) {
-        __weak YTKACESABRSession *weakSelf = self;
+    if (!self.triedTVClient && YTzoomTVDownloadsEnabled()) {
+        __weak YTzoomSABRSession *weakSelf = self;
         [self switchToTVClient:@"preference" then:^(__unused BOOL switched) {
             [weakSelf start];
         }];
@@ -924,9 +924,9 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         }
     }
     if (!self.usingTVClient &&
-        YTKACESABRCurrentNativeBody(self.videoID, self.ustreamerConfig).length == 0) {
+        YTzoomSABRCurrentNativeBody(self.videoID, self.ustreamerConfig).length == 0) {
         if (self.preparationAttempts == 0) {
-            YTKACEDownloadLog(self.identifier, @"waiting native video=%@", self.videoID);
+            YTzoomDownloadLog(self.identifier, @"waiting native video=%@", self.videoID);
         }
         NSTimeInterval now = NSDate.date.timeIntervalSinceReferenceDate;
         if (!self.preparationInFlight &&
@@ -934,16 +934,16 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
              now - self.lastPreparationRequest >= 2.0)) {
             self.preparationInFlight = YES;
             self.lastPreparationRequest = now;
-            __weak YTKACESABRSession *weakSelf = self;
-            YTKACEPreparePlayer(self.videoID, ^(id playerResponse, NSError *prepareError) {
-                YTKACESABRSession *strongSelf = weakSelf;
+            __weak YTzoomSABRSession *weakSelf = self;
+            YTzoomPreparePlayer(self.videoID, ^(id playerResponse, NSError *prepareError) {
+                YTzoomSABRSession *strongSelf = weakSelf;
                 if (strongSelf == nil || strongSelf.finished) return;
                 strongSelf.preparationInFlight = NO;
                 if (playerResponse != nil) {
                     NSError *applyError = nil;
                     [strongSelf applyPlayerResponse:playerResponse error:&applyError];
                 }
-                YTKACEDownloadLog(strongSelf.identifier,
+                YTzoomDownloadLog(strongSelf.identifier,
                     @"prepare result=%@ error=%@",
                     playerResponse != nil ? @"response" : @"none",
                     prepareError.localizedDescription ?: @"none");
@@ -961,7 +961,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
             dispatch_get_main_queue(), ^{ [self start]; });
         return;
     }
-    YTKACEDownloadLog(self.identifier, @"native ready video=%@ wait=%ld",
+    YTzoomDownloadLog(self.identifier, @"native ready video=%@ wait=%ld",
         self.videoID, (long)self.preparationAttempts);
     NSError *error = nil;
     if (![self prepare:&error]) {
@@ -985,19 +985,19 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     self.session = [NSURLSession sessionWithConfiguration:configuration
         delegate:self delegateQueue:queue];
     NSString *serverHost = [NSURL URLWithString:self.serverURL].host ?: @"unknown";
-    YTKACEDownloadLog(self.identifier,
+    YTzoomDownloadLog(self.identifier,
         @"SABR start video=%ld audio=%ld server=%@ mode=%@ connections=%ld native=%d",
         (long)self.video.option.itag, (long)self.audio.option.itag, serverHost,
         self.combinedMode ? @"combined" : @"sequential", 4L,
-        YTKACEHasNativeOnesieSession(self.videoID));
-    YTKACEDownloadLog(self.identifier,
+        YTzoomHasNativeOnesieSession(self.videoID));
+    YTzoomDownloadLog(self.identifier,
         @"formats video=%ld lmt=%ld xtags=%@ quality=%@ mime=%@ audio=%ld lmt=%ld xtags=%@",
         (long)self.video.option.itag, (long)self.video.option.lastModified,
         self.video.option.xtags, self.video.option.qualityLabel, self.video.option.mimeType,
         (long)self.audio.option.itag, (long)self.audio.option.lastModified,
         self.audio.option.xtags);
-    YTKACEDownloadLog(self.identifier, @"PoToken bytes=%lu",
-        (unsigned long)YTKACESABRCurrentPoToken().length);
+    YTzoomDownloadLog(self.identifier, @"PoToken bytes=%lu",
+        (unsigned long)YTzoomSABRCurrentPoToken().length);
     [self sendRequest];
 }
 
@@ -1028,10 +1028,10 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         requestNumber:wireRequestNumber];
     request.HTTPMethod = @"POST";
     request.HTTPBody = [self requestBody];
-    NSDictionary *standalone = YTKACESABRStandaloneFor(self.identifier);
+    NSDictionary *standalone = YTzoomSABRStandaloneFor(self.identifier);
     NSDictionary<NSString *, NSString *> *nativeHeaders = standalone
         ? standalone[@"headers"]
-        : YTKACESABRCurrentNativeHeaders(self.videoID, self.ustreamerConfig);
+        : YTzoomSABRCurrentNativeHeaders(self.videoID, self.ustreamerConfig);
     for (NSString *key in nativeHeaders) {
         NSString *lower = key.lowercaseString;
         if ([lower isEqualToString:@"host"] ||
@@ -1055,7 +1055,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     self.activeNetworkBytes = 0;
     self.activeResponseData = [NSMutableData data];
     self.activeResponse = nil;
-    YTKACEDownloadLog(self.identifier,
+    YTzoomDownloadLog(self.identifier,
         @"request logical=%ld wire=%ld source=%@ url=%@ body=%lu",
         (long)logicalRequestNumber, (long)wireRequestNumber,
         standalone ? @"standalone" : (nativeHeaders.count != 0 ? @"native-session" : @"raw"), request.URL.host,
@@ -1073,9 +1073,9 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     if (self.nativeRefreshInFlight) return;
     if (self.usingTVClient) {
         self.nativeRefreshInFlight = YES;
-        __weak YTKACESABRSession *weakSelf = self;
+        __weak YTzoomSABRSession *weakSelf = self;
         [self refreshTVClient:reason then:^(BOOL refreshed) {
-            YTKACESABRSession *strongSelf = weakSelf;
+            YTzoomSABRSession *strongSelf = weakSelf;
             if (strongSelf == nil) return;
             strongSelf.nativeRefreshInFlight = NO;
             if (refreshed) [strongSelf sendRequest];
@@ -1091,11 +1091,11 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     }
     self.nativeRefreshInFlight = YES;
     self.nativeRefreshAttempts += 1;
-    YTKACEDownloadLog(self.identifier, @"native refresh attempt=%ld reason=%@",
+    YTzoomDownloadLog(self.identifier, @"native refresh attempt=%ld reason=%@",
         (long)self.nativeRefreshAttempts, reason ?: @"authorization");
-    __weak YTKACESABRSession *weakSelf = self;
-    YTKACEPreparePlayer(self.videoID, ^(id playerResponse, NSError *error) {
-        YTKACESABRSession *strongSelf = weakSelf;
+    __weak YTzoomSABRSession *weakSelf = self;
+    YTzoomPreparePlayer(self.videoID, ^(id playerResponse, NSError *error) {
+        YTzoomSABRSession *strongSelf = weakSelf;
         if (strongSelf == nil || strongSelf.finished) return;
         strongSelf.nativeRefreshInFlight = NO;
         NSError *applyError = nil;
@@ -1122,7 +1122,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         return;
     }
     self.triedTVClient = YES;
-    YTKACEDownloadLog(self.identifier, @"switching to tv client reason=%@", reason);
+    YTzoomDownloadLog(self.identifier, @"switching to tv client reason=%@", reason);
     [self refreshTVClient:reason then:next];
 }
 
@@ -1133,31 +1133,31 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     }
     if (self.usingTVClient) {
         if (self.tvRefreshCount >= 3) {
-            YTKACEDownloadLog(self.identifier, @"tv client refresh exhausted reason=%@", reason);
+            YTzoomDownloadLog(self.identifier, @"tv client refresh exhausted reason=%@", reason);
             next(NO);
             return;
         }
         self.tvRefreshCount += 1;
-        YTKACEDownloadLog(self.identifier, @"tv client refresh attempt=%ld reason=%@",
+        YTzoomDownloadLog(self.identifier, @"tv client refresh attempt=%ld reason=%@",
             (long)self.tvRefreshCount, reason);
     }
-    __weak YTKACESABRSession *weakSelf = self;
-    YTKACETVFetchPlayerResponse(self.videoID, ^(id response, NSString *visitor, NSError *error) {
+    __weak YTzoomSABRSession *weakSelf = self;
+    YTzoomTVFetchPlayerResponse(self.videoID, ^(id response, NSString *visitor, NSError *error) {
         dispatch_async(dispatch_get_main_queue(), ^{
-            YTKACESABRSession *strongSelf = weakSelf;
+            YTzoomSABRSession *strongSelf = weakSelf;
             if (strongSelf == nil || strongSelf.finished) return;
             NSError *applyError = nil;
             if (response == nil) {
-                YTKACEDownloadLog(strongSelf.identifier, @"tv client unavailable error=%@",
+                YTzoomDownloadLog(strongSelf.identifier, @"tv client unavailable error=%@",
                     error.localizedDescription ?: @"none");
                 next(NO);
                 return;
             }
-            YTKACESABRSetStandaloneClient(strongSelf.identifier, YTKACETVClientInfo(),
-                                          YTKACETVHeaders(visitor));
+            YTzoomSABRSetStandaloneClient(strongSelf.identifier, YTzoomTVClientInfo(),
+                                          YTzoomTVHeaders(visitor));
             if (![strongSelf applyPlayerResponse:response error:&applyError]) {
-                YTKACESABRSetStandaloneClient(strongSelf.identifier, nil, nil);
-                YTKACEDownloadLog(strongSelf.identifier, @"tv client apply failed error=%@",
+                YTzoomSABRSetStandaloneClient(strongSelf.identifier, nil, nil);
+                YTzoomDownloadLog(strongSelf.identifier, @"tv client apply failed error=%@",
                     applyError.localizedDescription ?: @"none");
                 next(NO);
                 return;
@@ -1169,7 +1169,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
             strongSelf.playbackCookie = nil;
             [strongSelf.contexts removeAllObjects];
             [strongSelf.headers removeAllObjects];
-            YTKACEDownloadLog(strongSelf.identifier, @"tv client active host=%@",
+            YTzoomDownloadLog(strongSelf.identifier, @"tv client active host=%@",
                 [NSURL URLWithString:strongSelf.serverURL].host);
             next(YES);
         });
@@ -1180,9 +1180,9 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     if (self.finished || self.authRecoveryInFlight) return;
     if (self.usingTVClient) {
         self.authRecoveryInFlight = YES;
-        __weak YTKACESABRSession *weakSelf = self;
+        __weak YTzoomSABRSession *weakSelf = self;
         [self refreshTVClient:error.localizedDescription then:^(BOOL refreshed) {
-            YTKACESABRSession *strongSelf = weakSelf;
+            YTzoomSABRSession *strongSelf = weakSelf;
             if (strongSelf == nil) return;
             strongSelf.authRecoveryInFlight = NO;
             if (refreshed) [strongSelf sendRequest];
@@ -1192,9 +1192,9 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     }
     if (!self.triedTVClient) {
         self.authRecoveryInFlight = YES;
-        __weak YTKACESABRSession *weakSelf = self;
+        __weak YTzoomSABRSession *weakSelf = self;
         [self switchToTVClient:error.localizedDescription then:^(BOOL switched) {
-            YTKACESABRSession *strongSelf = weakSelf;
+            YTzoomSABRSession *strongSelf = weakSelf;
             if (strongSelf == nil) return;
             strongSelf.authRecoveryInFlight = NO;
             if (switched) [strongSelf sendRequest];
@@ -1205,28 +1205,28 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     static const NSTimeInterval waits[] = {0.0, 20.0, 45.0};
     const NSInteger steps = (NSInteger)(sizeof(waits) / sizeof(waits[0]));
     if (self.authRecoveryStep >= steps) {
-        YTKACEDownloadLog(self.identifier, @"authorization recovery exhausted");
+        YTzoomDownloadLog(self.identifier, @"authorization recovery exhausted");
         [self fail:error];
         return;
     }
     const NSTimeInterval wait = waits[self.authRecoveryStep];
     self.authRecoveryStep += 1;
     self.authRecoveryInFlight = YES;
-    YTKACEDownloadLog(self.identifier, @"authorization recovery step=%ld wait=%.0f route=player",
+    YTzoomDownloadLog(self.identifier, @"authorization recovery step=%ld wait=%.0f route=player",
         (long)self.authRecoveryStep, wait);
-    __weak YTKACESABRSession *weakSelf = self;
+    __weak YTzoomSABRSession *weakSelf = self;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(wait * NSEC_PER_SEC)),
         dispatch_get_main_queue(), ^{
-        YTKACESABRSession *waiting = weakSelf;
+        YTzoomSABRSession *waiting = weakSelf;
         if (waiting == nil || waiting.finished) return;
-        YTKACEPreparePlayerWithRoute(waiting.videoID, YES, ^(id playerResponse, NSError *prepareError) {
-            YTKACESABRSession *strongSelf = weakSelf;
+        YTzoomPreparePlayerWithRoute(waiting.videoID, YES, ^(id playerResponse, NSError *prepareError) {
+            YTzoomSABRSession *strongSelf = weakSelf;
             if (strongSelf == nil || strongSelf.finished) return;
             strongSelf.authRecoveryInFlight = NO;
             NSError *applyError = nil;
             if (playerResponse == nil ||
                 ![strongSelf applyPlayerResponse:playerResponse error:&applyError]) {
-                YTKACEDownloadLog(strongSelf.identifier, @"authorization recovery step=%ld failed error=%@",
+                YTzoomDownloadLog(strongSelf.identifier, @"authorization recovery step=%ld failed error=%@",
                     (long)strongSelf.authRecoveryStep,
                     (prepareError ?: applyError).localizedDescription ?: @"no response");
                 [strongSelf recoverAuthorization:error];
@@ -1238,7 +1238,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
             strongSelf.playbackCookie = nil;
             [strongSelf.contexts removeAllObjects];
             [strongSelf.headers removeAllObjects];
-            YTKACEDownloadLog(strongSelf.identifier, @"authorization recovery step=%ld applied host=%@ config=%lu",
+            YTzoomDownloadLog(strongSelf.identifier, @"authorization recovery step=%ld applied host=%@ config=%lu",
                 (long)strongSelf.authRecoveryStep,
                 [NSURL URLWithString:strongSelf.serverURL].host,
                 (unsigned long)strongSelf.ustreamerConfig.length);
@@ -1313,7 +1313,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     NSTimeInterval elapsed = MAX(NSDate.date.timeIntervalSinceReferenceDate -
         self.activeRequestStart, 0.001);
     double megabytesPerSecond = ((double)data.length / 1048576.0) / elapsed;
-    YTKACEDownloadLog(self.identifier,
+    YTzoomDownloadLog(self.identifier,
         @"response %ld status=%ld bytes=%lu seconds=%.2f speed=%.2fMB/s error=%@",
         (long)self.activeRequestNumber, (long)http.statusCode, (unsigned long)data.length,
         elapsed, megabytesPerSecond, error.localizedDescription ?: @"none");
@@ -1324,17 +1324,17 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         BOOL expired = http.statusCode == 401 || http.statusCode == 403 ||
             http.statusCode == 409 || http.statusCode == 410;
         if (expired && self.usingTVClient) {
-            __weak YTKACESABRSession *weakSelf = self;
+            __weak YTzoomSABRSession *weakSelf = self;
             NSString *reason = requestError.localizedDescription;
             dispatch_async(dispatch_get_main_queue(), ^{
                 [weakSelf refreshTVClient:reason then:^(BOOL refreshed) {
-                    YTKACESABRSession *strongSelf = weakSelf;
+                    YTzoomSABRSession *strongSelf = weakSelf;
                     if (strongSelf == nil) return;
                     if (refreshed) [strongSelf sendRequest];
                     else [strongSelf retryOrFail:requestError];
                 }];
             });
-        } else if (expired && YTKACEHasNativeOnesieSession(self.videoID)) {
+        } else if (expired && YTzoomHasNativeOnesieSession(self.videoID)) {
             [self refreshNativeSession:requestError.localizedDescription];
         } else {
             [self retryOrFail:requestError];
@@ -1355,66 +1355,66 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         return;
     }
     NSTimeInterval delay = MIN(pow(2.0, self.retryCount - 1) * 0.5, 12.0);
-    YTKACEDownloadLog(self.identifier, @"retry %ld delay=%.1f reason=%@",
+    YTzoomDownloadLog(self.identifier, @"retry %ld delay=%.1f reason=%@",
         (long)self.retryCount, delay, error.localizedDescription);
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay * NSEC_PER_SEC)),
         dispatch_get_global_queue(QOS_CLASS_UTILITY, 0), ^{ [self sendRequest]; });
 }
 
 - (void)handleInitialization:(NSData *)data {
-    NSData *formatID = YTKACEPBDataField(data, 2);
-    NSInteger itag = (NSInteger)YTKACEPBIntegerField(formatID, 1, 0);
-    NSString *xtags = YTKACEPBStringField(formatID, 3) ?: @"";
-    YTKACESABRTrack *track = [self trackForItag:itag xtags:xtags];
+    NSData *formatID = YTzoomPBDataField(data, 2);
+    NSInteger itag = (NSInteger)YTzoomPBIntegerField(formatID, 1, 0);
+    NSString *xtags = YTzoomPBStringField(formatID, 3) ?: @"";
+    YTzoomSABRTrack *track = [self trackForItag:itag xtags:xtags];
     if (track == nil) return;
     track.initialized = YES;
-    track.endTime = (int64_t)YTKACEPBIntegerField(data, 3, 0);
-    track.endSequence = (NSInteger)YTKACEPBIntegerField(data, 4, NSIntegerMax);
-    YTKACEDownloadLog(self.identifier, @"init itag=%ld end=%lld sequence=%ld",
+    track.endTime = (int64_t)YTzoomPBIntegerField(data, 3, 0);
+    track.endSequence = (NSInteger)YTzoomPBIntegerField(data, 4, NSIntegerMax);
+    YTzoomDownloadLog(self.identifier, @"init itag=%ld end=%lld sequence=%ld",
         (long)itag, track.endTime, (long)track.endSequence);
 }
 
 - (void)handlePolicy:(NSData *)data {
-    self.backoffMilliseconds = (NSInteger)YTKACEPBIntegerField(data, 4, 0);
-    NSData *cookie = YTKACEPBDataField(data, 7);
+    self.backoffMilliseconds = (NSInteger)YTzoomPBIntegerField(data, 4, 0);
+    NSData *cookie = YTzoomPBDataField(data, 7);
     if (cookie.length != 0) self.playbackCookie = cookie;
 }
 
 - (void)handleContext:(NSData *)data {
-    NSNumber *type = @((NSInteger)YTKACEPBIntegerField(data, 1, 0));
-    NSData *value = YTKACEPBDataField(data, 3);
-    BOOL send = YTKACEPBIntegerField(data, 4, 0) != 0;
-    NSInteger policy = (NSInteger)YTKACEPBIntegerField(data, 5, 0);
+    NSNumber *type = @((NSInteger)YTzoomPBIntegerField(data, 1, 0));
+    NSData *value = YTzoomPBDataField(data, 3);
+    BOOL send = YTzoomPBIntegerField(data, 4, 0) != 0;
+    NSInteger policy = (NSInteger)YTzoomPBIntegerField(data, 5, 0);
     if (type.integerValue == 0 || value.length == 0 || !send) return;
     if (policy != 2 || self.contexts[type] == nil) self.contexts[type] = value;
 }
 
 - (void)handleHeader:(NSData *)data {
-    YTKACESABRHeader *header = [YTKACESABRHeader new];
-    header.headerID = (NSInteger)YTKACEPBIntegerField(data, 1, 0);
-    header.itag = (NSInteger)YTKACEPBIntegerField(data, 3, 0);
-    header.xtags = YTKACEPBStringField(data, 5) ?: @"";
-    header.initialization = YTKACEPBIntegerField(data, 8, 0) != 0;
-    header.sequence = (NSInteger)YTKACEPBIntegerField(data, 9, 0);
-    header.startTime = (int64_t)YTKACEPBIntegerField(data, 11, 0);
-    header.duration = (int64_t)YTKACEPBIntegerField(data, 12, 0);
-    NSData *timeRange = YTKACEPBDataField(data, 15);
-    int64_t timescale = (int64_t)YTKACEPBIntegerField(timeRange, 3, 0);
+    YTzoomSABRHeader *header = [YTzoomSABRHeader new];
+    header.headerID = (NSInteger)YTzoomPBIntegerField(data, 1, 0);
+    header.itag = (NSInteger)YTzoomPBIntegerField(data, 3, 0);
+    header.xtags = YTzoomPBStringField(data, 5) ?: @"";
+    header.initialization = YTzoomPBIntegerField(data, 8, 0) != 0;
+    header.sequence = (NSInteger)YTzoomPBIntegerField(data, 9, 0);
+    header.startTime = (int64_t)YTzoomPBIntegerField(data, 11, 0);
+    header.duration = (int64_t)YTzoomPBIntegerField(data, 12, 0);
+    NSData *timeRange = YTzoomPBDataField(data, 15);
+    int64_t timescale = (int64_t)YTzoomPBIntegerField(timeRange, 3, 0);
     if (timescale > 0) {
         if (header.startTime == 0) {
-            int64_t ticks = (int64_t)YTKACEPBIntegerField(timeRange, 1, 0);
+            int64_t ticks = (int64_t)YTzoomPBIntegerField(timeRange, 1, 0);
             header.startTime = (ticks * 1000) / timescale;
         }
         if (header.duration == 0) {
-            int64_t ticks = (int64_t)YTKACEPBIntegerField(timeRange, 2, 0);
+            int64_t ticks = (int64_t)YTzoomPBIntegerField(timeRange, 2, 0);
             header.duration = (ticks * 1000) / timescale;
         }
     }
-    header.contentLength = (int64_t)YTKACEPBIntegerField(data, 14, 0);
-    NSData *formatID = YTKACEPBDataField(data, 13);
+    header.contentLength = (int64_t)YTzoomPBIntegerField(data, 14, 0);
+    NSData *formatID = YTzoomPBDataField(data, 13);
     if (header.itag == 0 && formatID != nil) {
-        header.itag = (NSInteger)YTKACEPBIntegerField(formatID, 1, 0);
-        header.xtags = YTKACEPBStringField(formatID, 3) ?: header.xtags;
+        header.itag = (NSInteger)YTzoomPBIntegerField(formatID, 1, 0);
+        header.xtags = YTzoomPBStringField(formatID, 3) ?: header.xtags;
     }
     header.data = [NSMutableData data];
     if (header.headerID >= 0) self.headers[@(header.headerID)] = header;
@@ -1423,7 +1423,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
 - (void)handleMedia:(NSData *)data {
     if (data.length < 1) return;
     const uint8_t *bytes = (const uint8_t *)data.bytes;
-    YTKACESABRHeader *header = self.headers[@(bytes[0])];
+    YTzoomSABRHeader *header = self.headers[@(bytes[0])];
     if (header == nil || data.length == 1) return;
     [header.data appendData:[data subdataWithRange:NSMakeRange(1, data.length - 1)]];
 }
@@ -1432,11 +1432,11 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     if (data.length < 1) return;
     const uint8_t *bytes = (const uint8_t *)data.bytes;
     NSNumber *key = @(bytes[0]);
-    YTKACESABRHeader *header = self.headers[key];
+    YTzoomSABRHeader *header = self.headers[key];
     [self.headers removeObjectForKey:key];
-    YTKACESABRTrack *track = [self trackForItag:header.itag xtags:header.xtags];
+    YTzoomSABRTrack *track = [self trackForItag:header.itag xtags:header.xtags];
     if (track == nil || header.data.length == 0) {
-        YTKACEDownloadLog(self.identifier,
+        YTzoomDownloadLog(self.identifier,
             @"segment ignored itag=%ld bytes=%lu", (long)header.itag,
             (unsigned long)header.data.length);
         return;
@@ -1445,7 +1445,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         (long)header.itag, header.xtags, (long)header.sequence, header.initialization];
     if ([track.segments containsObject:segmentKey]) return;
     if (header.contentLength > 0 && header.data.length != (NSUInteger)header.contentLength) {
-        YTKACEDownloadLog(self.identifier,
+        YTzoomDownloadLog(self.identifier,
             @"segment size mismatch itag=%ld got=%lu expected=%lld",
             (long)header.itag, (unsigned long)header.data.length,
             header.contentLength);
@@ -1474,22 +1474,22 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
 }
 
 - (void)handleRedirect:(NSData *)data {
-    NSString *redirect = YTKACEPBStringField(data, 1);
+    NSString *redirect = YTzoomPBStringField(data, 1);
     if (redirect.length != 0) {
         self.serverURL = redirect;
-        YTKACEDownloadLog(self.identifier, @"redirect host=%@",
+        YTzoomDownloadLog(self.identifier, @"redirect host=%@",
             [NSURL URLWithString:redirect].host);
     }
 }
 
-- (BOOL)trackComplete:(YTKACESABRTrack *)track {
+- (BOOL)trackComplete:(YTzoomSABRTrack *)track {
     if (track.endSequence != NSIntegerMax && track.lastSequence >= track.endSequence) {
         return YES;
     }
     return track.endTime > 0 && track.downloadedDuration + 1000 >= track.endTime;
 }
 
-- (YTKACESABRTrack *)activeTrack {
+- (YTzoomSABRTrack *)activeTrack {
     return self.mediaPhase == 2 ? self.video : self.audio;
 }
 
@@ -1503,7 +1503,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     self.stalledRequests = 0;
     self.retryCount = 0;
     self.backoffMilliseconds = 0;
-    YTKACEDownloadLog(self.identifier, @"phase video");
+    YTzoomDownloadLog(self.identifier, @"phase video");
     [self sendProgress];
     [self sendRequest];
 }
@@ -1545,8 +1545,8 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     while (offset < response.length) {
         uint32_t type = 0;
         uint32_t size = 0;
-        if (!YTKACEUMPValue(response, &offset, &type) ||
-            !YTKACEUMPValue(response, &offset, &size) || offset + size > response.length) {
+        if (!YTzoomUMPValue(response, &offset, &type) ||
+            !YTzoomUMPValue(response, &offset, &size) || offset + size > response.length) {
             [self retryOrFail:[self error:@"YouTube returned an incomplete SABR response." code:5]];
             return;
         }
@@ -1556,7 +1556,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         partCounts[partType] = @([partCounts[partType] unsignedIntegerValue] + 1);
         partBytes[partType] = @([partBytes[partType] unsignedLongLongValue] + size);
         if (self.requestNumber <= 1 && (type == 46 || type == 51)) {
-            YTKACEDownloadLog(self.identifier, @"directive type=%u data=%@", type,
+            YTzoomDownloadLog(self.identifier, @"directive type=%u data=%@", type,
                 [part base64EncodedStringWithOptions:0]);
         }
         if (type == 20) [self handleHeader:part];
@@ -1566,26 +1566,26 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         else if (type == 42) [self handleInitialization:part];
         else if (type == 43) [self handleRedirect:part];
         else if (type == 46) {
-            NSData *params = YTKACEPBDataField(part, 1);
-            reloadToken = YTKACEPBStringField(params, 1);
+            NSData *params = YTzoomPBDataField(part, 1);
+            reloadToken = YTzoomPBStringField(params, 1);
         }
         else if (type == 44) {
             rejected = YES;
-            rejectionType = YTKACEPBStringField(part, 1);
-            rejectionCode = (NSInteger)YTKACEPBIntegerField(part, 2, 0);
-            YTKACEDownloadLog(self.identifier, @"SABR error type=%@ code=%ld data=%@",
+            rejectionType = YTzoomPBStringField(part, 1);
+            rejectionCode = (NSInteger)YTzoomPBIntegerField(part, 2, 0);
+            YTzoomDownloadLog(self.identifier, @"SABR error type=%@ code=%ld data=%@",
                 rejectionType ?: @"unknown", (long)rejectionCode,
-                YTKACESABRHex(part, 64));
+                YTzoomSABRHex(part, 64));
         }
         else if (type == 47 && size <= 8) terminalMarker = YES;
         else if (type == 57) [self handleContext:part];
         else if (type == 58) {
-            protectionStatus = (NSInteger)YTKACEPBIntegerField(part, 1, 0);
-            protectionRetries = (NSInteger)YTKACEPBIntegerField(part, 2, 0);
+            protectionStatus = (NSInteger)YTzoomPBIntegerField(part, 1, 0);
+            protectionRetries = (NSInteger)YTzoomPBIntegerField(part, 2, 0);
             attestation = protectionStatus >= 3;
-            YTKACEDownloadLog(self.identifier,
+            YTzoomDownloadLog(self.identifier,
                 @"protection status=%ld retries=%ld data=%@", (long)protectionStatus,
-                (long)protectionRetries, YTKACESABRHex(part, 64));
+                (long)protectionRetries, YTzoomSABRHex(part, 64));
         }
     }
     NSMutableArray<NSString *> *partSummary = [NSMutableArray array];
@@ -1595,17 +1595,17 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         [partSummary addObject:[NSString stringWithFormat:@"%@:%@/%@",
             partType, partCounts[partType], partBytes[partType]]];
     }
-    YTKACEDownloadLog(self.identifier, @"UMP parts=%@",
+    YTzoomDownloadLog(self.identifier, @"UMP parts=%@",
         [partSummary componentsJoinedByString:@","]);
     if (reloadToken.length != 0 && !self.reloadInFlight && self.reloadCount < 3) {
         self.reloadInFlight = YES;
         self.reloadCount += 1;
-        YTKACEDownloadLog(self.identifier, @"reload requested attempt=%ld token=%lu",
+        YTzoomDownloadLog(self.identifier, @"reload requested attempt=%ld token=%lu",
             (long)self.reloadCount, (unsigned long)reloadToken.length);
-        __weak YTKACESABRSession *weakSelf = self;
+        __weak YTzoomSABRSession *weakSelf = self;
         if (self.usingTVClient) {
             [self refreshTVClient:@"reload requested" then:^(BOOL refreshed) {
-                YTKACESABRSession *strongSelf = weakSelf;
+                YTzoomSABRSession *strongSelf = weakSelf;
                 if (strongSelf == nil) return;
                 strongSelf.reloadInFlight = NO;
                 if (refreshed) [strongSelf sendRequest];
@@ -1614,9 +1614,9 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
             }];
             return;
         }
-        YTKACEReloadPlayer(self.videoID, reloadToken,
+        YTzoomReloadPlayer(self.videoID, reloadToken,
             ^(id playerResponse, NSError *error) {
-            YTKACESABRSession *strongSelf = weakSelf;
+            YTzoomSABRSession *strongSelf = weakSelf;
             if (strongSelf == nil || strongSelf.finished) return;
             strongSelf.reloadInFlight = NO;
             NSError *applyError = nil;
@@ -1624,7 +1624,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
                                                                      error:&applyError]) {
                 NSError *finalError = error ?: applyError ?: [strongSelf error:
                     @"YouTube could not refresh the high-resolution stream." code:9];
-                YTKACEDownloadLog(strongSelf.identifier, @"reload failed error=%@",
+                YTzoomDownloadLog(strongSelf.identifier, @"reload failed error=%@",
                     finalError.localizedDescription);
                 [strongSelf retryOrFail:finalError];
                 return;
@@ -1635,7 +1635,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
             strongSelf.playbackCookie = nil;
             [strongSelf.contexts removeAllObjects];
             [strongSelf.headers removeAllObjects];
-            YTKACEDownloadLog(strongSelf.identifier, @"reload applied host=%@ config=%lu",
+            YTzoomDownloadLog(strongSelf.identifier, @"reload applied host=%@ config=%lu",
                 [NSURL URLWithString:strongSelf.serverURL].host,
                 (unsigned long)strongSelf.ustreamerConfig.length);
             [strongSelf sendRequest];
@@ -1657,7 +1657,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
             [self recoverAuthorization:error];
         } else if (self.attestationRetries < 3) {
             self.attestationRetries += 1;
-            if (YTKACEHasNativeOnesieSession(self.videoID)) {
+            if (YTzoomHasNativeOnesieSession(self.videoID)) {
                 [self refreshNativeSession:message];
             } else {
                 [self retryOrFail:error];
@@ -1668,7 +1668,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         return;
     }
     [self sendProgress];
-    YTKACESABRTrack *activeTrack = [self activeTrack];
+    YTzoomSABRTrack *activeTrack = [self activeTrack];
     if (self.combinedMode && [self trackComplete:self.video] &&
         [self trackComplete:self.audio]) {
         [self finish];
@@ -1710,7 +1710,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     if (after <= before) self.stalledRequests += 1;
     else {
         if (self.authRecoveryStep > 0) {
-            YTKACEDownloadLog(self.identifier, @"authorization recovered at step=%ld",
+            YTzoomDownloadLog(self.identifier, @"authorization recovered at step=%ld",
                 (long)self.authRecoveryStep);
             self.authRecoveryStep = 0;
         }
@@ -1721,7 +1721,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
         self.attestationRetries = 0;
         self.tvRefreshCount = 0;
     }
-    YTKACEDownloadLog(self.identifier,
+    YTzoomDownloadLog(self.identifier,
         @"progress audio=%.3f/%lld video=%.3f/%lld bytes=%lld+%lld stalled=%ld",
         (double)self.audio.downloadedDuration, self.audio.endTime,
         (double)self.video.downloadedDuration, self.video.endTime,
@@ -1759,7 +1759,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     self.playbackCookie = nil;
     [self.headers removeAllObjects];
     [self.contexts removeAllObjects];
-    YTKACEDownloadLog(self.identifier,
+    YTzoomDownloadLog(self.identifier,
         @"session restart attempt=%ld phase=%ld reason=%@ audio=%.0f/%lld video=%.0f/%lld",
         (long)self.stallRecoveryCount, (long)self.mediaPhase, reason ?: @"stalled",
         (double)self.audio.downloadedDuration, self.audio.endTime,
@@ -1780,7 +1780,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     self.retryCount = 0;
     self.backoffMilliseconds = 0;
     [self.headers removeAllObjects];
-    YTKACEDownloadLog(self.identifier,
+    YTzoomDownloadLog(self.identifier,
         @"combined fallback phase=%@ reason=%@ audio=%lld video=%lld",
         self.mediaPhase == 1 ? @"audio" : @"video", reason ?: @"unknown",
         self.audio.downloadedBytes, self.video.downloadedBytes);
@@ -1803,7 +1803,7 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     [self.video.handle closeFile];
     [self.audio.handle closeFile];
     [self.session invalidateAndCancel];
-    YTKACEDownloadLog(self.identifier, @"SABR complete audio=%lld video=%lld",
+    YTzoomDownloadLog(self.identifier, @"SABR complete audio=%lld video=%lld",
         self.audio.downloadedBytes, self.video.downloadedBytes);
     dispatch_async(dispatch_get_main_queue(), ^{
         self.completion(self.video.URL, self.audio.URL, nil);
@@ -1816,13 +1816,13 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
     [self.video.handle closeFile];
     [self.audio.handle closeFile];
     [self.session invalidateAndCancel];
-    YTKACEDownloadLog(self.identifier, @"SABR failed code=%ld error=%@",
+    YTzoomDownloadLog(self.identifier, @"SABR failed code=%ld error=%@",
         (long)error.code, error.localizedDescription);
     NSURL *scratch = self.video.URL.URLByDeletingLastPathComponent
         ?: self.audio.URL.URLByDeletingLastPathComponent;
     if (self.video.URL != nil) [NSFileManager.defaultManager removeItemAtURL:self.video.URL error:nil];
     if (self.audio.URL != nil) [NSFileManager.defaultManager removeItemAtURL:self.audio.URL error:nil];
-    if ([scratch.lastPathComponent hasPrefix:@"YTKACE-"]) {
+    if ([scratch.lastPathComponent hasPrefix:@"YTzoom-"]) {
         [NSFileManager.defaultManager removeItemAtURL:scratch error:nil];
     }
     dispatch_async(dispatch_get_main_queue(), ^{ self.completion(nil, nil, error); });
@@ -1839,11 +1839,11 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
 
 @end
 
-@interface YTKACESABRTask ()
+@interface YTzoomSABRTask ()
 @property(nonatomic, copy) dispatch_block_t cancelBlock;
 @end
 
-@implementation YTKACESABRTask
+@implementation YTzoomSABRTask
 
 - (void)cancel {
     if (self.cancelBlock != nil) self.cancelBlock();
@@ -1851,39 +1851,39 @@ NSUInteger YTKACEPurgeDownloadScratch(BOOL includeActive) {
 
 @end
 
-@implementation YTKACESABRDownloader
+@implementation YTzoomSABRDownloader
 
-+ (YTKACESABRTask *)downloadPlayerResponse:(id)playerResponse
-                   videoOption:(YTKACEStreamOption *)videoOption
-                   audioOption:(YTKACEStreamOption *)audioOption
++ (YTzoomSABRTask *)downloadPlayerResponse:(id)playerResponse
+                   videoOption:(YTzoomStreamOption *)videoOption
+                   audioOption:(YTzoomStreamOption *)audioOption
                      audioOnly:(BOOL)audioOnly
                        videoID:(NSString *)videoID
                      identifier:(NSString *)identifier
-                      progress:(YTKACESABRProgress)progress
-                    completion:(YTKACESABRCompletion)completion {
-    YTKACESABRSession *session = [YTKACESABRSession new];
-    YTKACESABRTask *task = [YTKACESABRTask new];
+                      progress:(YTzoomSABRProgress)progress
+                    completion:(YTzoomSABRCompletion)completion {
+    YTzoomSABRSession *session = [YTzoomSABRSession new];
+    YTzoomSABRTask *task = [YTzoomSABRTask new];
     session.playerResponse = playerResponse;
-    session.video = [YTKACESABRTrack new];
+    session.video = [YTzoomSABRTrack new];
     session.video.option = videoOption;
-    session.audio = [YTKACESABRTrack new];
+    session.audio = [YTzoomSABRTrack new];
     session.audio.option = audioOption;
     session.audioOnly = audioOnly;
-    session.combinedMode = YTKACE_COMBINED_SABR && !audioOnly;
+    session.combinedMode = YTzoom_COMBINED_SABR && !audioOnly;
     session.videoID = videoID ?: @"";
     session.identifier = identifier;
     session.progress = progress;
     session.completion = completion;
-    __weak YTKACESABRSession *weakSession = session;
+    __weak YTzoomSABRSession *weakSession = session;
     task.cancelBlock = ^{ [weakSession cancel]; };
     objc_setAssociatedObject(session, @selector(start), session, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    YTKACESABRCompletion original = [completion copy];
-    __weak YTKACESABRTask *weakTask = task;
+    YTzoomSABRCompletion original = [completion copy];
+    __weak YTzoomSABRTask *weakTask = task;
     session.completion = ^(NSURL *videoURL, NSURL *audioURL, NSError *error) {
-        YTKACESABRSetStandaloneClient(identifier, nil, nil);
+        YTzoomSABRSetStandaloneClient(identifier, nil, nil);
         original(videoURL, audioURL, error);
         weakTask.cancelBlock = nil;
-        YTKACESABRSession *strongSession = weakSession;
+        YTzoomSABRSession *strongSession = weakSession;
         objc_setAssociatedObject(strongSession, @selector(start), nil,
             OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     };

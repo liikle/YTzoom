@@ -4,33 +4,33 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-FOUNDATION_EXPORT NSString * const YTKACEMasterEnabledKey;
-FOUNDATION_EXPORT NSString * const YTKACEOLEDKey;
-FOUNDATION_EXPORT NSString * const YTKACENoAdsKey;
-FOUNDATION_EXPORT NSString * const YTKACESponsorBlockKey;
-FOUNDATION_EXPORT NSString * const YTKACEDownloadKey;
-FOUNDATION_EXPORT NSString * const YTKACEBackgroundPlaybackKey;
-FOUNDATION_EXPORT NSString * const YTKACEPiPKey;
-FOUNDATION_EXPORT NSString * const YTKACESpeedKey;
-FOUNDATION_EXPORT NSString * const YTKACELoopKey;
-FOUNDATION_EXPORT NSString * const YTKACESleepTimerKey;
-FOUNDATION_EXPORT NSString * const YTKACEPreferencesDidChangeNotification;
+FOUNDATION_EXPORT NSString * const YTzoomMasterEnabledKey;
+FOUNDATION_EXPORT NSString * const YTzoomOLEDKey;
+FOUNDATION_EXPORT NSString * const YTzoomNoAdsKey;
+FOUNDATION_EXPORT NSString * const YTzoomSponsorBlockKey;
+FOUNDATION_EXPORT NSString * const YTzoomDownloadKey;
+FOUNDATION_EXPORT NSString * const YTzoomBackgroundPlaybackKey;
+FOUNDATION_EXPORT NSString * const YTzoomPiPKey;
+FOUNDATION_EXPORT NSString * const YTzoomSpeedKey;
+FOUNDATION_EXPORT NSString * const YTzoomLoopKey;
+FOUNDATION_EXPORT NSString * const YTzoomSleepTimerKey;
+FOUNDATION_EXPORT NSString * const YTzoomPreferencesDidChangeNotification;
 
-FOUNDATION_EXPORT void YTKACERegisterDefaults(void);
-FOUNDATION_EXPORT BOOL YTKACEMasterEnabled(void);
-FOUNDATION_EXPORT BOOL YTKACEFeatureEnabled(NSString *key);
-FOUNDATION_EXPORT BOOL YTKACEDownloadsEnabled(void);
-FOUNDATION_EXPORT NSInteger YTKACEDownloadPlacement(void);
-FOUNDATION_EXPORT BOOL YTKACEOLEDActive(UITraitCollection * _Nullable traits);
-FOUNDATION_EXPORT UIColor *YTKACEInterfaceBackgroundColor(
+FOUNDATION_EXPORT void YTzoomRegisterDefaults(void);
+FOUNDATION_EXPORT BOOL YTzoomMasterEnabled(void);
+FOUNDATION_EXPORT BOOL YTzoomFeatureEnabled(NSString *key);
+FOUNDATION_EXPORT BOOL YTzoomDownloadsEnabled(void);
+FOUNDATION_EXPORT NSInteger YTzoomDownloadPlacement(void);
+FOUNDATION_EXPORT BOOL YTzoomOLEDActive(UITraitCollection * _Nullable traits);
+FOUNDATION_EXPORT UIColor *YTzoomInterfaceBackgroundColor(
     UITraitCollection * _Nullable traits);
-FOUNDATION_EXPORT UIColor *YTKACEInterfaceSurfaceColor(
+FOUNDATION_EXPORT UIColor *YTzoomInterfaceSurfaceColor(
     UITraitCollection * _Nullable traits);
-FOUNDATION_EXPORT BOOL YTKACESponsorBlockEnabled(void);
-FOUNDATION_EXPORT void YTKACESetPreference(NSString *key, BOOL enabled);
-FOUNDATION_EXPORT id _Nullable YTKACEPreferenceObject(NSString *key);
-FOUNDATION_EXPORT void YTKACESetPreferenceObject(NSString *key, id _Nullable value);
-FOUNDATION_EXPORT NSURL *YTKACEApplicationSupportDirectory(void);
-FOUNDATION_EXPORT NSUInteger YTKACEPurgeSystemCaches(void);
+FOUNDATION_EXPORT BOOL YTzoomSponsorBlockEnabled(void);
+FOUNDATION_EXPORT void YTzoomSetPreference(NSString *key, BOOL enabled);
+FOUNDATION_EXPORT id _Nullable YTzoomPreferenceObject(NSString *key);
+FOUNDATION_EXPORT void YTzoomSetPreferenceObject(NSString *key, id _Nullable value);
+FOUNDATION_EXPORT NSURL *YTzoomApplicationSupportDirectory(void);
+FOUNDATION_EXPORT NSUInteger YTzoomPurgeSystemCaches(void);
 
 NS_ASSUME_NONNULL_END

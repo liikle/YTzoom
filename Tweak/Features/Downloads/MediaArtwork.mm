@@ -2,7 +2,7 @@
 
 #import <AVFoundation/AVFoundation.h>
 
-NSData *YTKACEMediaArtworkData(NSURL *URL) {
+NSData *YTzoomMediaArtworkData(NSURL *URL) {
     NSURL *base = URL.URLByDeletingPathExtension;
     for (NSString *extension in @[@"jpg", @"png"]) {
         NSData *data = [NSData dataWithContentsOfURL:
@@ -19,7 +19,7 @@ NSData *YTKACEMediaArtworkData(NSURL *URL) {
     return nil;
 }
 
-UIImage *YTKACEMediaArtworkImage(NSURL *URL) {
-    NSData *data = YTKACEMediaArtworkData(URL);
+UIImage *YTzoomMediaArtworkImage(NSURL *URL) {
+    NSData *data = YTzoomMediaArtworkData(URL);
     return data.length == 0 ? nil : [UIImage imageWithData:data];
 }

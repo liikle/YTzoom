@@ -19,7 +19,8 @@ jobs:
 
   build:
     needs: test
-    runs-on: ubuntu-latest
+    # Theos' installer apt-installs libxml2, which Ubuntu 26.04 (ubuntu-latest) no longer ships.
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:

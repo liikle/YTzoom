@@ -417,6 +417,7 @@ static UIViewController *YTzoomTitlePresenter(UIView *view) {
 @end
 
 static void YTzoomTitleDetach(UIView *input) {
+    YTzoomCommentHoldDetachForInput(input);
     YTzoomTitleButton *button = objc_getAssociatedObject(input, YTzoomTitleButtonAssociation);
     if (button == nil) return;
     if ([input isKindOfClass:UITextField.class] && ((UITextField *)input).rightView == button) {
@@ -479,13 +480,16 @@ static void YTzoomTitleEvaluate(UIView *input) {
             wanted = YTzoomTitleIsUploadScreen(input) && YTzoomTitleIsTopmostInput(input);
         }
     }
-    if (wanted) YTzoomTitleAttach(input);
-    else YTzoomTitleDetach(input);
+    if (wanted) {
+        YTzoomTitleAttach(input);
+        YTzoomCommentHoldAttachForInput(input);
+    } else {
+        YTzoomTitleDetach(input);
+    }
 }
 
 static void YTzoomTitleConsider(UIView *input) {
     if (input.window == nil) return;
-    YTzoomCommentHoldConsider(input);
     if (!YTzoomFeatureEnabled(YTzoomAITitlesKey) &&
         objc_getAssociatedObject(input, YTzoomTitleButtonAssociation) == nil) {
         return;

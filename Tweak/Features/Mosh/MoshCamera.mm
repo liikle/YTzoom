@@ -92,10 +92,14 @@ static void YTzoomMoshNoteLiveAppend(CMTime time) {
 
 static BOOL YTzoomMoshIsRecording(void) {
     os_unfair_lock_lock(&YTzoomMoshLock);
-    BOOL recording = YTzoomMoshRecorderHooked
-        ? YTzoomMoshRecorderRecording
-        : (YTzoomMoshMovieRecording ||
-           CACurrentMediaTime() - YTzoomMoshLastLiveAppend < YTzoomMoshRecordingGap);
+    // Any signal counts. The recorder hooks matching at install time does NOT
+    // mean they fire at runtime (YouTube may record through a different class),
+    // and relying on them alone meant recording was never detected and nothing
+    // ran. The writer-append signal is the reliable one when YouTube records
+    // through AVAssetWriter, which the binary scan shows it does.
+    BOOL recording = YTzoomMoshRecorderRecording || YTzoomMoshMovieRecording ||
+        (YTzoomMoshLastLiveAppend != 0.0 &&
+         CACurrentMediaTime() - YTzoomMoshLastLiveAppend < YTzoomMoshRecordingGap);
     os_unfair_lock_unlock(&YTzoomMoshLock);
     return recording;
 }

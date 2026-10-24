@@ -90,6 +90,7 @@ static float YTzoomCodecMeanDifference(CVPixelBufferRef a, CVPixelBufferRef b) {
     CVPixelBufferRef _latestDecoded;   // decoder output, YouTube's format
     CVPixelBufferRef _lastInput;       // most recent encoder input, for ghost strength
     BOOL _hasDecoded;                  // the decoder has produced at least one picture
+    BOOL _writeBack;                   // overwrite the camera frame with the decoded picture
 
     int64_t _encodeIndex;              // monotonic, carried as each frame's PTS
     int64_t _desyncAtIndex;            // withhold the first frame at/after this index; -1 when none
@@ -225,6 +226,9 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
     os_unfair_lock_lock(&_lock);
     _framesSinceClipStart = 0;
     _framesWithoutOutput = 0;
+    // Only overwrite YouTube's frame with the decoded picture while moshing, so
+    // clip 1 (and any non-moshing clip) stays the pristine live camera.
+    _writeBack = moshing;
     if (firstClip) {
         // Clip 1 opens on a fresh baseline keyframe and never moshes.
         _forceNextKeyframe = YES;
@@ -327,10 +331,10 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
     // few frames and, while a mosh holds the decoder, the held reference is the
     // effect. The encode→decode path runs on its own VideoToolbox threads.
     os_unfair_lock_lock(&_lock);
-    BOOL haveDecoded = _hasDecoded;
-    if (haveDecoded) YTzoomCodecCopy(_latestDecoded, pixelBuffer);
+    BOOL wrote = _hasDecoded && _writeBack;
+    if (wrote) YTzoomCodecCopy(_latestDecoded, pixelBuffer);
     os_unfair_lock_unlock(&_lock);
-    return haveDecoded;
+    return wrote;
 }
 
 - (void)applyBitrateForFrame:(int)frame {

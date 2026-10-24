@@ -77,12 +77,6 @@ static UIView *YTzoomHoldAllFindInWindows(YTzoomHoldAllMatcher matcher) {
     return nil;
 }
 
-static UIView *YTzoomFindByIdentifier(NSString *identifier) {
-    return YTzoomHoldAllFindInWindows(^BOOL(UIView *view, __unused NSString *text) {
-        return [view.accessibilityIdentifier isEqualToString:identifier];
-    });
-}
-
 // Taps a view the way the user would: the enclosing control, then the
 // accessibility action VoiceOver uses, then the view's own tap gestures.
 static BOOL YTzoomHoldAllTap(UIView *view) {
@@ -275,55 +269,44 @@ static YTzoomHoldAllButton *YTzoomHoldAllMake(UIView *anchor, CGFloat side) {
     return button;
 }
 
-// Attaches the toggle just below `anchor` (the AI title button, or the title
-// field), climbing out of a clipping container if one would hide it.
-static void YTzoomHoldAllAttach(UIView *anchor) {
-    YTzoomHoldAllButton *existing = objc_getAssociatedObject(anchor, YTzoomHoldAllAssociation);
+// Attaches the toggle just below the title field `input`, trailing-aligned so
+// it sits under the AI title button at the field's right edge. Climbs out of a
+// clipping container if one would hide it.
+void YTzoomCommentHoldAttachForInput(UIView *input) {
+    if (!YTzoomFeatureEnabled(YTzoomHoldAllButtonKey) || input == nil || input.window == nil) return;
+    YTzoomHoldAllButton *existing = objc_getAssociatedObject(input, YTzoomHoldAllAssociation);
     if (existing != nil && existing.superview != nil && existing.window != nil) {
         [existing refresh];
         return;
     }
     [existing removeFromSuperview];
 
-    CGFloat side = MAX(34.0, MIN(MAX(anchor.bounds.size.width, anchor.bounds.size.height), 44.0));
-    UIView *page = YTzoomHoldAllOwner(anchor).view;
-    UIView *host = anchor.superview;
+    CGFloat side = 36.0;
+    UIView *page = YTzoomHoldAllOwner(input).view;
+    UIView *host = input.superview;
     while (host != nil && host != page && host.clipsToBounds &&
-           CGRectGetMaxY([anchor convertRect:anchor.bounds toView:host]) + side + 10.0 > host.bounds.size.height &&
+           CGRectGetMaxY([input convertRect:input.bounds toView:host]) + side + 10.0 > host.bounds.size.height &&
            ![host isKindOfClass:UIScrollView.class]) {
         host = host.superview;
     }
     if (host == nil) return;
 
-    YTzoomHoldAllButton *button = YTzoomHoldAllMake(anchor, side);
+    YTzoomHoldAllButton *button = YTzoomHoldAllMake(input, side);
     button.translatesAutoresizingMaskIntoConstraints = NO;
     [host addSubview:button];
     [NSLayoutConstraint activateConstraints:@[
-        [button.centerXAnchor constraintEqualToAnchor:anchor.centerXAnchor],
-        [button.topAnchor constraintEqualToAnchor:anchor.bottomAnchor constant:10.0],
+        [button.trailingAnchor constraintEqualToAnchor:input.trailingAnchor constant:-2.0],
+        [button.topAnchor constraintEqualToAnchor:input.bottomAnchor constant:8.0],
         [button.widthAnchor constraintEqualToConstant:side],
         [button.heightAnchor constraintEqualToConstant:side]
     ]];
-    objc_setAssociatedObject(anchor, YTzoomHoldAllAssociation, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
-    YTzoomDownloadLog(@"holdall", @"attached below %@", NSStringFromClass(anchor.class));
+    objc_setAssociatedObject(input, YTzoomHoldAllAssociation, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+    YTzoomDownloadLog(@"holdall", @"attached below %@ host %@", NSStringFromClass(input.class),
+                      NSStringFromClass(host.class));
 }
 
-static void YTzoomHoldAllScan(UIView *input) {
-    if (!YTzoomFeatureEnabled(YTzoomHoldAllButtonKey) || input.window == nil) return;
-    // Prefer anchoring below the AI title button, as asked; fall back to the
-    // title field itself when that button isn't present.
-    UIView *anchor = YTzoomFindByIdentifier(@"YTzoom.AITitleButton") ?: input;
-    YTzoomHoldAllAttach(anchor);
-}
-
-void YTzoomCommentHoldConsider(UIView *input) {
-    if (!YTzoomFeatureEnabled(YTzoomHoldAllButtonKey) || input.window == nil) return;
-    __weak UIView *weakInput = input;
-    for (NSNumber *delay in @[@0.4, @1.3]) {
-        dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delay.doubleValue * NSEC_PER_SEC)),
-                       dispatch_get_main_queue(), ^{
-            UIView *strongInput = weakInput;
-            if (strongInput != nil) YTzoomHoldAllScan(strongInput);
-        });
-    }
+void YTzoomCommentHoldDetachForInput(UIView *input) {
+    YTzoomHoldAllButton *button = objc_getAssociatedObject(input, YTzoomHoldAllAssociation);
+    [button removeFromSuperview];
+    objc_setAssociatedObject(input, YTzoomHoldAllAssociation, nil, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }

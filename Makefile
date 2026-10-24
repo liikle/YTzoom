@@ -86,8 +86,7 @@ YTzoom_FILES = \
 	Tweak/Features/AITitles/GeminiClient.mm \
 	Tweak/Features/AITitles/TitleGenerator.mm \
 	Tweak/Features/Region/RegionSpoof.mm \
-	Tweak/Features/Mosh/datamosh.mm \
-	Tweak/Features/Mosh/MoshEngine.mm \
+	Tweak/Features/Mosh/MoshCodec.mm \
 	Tweak/Features/Mosh/MoshLens.mm \
 	Tweak/Features/Mosh/MoshCamera.mm \
 	Tweak/Features/Shorts/CommentHoldButton.mm \

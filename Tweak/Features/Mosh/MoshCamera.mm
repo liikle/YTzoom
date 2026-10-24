@@ -5,7 +5,7 @@
 #import "../../UI/Assets.h"
 #import "../../UI/Notice.h"
 #import "../Downloads/DownloadLog.h"
-#import "MoshEngine.h"
+#import "MoshCodec.h"
 #import "MoshLens.h"
 
 #import <AVFoundation/AVFoundation.h>
@@ -18,13 +18,16 @@
 
 // Moshly camera for the Shorts camera. YouTube keeps its own screen, music
 // picker and upload flow; this sits underneath it:
-//   - every camera frame passes through a delegate proxy, which runs the
-//     datamosh engine on it in place before YouTube's pipeline sees it;
-//   - when clip 1 stops, its last frame is kept and shown as a ghost over the
-//     preview; when clip 2 starts, the engine is seeded with that frame and a
-//     keyframe is dropped, so clip 2 smears out of clip 1 (Moshly's splice);
-//   - the capture device is swapped for the virtual back camera so 0.5x
-//     exists, pinned to 60 fps, and stabilization follows a toggle.
+//   - every recorded frame passes through a delegate proxy, which runs it
+//     through MoshCodec (a live H.264 encoder/decoder pair) in place before
+//     YouTube records it, so the preview and the file both carry the mosh;
+//   - the codec keeps one open GOP for the whole camera session, so each new
+//     clip resumes against the previous clip's reference picture and its first
+//     frame is withheld — the desync that starts the mosh (Moshly Classic);
+//   - clip 1 stops and its last frame is shown as a ghost for lining up the
+//     next clip; deleting a clip re-anchors onto the one before it;
+//   - 0.5x via zoom or a temporary ultra-wide input swap, 60 fps, and a
+//     stabilization toggle.
 
 NSString * const YTzoomMoshCameraKey = @"YTzoom.Preference.Mosh.Enabled";
 NSString * const YTzoomMoshActiveKey = @"YTzoom.Preference.Mosh.Active";
@@ -32,6 +35,7 @@ NSString * const YTzoomMoshUltraWideKey = @"YTzoom.Preference.Mosh.UltraWide";
 NSString * const YTzoomMoshStabilizationKey = @"YTzoom.Preference.Mosh.Stabilization";
 NSString * const YTzoomMoshHighFrameRateKey = @"YTzoom.Preference.Mosh.HighFrameRate";
 NSString * const YTzoomMoshGhostKey = @"YTzoom.Preference.Mosh.Ghost";
+NSString * const YTzoomMoshIntensityKey = @"YTzoom.Preference.Mosh.Intensity";
 
 static const int YTzoomMoshFrameRate = 60;
 // A segment counts as recording while YouTube's writer took a live frame this recently.
@@ -60,7 +64,10 @@ static BOOL YTzoomMoshRecorderHooked;
 static BOOL YTzoomMoshRecorderRecording;
 
 // Capture-queue state.
-static MoshEngine *YTzoomMoshEngineInstance;
+static MoshCodec *YTzoomMoshCodecInstance;
+static BOOL YTzoomMoshProjectStarted;         // a first clip has been recorded this session
+static CVPixelBufferRef YTzoomMoshReanchorFrame;   // owned; the frame to re-anchor onto
+static BOOL YTzoomMoshReanchorPending;
 static BOOL YTzoomMoshWasRecording;
 static BOOL YTzoomMoshMoshing;
 static CVPixelBufferRef YTzoomMoshLatestFrame;   // retained, newest recorded frame
@@ -206,44 +213,59 @@ static void YTzoomMoshHandleFrame(AVCaptureOutput *output, CMSampleBufferRef sam
 
     BOOL recording = YTzoomMoshIsRecording();
     if (recording && !YTzoomMoshWasRecording) {
-        // Clip start: splice onto the previous clip if there is one.
-        CVPixelBufferRef previous = YTzoomMoshCopyLastClipFrame();
-        YTzoomMoshMoshing = NO;
-        if (previous != NULL && YTzoomMoshPreference(YTzoomMoshActiveKey)) {
-            OSType format = CVPixelBufferGetPixelFormatType(frame);
-            int width = (int)CVPixelBufferGetWidth(frame);
-            int height = (int)CVPixelBufferGetHeight(frame);
-            MoshEngine *engine = YTzoomMoshEngineInstance;
-            if (engine == nil || engine.width != width || engine.height != height || engine.pixelFormat != format) {
-                engine = [[MoshEngine alloc] initWithWidth:width height:height pixelFormat:format];
-                YTzoomMoshEngineInstance = engine;
-            }
-            YTzoomMoshMoshing = [engine seedWithPixelBuffer:previous];
-            YTzoomDownloadLog(@"mosh", @"clip start %dx%d format %u seeded %d", width, height,
-                              (unsigned)format, YTzoomMoshMoshing);
+        // Clip start. The codec keeps its own reference across clips (open GOP,
+        // sessions built once), so clip 2 onward resume against clip 1's last
+        // picture automatically; a clip just declares whether it moshes.
+        OSType format = CVPixelBufferGetPixelFormatType(frame);
+        int width = (int)CVPixelBufferGetWidth(frame);
+        int height = (int)CVPixelBufferGetHeight(frame);
+        MoshCodec *codec = YTzoomMoshCodecInstance;
+        if (codec == nil || codec.width != width || codec.height != height || codec.pixelFormat != format) {
+            // A new codec can only resume from its own first keyframe, so this
+            // is a fresh project whatever came before (e.g. a resolution change).
+            codec = [[MoshCodec alloc] initWithWidth:width height:height pixelFormat:format
+                                           frameRate:YTzoomMoshFrameRate];
+            YTzoomMoshCodecInstance = codec;
+            YTzoomMoshProjectStarted = NO;
         }
-        if (previous != NULL) CVPixelBufferRelease(previous);
+        // If a clip was deleted, feed the frame that now ends the project back
+        // as a deliberate keyframe before this clip, so it moshes out of that
+        // rather than out of the deleted footage.
+        if (YTzoomMoshReanchorPending && codec != nil && YTzoomMoshProjectStarted) {
+            if (YTzoomMoshReanchorFrame != NULL) [codec reanchorWithPixelBuffer:YTzoomMoshReanchorFrame];
+            YTzoomMoshReanchorPending = NO;
+        }
+        BOOL firstClip = !YTzoomMoshProjectStarted;
+        BOOL moshing = codec != nil && !firstClip && YTzoomMoshPreference(YTzoomMoshActiveKey);
+        YTzoomMoshMoshing = moshing;
+        codec.intensity = (int)[YTzoomPreferenceObject(YTzoomMoshIntensityKey) integerValue];
+        [codec beginClipFirst:firstClip moshing:moshing];
+        YTzoomDownloadLog(@"mosh", @"clip start %dx%d fmt %u first %d mosh %d", width, height,
+                          (unsigned)format, firstClip, moshing);
         dispatch_async(dispatch_get_main_queue(), ^{ [YTzoomMoshOverlay hideGhost]; });
     }
 
-    if (recording && YTzoomMoshMoshing) {
-        [YTzoomMoshEngineInstance processPixelBuffer:frame];
-    }
-
-    if (recording) {
+    if (recording && YTzoomMoshCodecInstance != nil) {
+        // Runs every recorded frame: encodes it and writes the decoder's latest
+        // picture back in place. While a mosh holds the decoder that picture is
+        // the held reference, which is the effect, in the preview and the file.
+        [YTzoomMoshCodecInstance processPixelBuffer:frame];
         if (YTzoomMoshLatestFrame != frame) {
             if (YTzoomMoshLatestFrame != NULL) CVPixelBufferRelease(YTzoomMoshLatestFrame);
             YTzoomMoshLatestFrame = CVPixelBufferRetain(frame);
         }
-    } else if (YTzoomMoshWasRecording) {
-        // Clip end: keep its last frame (already moshed, if it was) for the next clip.
+    } else if (!recording && YTzoomMoshWasRecording) {
+        // Clip end: drain the decoder and keep this clip's last frame for the
+        // ghost overlay and for re-anchoring if it is later deleted.
+        [YTzoomMoshCodecInstance endClip];
+        YTzoomMoshProjectStarted = YES;
         CVPixelBufferRef last = YTzoomMoshCopyPixelBuffer(YTzoomMoshLatestFrame);
         if (YTzoomMoshLatestFrame != NULL) CVPixelBufferRelease(YTzoomMoshLatestFrame);
         YTzoomMoshLatestFrame = NULL;
         if (last != NULL) {
             YTzoomMoshPushClipFrame(last);
             YTzoomDownloadLog(@"mosh", @"clip end, kept last frame");
-            if (YTzoomMoshPreference(YTzoomMoshGhostKey) && YTzoomMoshPreference(YTzoomMoshActiveKey)) {
+            if (YTzoomMoshPreference(YTzoomMoshGhostKey)) {
                 UIImage *ghost = YTzoomMoshGhostImage(last, position);
                 if (ghost != nil) {
                     dispatch_async(dispatch_get_main_queue(), ^{ [YTzoomMoshOverlay showGhost:ghost]; });
@@ -256,21 +278,32 @@ static void YTzoomMoshHandleFrame(AVCaptureOutput *output, CMSampleBufferRef sam
     YTzoomMoshWasRecording = recording;
 }
 
+// Start a fresh project: the next recording is clip 1 again, on a new keyframe.
 static void YTzoomMoshForgetClips(void) {
     os_unfair_lock_lock(&YTzoomMoshLock);
     [YTzoomMoshClipFrames removeAllObjects];
+    if (YTzoomMoshReanchorFrame != NULL) { CVPixelBufferRelease(YTzoomMoshReanchorFrame); YTzoomMoshReanchorFrame = NULL; }
+    YTzoomMoshReanchorPending = NO;
+    YTzoomMoshProjectStarted = NO;
     os_unfair_lock_unlock(&YTzoomMoshLock);
     [YTzoomMoshOverlay hideGhost];
 }
 
-// YouTube deleted its last clip: the next clip moshes out of the one before it.
+// YouTube deleted its last clip: re-anchor onto the clip before it so the next
+// clip moshes out of that, and show its ghost.
 static void YTzoomMoshDropLastClip(void) {
     os_unfair_lock_lock(&YTzoomMoshLock);
     if (YTzoomMoshClipFrames.count != 0) [YTzoomMoshClipFrames removeLastObject];
+    BOOL empty = YTzoomMoshClipFrames.count == 0;
     os_unfair_lock_unlock(&YTzoomMoshLock);
     CVPixelBufferRef previous = YTzoomMoshCopyLastClipFrame();
-    UIImage *ghost = previous != NULL && YTzoomMoshPreference(YTzoomMoshGhostKey) &&
-            YTzoomMoshPreference(YTzoomMoshActiveKey)
+    os_unfair_lock_lock(&YTzoomMoshLock);
+    if (YTzoomMoshReanchorFrame != NULL) CVPixelBufferRelease(YTzoomMoshReanchorFrame);
+    YTzoomMoshReanchorFrame = previous != NULL ? CVPixelBufferRetain(previous) : NULL;
+    YTzoomMoshReanchorPending = previous != NULL;
+    if (empty) YTzoomMoshProjectStarted = NO;   // nothing left: next clip is clip 1
+    os_unfair_lock_unlock(&YTzoomMoshLock);
+    UIImage *ghost = previous != NULL && YTzoomMoshPreference(YTzoomMoshGhostKey)
         ? YTzoomMoshGhostImage(previous, YTzoomMoshDevice.position) : nil;
     if (previous != NULL) CVPixelBufferRelease(previous);
     dispatch_async(dispatch_get_main_queue(), ^{

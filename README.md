@@ -85,8 +85,11 @@ Buttons on the left of the camera:
 - **Stabilization**: off by default, because it changes how the mosh moves.
 - **60/30**: frame rate. 60 fps is the default and falls back to 30 on lenses that can't do it.
 
-The engine is Moshly's portable C core (`Tweak/Features/Mosh/datamosh.*`), extended to take the camera's
-YUV frames directly and to spread the motion search across CPU cores.
+It is real H.264 datamoshing, matching Moshly's Classic effect: a live VideoToolbox encoder and decoder
+(`Tweak/Features/Mosh/MoshCodec.*`) run against each other, dropping keyframes, withholding each clip's
+first frame and resubmitting P-frames so the motion compounds. **Mosh Strength** (1 clean to 5) sets how
+many times. Because it is a codec round-trip inside YouTube's capture path, it is heavier than a filter —
+report anything that stutters or drops frames on your device.
 
 ## Hold All Comments
 

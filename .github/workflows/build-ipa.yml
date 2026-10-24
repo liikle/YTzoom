@@ -81,6 +81,36 @@ jobs:
             exit 1
           fi
 
+      - name: Recon
+        if: matrix.target.label == 'ios17'
+        run: |
+          set +e
+          mkdir rc && cd rc && unzip -q ../YouTube.ipa
+          APP=$(ls -d Payload/*.app)
+          find "$APP" -type f \( -perm -111 -o -name '*.dylib' \) | while read f; do
+            if file "$f" | grep -q Mach-O; then strings -a "$f"; fi
+          done > all.txt 2>/dev/null
+          wc -l all.txt
+          echo "=== AV USAGE ==="
+          for w in AVCaptureMovieFileOutput AVAssetWriterInputPixelBufferAdaptor AVAssetWriter AVCaptureVideoDataOutput AVCaptureVideoPreviewLayer AVCaptureMultiCamSession AVCaptureDeviceDiscoverySession builtInDualWideCamera builtInTripleCamera builtInUltraWideCamera AVCaptureDeviceTypeBuiltInUltraWideCamera videoZoomFactor rampToVideoZoomFactor setActiveVideoMinFrameDuration preferredVideoStabilizationMode setVideoSettings: kCVPixelFormatType setSampleBufferDelegate:queue: captureOutput:didOutputSampleBuffer:fromConnection: appendPixelBuffer:withPresentationTime: startSessionAtSourceTime: startRecordingToOutputFileURL:recordingDelegate: MTKView CAMetalLayer; do
+            printf '%s %s\n' "$(grep -c -- "$w" all.txt)" "$w"
+          done
+          echo "=== CAMERA CLASSES ==="
+          grep -E '^[A-Z][A-Za-z0-9_]{3,80}$' all.txt | grep -E '(Camera|Capture|Recorder|Recording|Shutter|RecordButton|Segment|Ghost|Align|Onion|ZoomFactor|Lens)' | grep -vE '^(AV|CM|CV|UI|NS|CA|MTL|CI|GLK|SCN|AR)' | sort -u | head -400
+          echo "=== SHORTS CREATION CLASSES ==="
+          grep -E '^[A-Z][A-Za-z0-9_]{3,80}$' all.txt | grep -E 'Shorts' | grep -E '(Creat|Camera|Edit|Upload|Record|Post|Metadata|Comment|Rail|Timeline)' | sort -u | head -400
+          echo "=== UPLOAD / COMMENT CLASSES ==="
+          grep -E '^[A-Z][A-Za-z0-9_]{3,80}$' all.txt | grep -E '(Upload|Moderation|CommentSetting|CommentsSetting|HoldAll|CommentPolicy|CommentOption|PostCreation|Publish)' | sort -u | head -300
+          echo "=== SWIFT CAMERA SYMBOLS ==="
+          grep -E '_TtC[0-9A-Za-z_]*(Camera|Capture|Record|Upload|Moderation)' all.txt | sort -u | head -120
+          echo "=== STRINGS ==="
+          find "$APP" -path '*en.lproj*' -name '*.strings' | while read f; do
+            plutil -convert xml1 -o - "$f" 2>/dev/null | grep -iE -B1 'hold all|hold potentially|comment moderation|increase strictness|save to device|download|60 ?fps|stabiliz|ultra ?wide|0\.5|lens' | grep -E '<(key|string)>' | head -80 | sed "s|^|$(basename $(dirname $(dirname "$f")))/$(basename "$f"): |"
+          done | head -500
+          echo "=== STRINGS IN BINARY ==="
+          grep -iE '^(hold all|comments|comment moderation|hold potentially inappropriate comments for review|increase strictness)' all.txt | sort -u | head -50
+          echo "=== END ==="
+
       - name: Inject
         id: inject
         run: |

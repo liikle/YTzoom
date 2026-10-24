@@ -87,28 +87,62 @@ jobs:
           set +e
           mkdir rc && cd rc && unzip -q ../YouTube.ipa
           APP=$(ls -d Payload/*.app)
-          find "$APP" -type f \( -perm -111 -o -name '*.dylib' \) | while read f; do
-            if file "$f" | grep -q Mach-O; then strings -a "$f"; fi
-          done > all.txt 2>/dev/null
+          echo "APP=$APP"
+          ls "$APP" | head -50
+          ls "$APP/Frameworks" | head -80
+          python3 - "$APP" <<'PY'
+          import os, re, sys
+          app = sys.argv[1]
+          pat = re.compile(rb'[\x20-\x7e]{4,200}')
+          seen = set()
+          files = 0
+          with open('all.txt', 'w') as out:
+              for root, dirs, names in os.walk(app):
+                  for name in names:
+                      path = os.path.join(root, name)
+                      try:
+                          with open(path, 'rb') as f:
+                              head = f.read(4)
+                              if head not in (b'\xcf\xfa\xed\xfe', b'\xca\xfe\xba\xbe'):
+                                  continue
+                              data = head + f.read()
+                      except OSError:
+                          continue
+                      files += 1
+                      for m in pat.findall(data):
+                          if m not in seen:
+                              seen.add(m)
+                              out.write(m.decode('ascii') + '\n')
+          print('macho files', files, 'unique strings', len(seen))
+          PY
           wc -l all.txt
           echo "=== AV USAGE ==="
-          for w in AVCaptureMovieFileOutput AVAssetWriterInputPixelBufferAdaptor AVAssetWriter AVCaptureVideoDataOutput AVCaptureVideoPreviewLayer AVCaptureMultiCamSession AVCaptureDeviceDiscoverySession builtInDualWideCamera builtInTripleCamera builtInUltraWideCamera AVCaptureDeviceTypeBuiltInUltraWideCamera videoZoomFactor rampToVideoZoomFactor setActiveVideoMinFrameDuration preferredVideoStabilizationMode setVideoSettings: kCVPixelFormatType setSampleBufferDelegate:queue: captureOutput:didOutputSampleBuffer:fromConnection: appendPixelBuffer:withPresentationTime: startSessionAtSourceTime: startRecordingToOutputFileURL:recordingDelegate: MTKView CAMetalLayer; do
+          for w in AVCaptureMovieFileOutput AVAssetWriterInputPixelBufferAdaptor AVAssetWriter AVCaptureVideoDataOutput AVCaptureVideoPreviewLayer AVCaptureMultiCamSession AVCaptureDeviceDiscoverySession AVCaptureDeviceTypeBuiltInDualWideCamera AVCaptureDeviceTypeBuiltInTripleCamera AVCaptureDeviceTypeBuiltInUltraWideCamera videoZoomFactor rampToVideoZoomFactor:withRate: setActiveVideoMinFrameDuration: preferredVideoStabilizationMode setVideoSettings: setSampleBufferDelegate:queue: captureOutput:didOutputSampleBuffer:fromConnection: appendPixelBuffer:withPresentationTime: appendSampleBuffer: startSessionAtSourceTime: startRecordingToOutputFileURL:recordingDelegate: MTKView CAMetalLayer AVSampleBufferDisplayLayer; do
             printf '%s %s\n' "$(grep -c -- "$w" all.txt)" "$w"
           done
           echo "=== CAMERA CLASSES ==="
-          grep -E '^[A-Z][A-Za-z0-9_]{3,80}$' all.txt | grep -E '(Camera|Capture|Recorder|Recording|Shutter|RecordButton|Segment|Ghost|Align|Onion|ZoomFactor|Lens)' | grep -vE '^(AV|CM|CV|UI|NS|CA|MTL|CI|GLK|SCN|AR)' | sort -u | head -400
-          echo "=== SHORTS CREATION CLASSES ==="
-          grep -E '^[A-Z][A-Za-z0-9_]{3,80}$' all.txt | grep -E 'Shorts' | grep -E '(Creat|Camera|Edit|Upload|Record|Post|Metadata|Comment|Rail|Timeline)' | sort -u | head -400
+          grep -E '^[A-Z][A-Za-z0-9_]{3,80}$' all.txt | grep -E '(Camera|Capture|Recorder|Recording|Shutter|RecordButton|Ghost|Align|Onion|Lens|Segment)' | grep -vE '^(AV|CM|CV|UI|NS|CA|MTL|CI|GLK|SCN|AR|PH|GTM|FIR|GPB)' | sort -u | head -300
+          echo "=== CAMERA SELECTORS ==="
+          grep -E '^[a-z][A-Za-z0-9_:]{6,120}$' all.txt | grep -E '(startRecording|stopRecording|pauseRecording|resumeRecording|didStartRecording|didStopRecording|didFinishRecording|recordButton|segment[A-Z]|Segment|isRecording|alignment|ghostImage|onionSkin)' | sort -u | head -250
+          echo "=== SHORTS CLASSES ==="
+          grep -E '^[A-Z][A-Za-z0-9_]{3,80}$' all.txt | grep -E 'Shorts' | grep -E '(Creat|Camera|Edit|Upload|Record|Post|Metadata|Comment|Rail|Timeline|Segment)' | sort -u | head -300
           echo "=== UPLOAD / COMMENT CLASSES ==="
-          grep -E '^[A-Z][A-Za-z0-9_]{3,80}$' all.txt | grep -E '(Upload|Moderation|CommentSetting|CommentsSetting|HoldAll|CommentPolicy|CommentOption|PostCreation|Publish)' | sort -u | head -300
-          echo "=== SWIFT CAMERA SYMBOLS ==="
-          grep -E '_TtC[0-9A-Za-z_]*(Camera|Capture|Record|Upload|Moderation)' all.txt | sort -u | head -120
+          grep -E '^[A-Z][A-Za-z0-9_]{3,80}$' all.txt | grep -E '(Upload|Moderation|CommentSetting|CommentsSetting|HoldAll|CommentPolicy|CommentOption|Publish|Visibility)' | sort -u | head -250
           echo "=== STRINGS ==="
+          ls -d "$APP"/*.bundle | sed 's|.*/||' | tr '\n' ' '; echo
           find "$APP" -path '*en.lproj*' -name '*.strings' | while read f; do
-            plutil -convert xml1 -o - "$f" 2>/dev/null | grep -iE -B1 'hold all|hold potentially|comment moderation|increase strictness|save to device|download|60 ?fps|stabiliz|ultra ?wide|0\.5|lens' | grep -E '<(key|string)>' | head -80 | sed "s|^|$(basename $(dirname $(dirname "$f")))/$(basename "$f"): |"
-          done | head -500
-          echo "=== STRINGS IN BINARY ==="
-          grep -iE '^(hold all|comments|comment moderation|hold potentially inappropriate comments for review|increase strictness)' all.txt | sort -u | head -50
+            b=$(basename "$(dirname "$(dirname "$f")")")/$(basename "$f")
+            plutil -convert xml1 -o - "$f" 2>/dev/null | python3 -c '
+          import sys, re
+          b = sys.argv[1]
+          txt = sys.stdin.read()
+          pairs = re.findall(r"<key>(.*?)</key>\s*<string>(.*?)</string>", txt, re.S)
+          pat = re.compile(r"hold all|hold potentially|moderation|strictness|comments? (on|off|setting)|allow comments|save to camera roll|ultra.?wide|stabiliz|fps|frame rate|align|0\.5|record|segment|undo|ghost", re.I)
+          for k, v in pairs:
+              if pat.search(k) or pat.search(v):
+                  print(b + ": " + k + " = " + v.replace("\n", " ")[:160])
+          ' "$b"
+          done | head -400
           echo "=== END ==="
 
       - name: Inject

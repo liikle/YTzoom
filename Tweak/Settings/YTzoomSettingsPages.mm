@@ -1821,12 +1821,15 @@ static NSDictionary *YTzoomShortsOptionsDefinition(void) {
                 YTzoomMoshStabilizationKey)
         ],
         @[
-            YTzoomToggleDetail(@"Hold All Comments Button",
-                @"Adds a button below the download button on the upload page that sets Comments to Hold all.",
+            YTzoomToggleDetail(@"Comments Toggle",
+                @"Adds a comment button below the AI title button on the upload page. On sets Comments to Hold all, off sets it to Basic.",
                 YTzoomHoldAllButtonKey),
-            YTzoomTextEntry(@"Hold All Option Text",
+            YTzoomTextEntry(@"\"Hold All\" Option Text",
                 @"The option's name as YouTube shows it in the Comments menu. Change it if your YouTube isn't in English.",
-                YTzoomHoldAllTextKey, @"Hold all", NO)
+                YTzoomHoldAllTextKey, @"Hold all", NO),
+            YTzoomTextEntry(@"\"Basic\" Option Text",
+                @"The name of the normal moderation option in the Comments menu.",
+                YTzoomHoldAllBasicTextKey, @"Basic", NO)
         ]
     ], @[YTzoomLocalized(@"PLAYBACK"), YTzoomLocalized(@"SCREEN TIME"), YTzoomLocalized(@"HIDE FROM SHORTS"),
          YTzoomLocalized(@"CREATE"), YTzoomLocalized(@"MOSHLY CAMERA"), YTzoomLocalized(@"UPLOAD")]);

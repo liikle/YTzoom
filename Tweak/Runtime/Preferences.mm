@@ -204,6 +204,8 @@ void YTzoomRegisterDefaults(void) {
         @"YTzoom.Preference.Mosh.Ghost": @YES,
         @"YTzoom.Preference.Mosh.Intensity": @3,
         @"YTzoom.Preference.Upload.HoldAllButton": @YES,
+        @"YTzoom.Preference.Upload.HoldAll": @NO,
+        @"YTzoom.Preference.Upload.BasicText": @"",
         @"YTzoom.Preference.Upload.HoldAllText": @"",
         @"YTzoom.Preference.Region.Language": @YES,
         @"YTzoom.Preference.Region.TimeZone": @YES,

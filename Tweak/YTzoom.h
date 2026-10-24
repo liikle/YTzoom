@@ -125,6 +125,8 @@ FOUNDATION_EXPORT NSString * const YTzoomMoshStabilizationKey;
 FOUNDATION_EXPORT NSString * const YTzoomMoshHighFrameRateKey;
 FOUNDATION_EXPORT NSString * const YTzoomMoshGhostKey;
 FOUNDATION_EXPORT NSString * const YTzoomHoldAllButtonKey;
+FOUNDATION_EXPORT NSString * const YTzoomHoldAllActiveKey;
+FOUNDATION_EXPORT NSString * const YTzoomHoldAllBasicTextKey;
 FOUNDATION_EXPORT NSString * const YTzoomHoldAllTextKey;
 void YTzoomInstallRegionHooks(void);
 void YTzoomApplyRegionOverride(id _Nullable context);

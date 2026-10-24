@@ -85,10 +85,11 @@ static float YTzoomCodecMeanDifference(CVPixelBufferRef a, CVPixelBufferRef b) {
     CMVideoFormatDescriptionRef _decoderFormat;
 
     os_unfair_lock _lock;
-    dispatch_semaphore_t _shown;
+    CVPixelBufferPoolRef _encodePool;  // copies of camera frames fed to the encoder
 
     CVPixelBufferRef _latestDecoded;   // decoder output, YouTube's format
     CVPixelBufferRef _lastInput;       // most recent encoder input, for ghost strength
+    BOOL _hasDecoded;                  // the decoder has produced at least one picture
 
     int64_t _encodeIndex;              // monotonic, carried as each frame's PTS
     int64_t _desyncAtIndex;            // withhold the first frame at/after this index; -1 when none
@@ -129,11 +130,18 @@ static const int kStallFrames = 150;
     _fps = frameRate;
     _format = pixelFormat;
     _lock = OS_UNFAIR_LOCK_INIT;
-    _shown = dispatch_semaphore_create(0);
     _desyncAtIndex = -1;
     _intensity = 3;
     _allowsRecoveryKeyframes = YES;
-    if (![self buildCompression] ||
+    NSDictionary *bufferAttrs = @{
+        (id)kCVPixelBufferPixelFormatTypeKey: @(pixelFormat),
+        (id)kCVPixelBufferWidthKey: @(width),
+        (id)kCVPixelBufferHeightKey: @(height),
+        (id)kCVPixelBufferIOSurfacePropertiesKey: @{}
+    };
+    if (CVPixelBufferPoolCreate(kCFAllocatorDefault, NULL,
+                                (__bridge CFDictionaryRef)bufferAttrs, &_encodePool) != kCVReturnSuccess ||
+        ![self buildCompression] ||
         CVPixelBufferCreate(kCFAllocatorDefault, width, height, pixelFormat,
                             (__bridge CFDictionaryRef)@{(id)kCVPixelBufferIOSurfacePropertiesKey: @{}},
                             &_latestDecoded) != kCVReturnSuccess) {
@@ -154,6 +162,7 @@ static const int kStallFrames = 150;
     if (_decoderFormat != NULL) CFRelease(_decoderFormat);
     if (_latestDecoded != NULL) CVPixelBufferRelease(_latestDecoded);
     if (_lastInput != NULL) CVPixelBufferRelease(_lastInput);
+    if (_encodePool != NULL) CVPixelBufferPoolRelease(_encodePool);
 }
 
 - (int)width { return _w; }
@@ -287,31 +296,39 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
 
     [self applyBitrateForFrame:_framesSinceClipStart];
 
+    // Encode a copy, not YouTube's buffer: encoding is asynchronous, and the
+    // decoded picture is written back into YouTube's buffer below, so handing
+    // the same buffer to the encoder would feed the decoder its own output.
+    CVPixelBufferRef toEncode = NULL;
+    if (CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, _encodePool, &toEncode) == kCVReturnSuccess &&
+        toEncode != NULL) {
+        YTzoomCodecCopy(pixelBuffer, toEncode);
+    } else {
+        toEncode = CVPixelBufferRetain(pixelBuffer);
+    }
+
     NSDictionary *frameProperties = forceKeyframe
         ? @{(id)kVTEncodeFrameOptionKey_ForceKeyFrame: @YES} : nil;
     CMTime pts = CMTimeMake(index, _fps);
     VTEncodeInfoFlags flags = 0;
-    OSStatus status = VTCompressionSessionEncodeFrame(_compression, pixelBuffer, pts,
+    OSStatus status = VTCompressionSessionEncodeFrame(_compression, toEncode, pts,
                                                       CMTimeMake(1, _fps),
                                                       (__bridge CFDictionaryRef)frameProperties,
                                                       NULL, &flags);
+    CVPixelBufferRelease(toEncode);
     if (status != noErr) {
         YTzoomDownloadLog(@"mosh", @"encode failed %d", (int)status);
         return NO;
     }
 
-    // Let the decoder catch up for this frame, but never block through a stall
-    // (which is the mosh), so time out after about a frame and a half.
-    dispatch_semaphore_wait(_shown, dispatch_time(DISPATCH_TIME_NOW,
-                            (int64_t)(1.5 * NSEC_PER_SEC / MAX(_fps, 1))));
-
+    // Never block the capture queue: a blocked queue makes AVFoundation discard
+    // camera frames, and the mosh deliberately stalls the decoder. Write back
+    // whatever the decoder has most recently produced; the pipeline lag is a
+    // few frames and, while a mosh holds the decoder, the held reference is the
+    // effect. The encode→decode path runs on its own VideoToolbox threads.
     os_unfair_lock_lock(&_lock);
-    BOOL haveDecoded = _latestDecoded != NULL && _framesWithoutOutput <= _framesSinceClipStart;
-    float ghost = _ghost;
-    (void)ghost;
-    if (haveDecoded) {
-        YTzoomCodecCopy(_latestDecoded, pixelBuffer);
-    }
+    BOOL haveDecoded = _hasDecoded;
+    if (haveDecoded) YTzoomCodecCopy(_latestDecoded, pixelBuffer);
     os_unfair_lock_unlock(&_lock);
     return haveDecoded;
 }
@@ -469,10 +486,10 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
     }
     os_unfair_lock_lock(&_lock);
     YTzoomCodecCopy(imageBuffer, _latestDecoded);
+    _hasDecoded = YES;
     _framesWithoutOutput = 0;
     if (_lastInput != NULL) _ghost = YTzoomCodecMeanDifference(_latestDecoded, _lastInput);
     os_unfair_lock_unlock(&_lock);
-    dispatch_semaphore_signal(_shown);
 }
 
 @end

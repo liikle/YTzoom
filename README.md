@@ -91,11 +91,12 @@ first frame and resubmitting P-frames so the motion compounds. **Mosh Strength**
 many times. Because it is a codec round-trip inside YouTube's capture path, it is heavier than a filter —
 report anything that stutters or drops frames on your device.
 
-## Hold All Comments
+## Comments Toggle
 
-On the upload page, a button below the download button sets Comments to **Hold all** in one tap. YouTube
-sends that menu's text from its servers, so if your YouTube isn't in English, set **Hold All Option Text**
-under YTzoom settings → Shorts → Upload to the option's name in your language.
+On the upload page, a comment button sits below the AI title button. On (crossed-out icon) sets Comments
+to **Hold all**; off (normal icon) sets it to **Basic**. It drives YouTube's own Comments → moderation
+menu in one tap. YouTube sends that menu's text from its servers, so if your YouTube isn't in English set
+the option names under YTzoom settings → Shorts → Upload.
 
 ## Region Testing
 

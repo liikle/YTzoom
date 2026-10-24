@@ -77,14 +77,17 @@ static NSMutableArray *YTzoomMoshClipFrames;
 static CFTimeInterval YTzoomMoshClipFrameTime;
 
 static void YTzoomMoshNoteLiveAppend(CMTime time) {
-    if (!CMTIME_IS_NUMERIC(time)) return;
-    // Live recording stamps frames with the host clock; exports in the editor
-    // start near zero, so they never count as recording.
-    Float64 now = CMTimeGetSeconds(CMClockGetTime(CMClockGetHostTimeClock()));
-    if (fabs(CMTimeGetSeconds(time) - now) > 5.0) return;
+    (void)time;
+    // Any video append counts as recording. (An earlier host-clock gate meant
+    // to exclude editor exports also rejected real recording, because YouTube,
+    // like Moshly, timestamps its writer from a counter near zero rather than
+    // the host clock.) The recorder hooks below are preferred when present and
+    // avoid treating an export as a clip.
     os_unfair_lock_lock(&YTzoomMoshLock);
+    BOOL first = YTzoomMoshLastLiveAppend == 0.0;
     YTzoomMoshLastLiveAppend = CACurrentMediaTime();
     os_unfair_lock_unlock(&YTzoomMoshLock);
+    if (first) YTzoomDownloadLog(@"mosh", @"first writer append seen");
 }
 
 static BOOL YTzoomMoshIsRecording(void) {
@@ -199,6 +202,10 @@ static void YTzoomMoshHandleFrame(AVCaptureOutput *output, CMSampleBufferRef sam
     if (main == nil || (output != main && area > YTzoomMoshMainArea)) {
         YTzoomMoshMainOutput = output;
         main = output;
+        YTzoomDownloadLog(@"mosh", @"main output %@ %zux%zu fmt %u recorderHooked %d",
+                          NSStringFromClass(output.class), CVPixelBufferGetWidth(frame),
+                          CVPixelBufferGetHeight(frame),
+                          (unsigned)CVPixelBufferGetPixelFormatType(frame), YTzoomMoshRecorderHooked);
     }
     if (output != main) return;
     YTzoomMoshMainArea = area;
@@ -249,7 +256,12 @@ static void YTzoomMoshHandleFrame(AVCaptureOutput *output, CMSampleBufferRef sam
         // Runs every recorded frame: encodes it and writes the decoder's latest
         // picture back in place. While a mosh holds the decoder that picture is
         // the held reference, which is the effect, in the preview and the file.
-        [YTzoomMoshCodecInstance processPixelBuffer:frame];
+        BOOL wrote = [YTzoomMoshCodecInstance processPixelBuffer:frame];
+        static int logCounter;
+        if ((logCounter++ % 30) == 0) {
+            YTzoomDownloadLog(@"mosh", @"recording mosh %d wroteDecoded %d ghost %.1f",
+                              YTzoomMoshMoshing, wrote, YTzoomMoshCodecInstance.ghostStrength);
+        }
         if (YTzoomMoshLatestFrame != frame) {
             if (YTzoomMoshLatestFrame != NULL) CVPixelBufferRelease(YTzoomMoshLatestFrame);
             YTzoomMoshLatestFrame = CVPixelBufferRetain(frame);
@@ -796,15 +808,11 @@ static void YTzoomMoshStopRunning(AVCaptureSession *session, SEL selector) {
 
 static void YTzoomMoshSetStabilization(AVCaptureConnection *connection, SEL selector,
                                        AVCaptureVideoStabilizationMode mode) {
-    // While the Moshly camera is on, stabilization follows its toggle: it
-    // changes the motion the mosh feeds on, so it is off unless asked for.
+    // While the Moshly camera is on, stabilization follows its toggle and is
+    // forced to Standard (not the laggy cinematic modes) when on, off otherwise.
     if (YTzoomMoshEnabled() && YTzoomMoshSession != nil && connection.isVideoStabilizationSupported) {
-        AVCaptureVideoStabilizationMode wanted = YTzoomMoshPreference(YTzoomMoshStabilizationKey)
-            ? mode : AVCaptureVideoStabilizationModeOff;
-        if (YTzoomMoshPreference(YTzoomMoshStabilizationKey) && mode == AVCaptureVideoStabilizationModeOff) {
-            wanted = AVCaptureVideoStabilizationModeStandard;
-        }
-        mode = wanted;
+        mode = YTzoomMoshPreference(YTzoomMoshStabilizationKey)
+            ? AVCaptureVideoStabilizationModeStandard : AVCaptureVideoStabilizationModeOff;
     }
     ((void (*)(id, SEL, AVCaptureVideoStabilizationMode))OriginalSetStabilization)(connection, selector, mode);
 }
@@ -994,6 +1002,9 @@ static UIColor *YTzoomMoshOnColor(void) {
     [self hideGhost];
     UIViewController *controller = [self cameraController];
     UIView *preview = [self previewViewIn:controller.view depth:0];
+    // Over the camera picture but under YouTube's controls: just above the
+    // preview view if found, else low in the controller's z-order (index 1),
+    // which still sits above the camera layer at the back.
     UIView *host = preview.superview ?: controller.view;
     if (host == nil) return;
     UIImageView *ghost = [[UIImageView alloc] initWithImage:image];
@@ -1002,11 +1013,25 @@ static UIColor *YTzoomMoshOnColor(void) {
     ghost.alpha = 0.0;
     ghost.userInteractionEnabled = NO;
     ghost.accessibilityIdentifier = @"YTzoom.MoshGhost";
-    ghost.frame = preview != nil ? preview.frame : host.bounds;
-    ghost.autoresizingMask = UIViewAutoresizingFlexibleWidth | UIViewAutoresizingFlexibleHeight;
-    if (preview != nil) [host insertSubview:ghost aboveSubview:preview];
-    else [host addSubview:ghost];
+    ghost.translatesAutoresizingMaskIntoConstraints = NO;
+    UIView *reference = preview ?: host;
+    if (preview != nil) {
+        [host insertSubview:ghost aboveSubview:preview];
+    } else if (host.subviews.count > 0) {
+        [host insertSubview:ghost atIndex:MIN((NSUInteger)1, host.subviews.count)];
+    } else {
+        [host addSubview:ghost];
+    }
+    [NSLayoutConstraint activateConstraints:@[
+        [ghost.leadingAnchor constraintEqualToAnchor:reference.leadingAnchor],
+        [ghost.trailingAnchor constraintEqualToAnchor:reference.trailingAnchor],
+        [ghost.topAnchor constraintEqualToAnchor:reference.topAnchor],
+        [ghost.bottomAnchor constraintEqualToAnchor:reference.bottomAnchor]
+    ]];
     YTzoomMoshCurrentGhost = ghost;
+    YTzoomDownloadLog(@"mosh", @"ghost shown, preview %@ host %@",
+                      preview != nil ? NSStringFromClass(preview.class) : @"nil",
+                      NSStringFromClass(host.class));
     [UIView animateWithDuration:0.2 animations:^{ ghost.alpha = 0.45; }];
 }
 

@@ -78,24 +78,18 @@ BOOL YTzoomMoshConfigureFrameRate(AVCaptureDevice *device, int fps) {
 
 AVCaptureVideoStabilizationMode YTzoomMoshApplyStabilization(AVCaptureConnection *connection, BOOL enabled) {
     if (!connection.isVideoStabilizationSupported) return AVCaptureVideoStabilizationModeOff;
+    // Standard only. The cinematic modes add a lot of latency and crop, which
+    // is the delay the camera showed; Standard is responsive.
     AVCaptureVideoStabilizationMode mode = AVCaptureVideoStabilizationModeOff;
     if (enabled) {
-        NSMutableArray<NSNumber *> *ladder = [NSMutableArray array];
-        if (@available(iOS 13.0, *)) [ladder addObject:@(AVCaptureVideoStabilizationModeCinematicExtended)];
-        [ladder addObjectsFromArray:@[@(AVCaptureVideoStabilizationModeCinematic),
-                                      @(AVCaptureVideoStabilizationModeStandard)]];
         AVCaptureDeviceFormat *format = nil;
         for (AVCaptureInputPort *port in connection.inputPorts) {
             if ([port.input isKindOfClass:AVCaptureDeviceInput.class]) {
                 format = ((AVCaptureDeviceInput *)port.input).device.activeFormat;
             }
         }
-        for (NSNumber *candidate in ladder) {
-            AVCaptureVideoStabilizationMode value = (AVCaptureVideoStabilizationMode)candidate.integerValue;
-            if (format == nil || [format isVideoStabilizationModeSupported:value]) {
-                mode = value;
-                break;
-            }
+        if (format == nil || [format isVideoStabilizationModeSupported:AVCaptureVideoStabilizationModeStandard]) {
+            mode = AVCaptureVideoStabilizationModeStandard;
         }
     }
     connection.preferredVideoStabilizationMode = mode;

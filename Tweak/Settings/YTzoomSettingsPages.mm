@@ -1817,7 +1817,7 @@ static NSDictionary *YTzoomShortsOptionsDefinition(void) {
                 @"Falls back to 30 fps on lenses that can't do 60.",
                 YTzoomMoshHighFrameRateKey),
             YTzoomToggleDetail(@"Stabilization",
-                @"Off by default because it changes how the mosh moves.",
+                @"Standard stabilization, on by default. It changes how the mosh moves.",
                 YTzoomMoshStabilizationKey)
         ],
         @[

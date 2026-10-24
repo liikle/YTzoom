@@ -1104,3 +1104,4 @@ Licensed under CC BY-NC-SA 4.0.";
 "\"Hold All\" Option Text" = "\"Hold All\" Option Text";
 "\"Basic\" Option Text" = "\"Basic\" Option Text";
 "The name of the normal moderation option in the Comments menu." = "The name of the normal moderation option in the Comments menu.";
+"Standard stabilization, on by default. It changes how the mosh moves." = "Standard stabilization, on by default. It changes how the mosh moves.";

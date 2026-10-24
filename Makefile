@@ -86,6 +86,11 @@ YTzoom_FILES = \
 	Tweak/Features/AITitles/GeminiClient.mm \
 	Tweak/Features/AITitles/TitleGenerator.mm \
 	Tweak/Features/Region/RegionSpoof.mm \
+	Tweak/Features/Mosh/datamosh.mm \
+	Tweak/Features/Mosh/MoshEngine.mm \
+	Tweak/Features/Mosh/MoshLens.mm \
+	Tweak/Features/Mosh/MoshCamera.mm \
+	Tweak/Features/Shorts/CommentHoldButton.mm \
 	Tweak/Settings/SettingsEntry.mm \
 	Tweak/Settings/NativeSettingsEntry.mm \
 	Tweak/Settings/YTzoomRootOptionsController.mm \
@@ -100,7 +105,7 @@ YTzoom_CFLAGS += -DYTzoom_VERSION_STRING=\"$(shell awk '/^Version:/ {print $$2}'
 YTzoom_CFLAGS += -Wno-module-import-in-extern-c
 YTzoom_CFLAGS += -I$(THEOS_PROJECT_DIR)/Vendor/FFmpeg/include
 YTzoom_CCFLAGS = -std=c++17
-YTzoom_FRAMEWORKS = Foundation UIKit CoreGraphics CoreText JavaScriptCore AVFoundation AVKit AudioToolbox Photos QuartzCore MediaPlayer Security SystemConfiguration UniformTypeIdentifiers VideoToolbox CoreMedia
+YTzoom_FRAMEWORKS = Foundation UIKit CoreGraphics CoreText CoreImage CoreVideo JavaScriptCore AVFoundation AVKit AudioToolbox Photos QuartzCore MediaPlayer Security SystemConfiguration UniformTypeIdentifiers VideoToolbox CoreMedia
 YTzoom_LIBRARIES = z
 YTzoom_LDFLAGS = -Wl,-install_name,@rpath/YTzoom.dylib
 YTzoom_LDFLAGS += $(THEOS_PROJECT_DIR)/Vendor/FFmpeg/lib/libavformat.a

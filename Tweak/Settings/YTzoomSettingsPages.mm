@@ -359,6 +359,7 @@ BOOL YTzoomPreferenceNeedsRestart(NSString *key) {
         @"YTzoom.Preference.Feed.HomeTabsHidden",
         @"YTzoom.Preference.Language",
         @"YTzoom.Preference.Navigation.NotificationsHidden",
+        YTzoomMoshCameraKey,
         YTzoomRegionCountryKey,
         YTzoomRegionLanguageKey,
         YTzoomRegionTimeZoneKey,
@@ -1800,9 +1801,31 @@ static NSDictionary *YTzoomShortsOptionsDefinition(void) {
                 @"YTzoom.Preference.Shorts.PollOptions",
                 @[@"Original", @"6", @"10", @"20"],
                 @[@0, @6, @10, @20], 0)
+        ],
+        @[
+            YTzoomToggleDetail(@"Moshly Camera",
+                @"Datamosh between clips in the Shorts camera: record a clip, line up the next one over its ghost, and the next clip smears out of it. Adds lens, stabilization, 60 fps and datamosh buttons to the camera.",
+                YTzoomMoshCameraKey),
+            YTzoomToggleDetail(@"Ghost Preview",
+                @"Show the last frame of the previous clip over the camera until you record again.",
+                YTzoomMoshGhostKey),
+            YTzoomToggleDetail(@"Record at 60 fps",
+                @"Falls back to 30 fps on lenses that can't do 60.",
+                YTzoomMoshHighFrameRateKey),
+            YTzoomToggleDetail(@"Stabilization",
+                @"Off by default because it changes how the mosh moves.",
+                YTzoomMoshStabilizationKey)
+        ],
+        @[
+            YTzoomToggleDetail(@"Hold All Comments Button",
+                @"Adds a button below the download button on the upload page that sets Comments to Hold all.",
+                YTzoomHoldAllButtonKey),
+            YTzoomTextEntry(@"Hold All Option Text",
+                @"The option's name as YouTube shows it in the Comments menu. Change it if your YouTube isn't in English.",
+                YTzoomHoldAllTextKey, @"Hold all", NO)
         ]
     ], @[YTzoomLocalized(@"PLAYBACK"), YTzoomLocalized(@"SCREEN TIME"), YTzoomLocalized(@"HIDE FROM SHORTS"),
-         YTzoomLocalized(@"CREATE")]);
+         YTzoomLocalized(@"CREATE"), YTzoomLocalized(@"MOSHLY CAMERA"), YTzoomLocalized(@"UPLOAD")]);
 }
 
 static NSDictionary *YTzoomTopBarDefinition(void) {

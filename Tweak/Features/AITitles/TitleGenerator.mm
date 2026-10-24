@@ -485,6 +485,7 @@ static void YTzoomTitleEvaluate(UIView *input) {
 
 static void YTzoomTitleConsider(UIView *input) {
     if (input.window == nil) return;
+    YTzoomCommentHoldConsider(input);
     if (!YTzoomFeatureEnabled(YTzoomAITitlesKey) &&
         objc_getAssociatedObject(input, YTzoomTitleButtonAssociation) == nil) {
         return;

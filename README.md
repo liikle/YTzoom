@@ -16,6 +16,7 @@ An open-source YouTube enhancement for iOS.
 | Library | Downloaded video, Shorts and audio players with resume support |
 | Settings | Searchable settings, 15 languages and a native YouTube settings section |
 | AI titles | A Gemini-powered button next to the Shorts title box that suggests titles from the video and the text you added |
+| Moshly camera | Live datamosh between Shorts clips, a ghost of the last clip, 0.5× lens, stabilization and 60 fps |
 | Region testing | Tell YouTube you are in another country (US, UK, Japan and more) to test region-locked features |
 
 ## Compatibility
@@ -69,6 +70,29 @@ frames can be read), the text you typed in the Shorts editor and your draft titl
 the device and is left out of YTzoom backups. If the button doesn't show up on the upload screen,
 set **Show Button On** to **Any Text Box**, then hold the button to copy the screen's class names and
 open an issue with them.
+
+## Moshly Camera
+
+The Shorts camera keeps YouTube's screen, music picker and upload flow, with Moshly's datamosh engine
+underneath. Record a clip; its last frame stays on screen as a ghost so you can line up the next shot.
+Record the next clip and it smears out of the last one, live in the preview and in the recorded video.
+Deleting the last clip in YouTube brings back the ghost of the clip before it.
+
+Buttons on the left of the camera:
+
+- **Datamosh** (wand): on or off. Hold it to forget the last clip and start fresh.
+- **Lens**: 1× or 0.5× ultra-wide.
+- **Stabilization**: off by default, because it changes how the mosh moves.
+- **60/30**: frame rate. 60 fps is the default and falls back to 30 on lenses that can't do it.
+
+The engine is Moshly's portable C core (`Tweak/Features/Mosh/datamosh.*`), extended to take the camera's
+YUV frames directly and to spread the motion search across CPU cores.
+
+## Hold All Comments
+
+On the upload page, a button below the download button sets Comments to **Hold all** in one tap. YouTube
+sends that menu's text from its servers, so if your YouTube isn't in English, set **Hold All Option Text**
+under YTzoom settings → Shorts → Upload to the option's name in your language.
 
 ## Region Testing
 

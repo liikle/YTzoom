@@ -62,6 +62,7 @@ static void YTzoomInstallModules(void) {
     YTzoomInstallPostImageSaverHooks();
     YTzoomInstallNativeShareHooks();
     YTzoomInstallAITitleHooks();
+    YTzoomInstallMoshCameraHooks();
     YTzoomInstallRegionHooks();
     YTzoomInstallSettingsEntryHooks();
     YTzoomInstallNativeSettingsHooks();

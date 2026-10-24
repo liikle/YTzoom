@@ -64,6 +64,8 @@ YTzoom_FILES = \
 	Tweak/Features/Shorts/ShortsStartup.mm \
 	Tweak/Features/Shorts/ShortsPinch.mm \
 	Tweak/Features/Shorts/ShortsPiP.mm \
+	Tweak/Features/Shorts/ShortsStickers.mm \
+	Tweak/Features/Shorts/ShortsCreatorTools.mm \
 	Tweak/Features/Compatibility/SideloadCompatibility.mm \
 	Tweak/Features/Compatibility/CastCompatibility.mm \
 	Tweak/Features/Onboarding/FirstLaunch.mm \
@@ -98,7 +100,7 @@ YTzoom_CFLAGS += -DYTzoom_VERSION_STRING=\"$(shell awk '/^Version:/ {print $$2}'
 YTzoom_CFLAGS += -Wno-module-import-in-extern-c
 YTzoom_CFLAGS += -I$(THEOS_PROJECT_DIR)/Vendor/FFmpeg/include
 YTzoom_CCFLAGS = -std=c++17
-YTzoom_FRAMEWORKS = Foundation UIKit JavaScriptCore AVFoundation AVKit AudioToolbox Photos QuartzCore MediaPlayer Security SystemConfiguration UniformTypeIdentifiers VideoToolbox CoreMedia
+YTzoom_FRAMEWORKS = Foundation UIKit CoreGraphics CoreText JavaScriptCore AVFoundation AVKit AudioToolbox Photos QuartzCore MediaPlayer Security SystemConfiguration UniformTypeIdentifiers VideoToolbox CoreMedia
 YTzoom_LIBRARIES = z
 YTzoom_LDFLAGS = -Wl,-install_name,@rpath/YTzoom.dylib
 YTzoom_LDFLAGS += $(THEOS_PROJECT_DIR)/Vendor/FFmpeg/lib/libavformat.a

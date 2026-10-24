@@ -1774,8 +1774,35 @@ static NSDictionary *YTzoomShortsOptionsDefinition(void) {
             YTzoomToggle(@"Remove Save", @"YTzoom.Preference.Shorts.SaveHidden", @"", @""),
             YTzoomToggle(@"Remove Remix", @"YTzoom.Preference.Shorts.RemixHidden", @"", @""),
             YTzoomToggle(@"Remove Sound Button", @"YTzoom.Preference.Shorts.SoundHidden", @"", @"")
+        ],
+        @[
+            YTzoomToggleDetail(@"Invisible Interactive Stickers",
+                @"Polls, questions and other interactive stickers you add stay tappable but aren't drawn in the editor or the uploaded Short.",
+                @"YTzoom.Preference.Shorts.InvisibleStickers"),
+            YTzoomPickerDetail(@"Sticker Max Size",
+                @"Pinch interactive stickers past YouTube's 1.5x limit in the Shorts editor.",
+                @"YTzoom.Preference.Shorts.StickerMaxScale",
+                @[@"Original", @"3x", @"5x", @"10x", @"Unlimited"],
+                @[@0, @3, @5, @10, @-1], 0),
+            YTzoomToggleDetail(@"Unlimited Text & Image Stickers",
+                @"Remove YouTube's cap on how many text and image stickers a Short can have.",
+                @"YTzoom.Preference.Shorts.UnlimitedStickers"),
+            YTzoomActionDetail(@"Text Sticker Font",
+                @"Use a .ttf or .otf font from Files for every text sticker style.",
+                ^(UIViewController *controller) {
+                    YTzoomPresentStickerFontMenu(controller);
+                }),
+            YTzoomToggleDetail(@"Longer Polls",
+                @"Allow up to 500 characters in poll questions and 200 in answers.",
+                @"YTzoom.Preference.Shorts.LongerPolls"),
+            YTzoomPickerDetail(@"Poll Answer Options",
+                @"How many answers a new poll sticker can have.",
+                @"YTzoom.Preference.Shorts.PollOptions",
+                @[@"Original", @"6", @"10", @"20"],
+                @[@0, @6, @10, @20], 0)
         ]
-    ], @[YTzoomLocalized(@"PLAYBACK"), YTzoomLocalized(@"SCREEN TIME"), YTzoomLocalized(@"HIDE FROM SHORTS")]);
+    ], @[YTzoomLocalized(@"PLAYBACK"), YTzoomLocalized(@"SCREEN TIME"), YTzoomLocalized(@"HIDE FROM SHORTS"),
+         YTzoomLocalized(@"CREATE")]);
 }
 
 static NSDictionary *YTzoomTopBarDefinition(void) {

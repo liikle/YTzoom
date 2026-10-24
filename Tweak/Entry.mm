@@ -44,6 +44,8 @@ static void YTzoomInstallModules(void) {
     YTzoomInstallShortsStartupHooks();
     YTzoomInstallShortsPinchHooks();
     YTzoomInstallShortsPiPHooks();
+    YTzoomInstallShortsStickerHooks();
+    YTzoomInstallShortsCreatorHooks();
     YTzoomInstallProgressBarHooks();
     YTzoomInstallStreamingHooks();
     YTzoomInstallHLSPlaybackHooks();

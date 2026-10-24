@@ -4,6 +4,7 @@
 @class CALayer;
 @class UIImage;
 @class UIColor;
+@class UIViewController;
 
 NS_ASSUME_NONNULL_BEGIN
 
@@ -61,6 +62,9 @@ void YTzoomInstallShortsLimitHooks(void);
 void YTzoomInstallShortsStartupHooks(void);
 void YTzoomInstallShortsPinchHooks(void);
 void YTzoomInstallShortsPiPHooks(void);
+void YTzoomInstallShortsStickerHooks(void);
+void YTzoomInstallShortsCreatorHooks(void);
+void YTzoomPresentStickerFontMenu(UIViewController *controller);
 void YTzoomSetShortsOverlayFullscreen(UIView *overlay, BOOL fullscreen);
 void YTzoomSetShortsElementsFullscreen(UIView *container, BOOL fullscreen);
 UIView *YTzoomShortsContainerForView(UIView *view, UIView *fallbackRoot);

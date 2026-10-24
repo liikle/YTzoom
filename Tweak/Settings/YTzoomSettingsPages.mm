@@ -2011,14 +2011,13 @@ static NSDictionary *YTzoomAIDefinition(void) {
     return YTzoomPageDefinition(@"ai", @"AI & Region", @[
         @[
             YTzoomToggleDetail(@"AI Title Button",
-                @"Adds a button next to the title box when you upload a Short. Gemini writes titles from the video and the text you added.",
+                @"Adds a button next to the title box when you upload a Short. Gemini suggests 5 short titles from the video and the text you added.",
                 YTzoomAITitlesKey),
             YTzoomTextEntry(@"Gemini API Key",
                 @"Get a key at aistudio.google.com. It stays on this device and isn't included in backups.",
                 @"YTzoom.Secret.GeminiAPIKey", @"AIza...", YES),
             YTzoomTextEntry(@"Gemini Model", @"Leave empty to use the latest Flash model.",
                 @"YTzoom.Preference.AITitles.Model", @"gemini-flash-latest", NO),
-            YTzoomToggle(@"Add Hashtags", YTzoomAITitlesHashtagsKey, @"", @""),
             YTzoomPickerDetail(@"Show Button On",
                 @"If the button doesn't appear on the upload screen, use Any Text Box and hold the button to copy the screen's class names.",
                 YTzoomAITitlesPlacementKey,

@@ -11,9 +11,9 @@
 #import <objc/runtime.h>
 
 NSString * const YTzoomAITitlesKey = @"YTzoom.Preference.AITitles.Enabled";
-NSString * const YTzoomAITitlesHashtagsKey = @"YTzoom.Preference.AITitles.Hashtags";
 NSString * const YTzoomAITitlesPlacementKey = @"YTzoom.Preference.AITitles.Placement";
 
+static const NSUInteger YTzoomTitleSuggestionCount = 5;
 static const NSTimeInterval YTzoomTitleMediaLifetime = 3.0 * 60.0 * 60.0;
 static const NSTimeInterval YTzoomTitleTextLifetime = 45.0 * 60.0;
 static const void *YTzoomTitleButtonAssociation = &YTzoomTitleButtonAssociation;
@@ -300,6 +300,7 @@ static UIViewController *YTzoomTitlePresenter(UIView *view) {
 @property(nonatomic, weak) UIView *textInput;
 @property(nonatomic, strong) UIActivityIndicatorView *spinner;
 @property(nonatomic) BOOL busy;
+@property(nonatomic, strong) NSMutableOrderedSet<NSString *> *rejectedTitles;
 @end
 
 @implementation YTzoomTitleButton
@@ -307,6 +308,7 @@ static UIViewController *YTzoomTitlePresenter(UIView *view) {
 + (instancetype)buttonForInput:(UIView *)input {
     YTzoomTitleButton *button = [self buttonWithType:UIButtonTypeSystem];
     button.textInput = input;
+    button.rejectedTitles = [NSMutableOrderedSet orderedSet];
     UIImageSymbolConfiguration *configuration =
         [UIImageSymbolConfiguration configurationWithPointSize:17.0 weight:UIImageSymbolWeightSemibold];
     [button setImage:[UIImage systemImageNamed:@"sparkles" withConfiguration:configuration]
@@ -338,6 +340,11 @@ static UIViewController *YTzoomTitlePresenter(UIView *view) {
 }
 
 - (void)generate {
+    [self.rejectedTitles removeAllObjects];
+    [self requestTitles];
+}
+
+- (void)requestTitles {
     UIView *input = self.textInput;
     if (self.busy || input == nil) return;
     if (!YTzoomGeminiHasAPIKey()) {
@@ -349,13 +356,13 @@ static UIViewController *YTzoomTitlePresenter(UIView *view) {
         NSCharacterSet.whitespaceAndNewlineCharacterSet];
     NSArray<NSString *> *texts = YTzoomTitleEditorTexts(current);
     UIImage *screenshot = YTzoomTitleScreenshot(input.window);
-    BOOL hashtags = YTzoomFeatureEnabled(YTzoomAITitlesHashtagsKey);
+    NSArray<NSString *> *avoid = self.rejectedTitles.array;
     __weak YTzoomTitleButton *weakSelf = self;
     dispatch_async(dispatch_get_global_queue(QOS_CLASS_USER_INITIATED, 0), ^{
         NSArray<UIImage *> *frames = YTzoomTitleVideoFrames();
         BOOL useScreenshot = frames.count == 0 && screenshot != nil;
         YTzoomGeminiGenerateTitles(useScreenshot ? @[screenshot] : frames, useScreenshot,
-                                   texts, current, 3, hashtags,
+                                   texts, current, avoid, YTzoomTitleSuggestionCount,
                                    ^(NSArray<NSString *> *titles, NSString *error) {
             YTzoomTitleButton *button = weakSelf;
             button.busy = NO;
@@ -383,10 +390,12 @@ static UIViewController *YTzoomTitlePresenter(UIView *view) {
             if (input != nil) YTzoomTitleApply(input, title);
         }]];
     }
-    [sheet addAction:[UIAlertAction actionWithTitle:YTzoomLocalized(@"Try Again")
+    [sheet addAction:[UIAlertAction actionWithTitle:YTzoomLocalized(@"Regenerate")
                                               style:UIAlertActionStyleDefault
                                             handler:^(__unused UIAlertAction *action) {
-        [weakSelf generate];
+        YTzoomTitleButton *button = weakSelf;
+        [button.rejectedTitles addObjectsFromArray:titles];
+        [button requestTitles];
     }]];
     [sheet addAction:[UIAlertAction actionWithTitle:YTzoomLocalized(@"Cancel")
                                               style:UIAlertActionStyleCancel

@@ -10,6 +10,7 @@ NSString * const YTzoomGeminiModelKey = @"YTzoom.Preference.AITitles.Model";
 NSString * const YTzoomGeminiDefaultModel = @"gemini-flash-latest";
 
 static const NSUInteger YTzoomTitleMaxLength = 100;
+static const NSUInteger YTzoomTitleMaxWords = 4;
 
 static NSString *YTzoomGeminiString(NSString *key) {
     id value = YTzoomPreferenceObject(key);
@@ -33,8 +34,8 @@ static NSString *YTzoomGeminiPrompt(NSUInteger imageCount,
                                     BOOL screenshot,
                                     NSArray<NSString *> *texts,
                                     NSString *currentTitle,
-                                    NSUInteger count,
-                                    BOOL hashtags) {
+                                    NSArray<NSString *> *avoidTitles,
+                                    NSUInteger count) {
     NSMutableString *prompt = [NSMutableString string];
     [prompt appendFormat:@"You write titles for YouTube Shorts. Suggest %lu different titles "
                           "for the Short described below.\n\n", (unsigned long)count];
@@ -54,17 +55,19 @@ static NSString *YTzoomGeminiPrompt(NSUInteger imageCount,
     if (currentTitle.length != 0) {
         [prompt appendFormat:@"The creator's current draft title is: %@\n", currentTitle];
     }
+    if (avoidTitles.count != 0) {
+        [prompt appendString:@"The creator didn't like these titles, so write different ones:\n"];
+        for (NSString *title in avoidTitles) [prompt appendFormat:@"- %@\n", title];
+    }
     [prompt appendFormat:
         @"\nRules:\n"
+         "- Each title is 1 to %lu words. Shorter is fine.\n"
+         "- A title may end with one emoji, but doesn't have to. No emoji anywhere else.\n"
          "- Describe what actually happens in the video. Don't invent details.\n"
-         "- Keep each title under 70 characters.\n"
          "- Write in the same language as the creator's text. If there is none, write in %@.\n"
-         "- No quotation marks around titles. At most one emoji per title.\n"
-         "- %@\n"
-         "\nReturn JSON with a \"titles\" array of strings.",
-        YTzoomGeminiLanguageName(),
-        hashtags ? @"End each title with one or two relevant hashtags."
-                 : @"Don't use hashtags."];
+         "- No hashtags and no quotation marks.\n"
+         "\nReturn JSON with a \"titles\" array of %lu strings.",
+        (unsigned long)YTzoomTitleMaxWords, YTzoomGeminiLanguageName(), (unsigned long)count];
     return prompt;
 }
 
@@ -102,6 +105,18 @@ static NSString *YTzoomGeminiCleanTitle(NSString *raw) {
     return title;
 }
 
+// Emoji don't count as words.
+static NSUInteger YTzoomGeminiWordCount(NSString *title) {
+    NSUInteger words = 0;
+    for (NSString *token in [title componentsSeparatedByCharactersInSet:
+             NSCharacterSet.whitespaceCharacterSet]) {
+        if ([token rangeOfCharacterFromSet:NSCharacterSet.alphanumericCharacterSet].location != NSNotFound) {
+            words++;
+        }
+    }
+    return words;
+}
+
 static NSArray<NSString *> *YTzoomGeminiParseTitles(NSString *text) {
     NSArray *raw = nil;
     NSData *data = [text dataUsingEncoding:NSUTF8StringEncoding];
@@ -115,7 +130,8 @@ static NSArray<NSString *> *YTzoomGeminiParseTitles(NSString *text) {
     for (id entry in raw) {
         if (![entry isKindOfClass:NSString.class]) continue;
         NSString *title = YTzoomGeminiCleanTitle(entry);
-        if (title.length != 0) [titles addObject:title];
+        NSUInteger words = YTzoomGeminiWordCount(title);
+        if (words != 0 && words <= YTzoomTitleMaxWords) [titles addObject:title];
     }
     return titles.array;
 }
@@ -134,8 +150,8 @@ void YTzoomGeminiGenerateTitles(NSArray<UIImage *> *images,
                                 BOOL imagesAreScreenshot,
                                 NSArray<NSString *> *editorTexts,
                                 NSString *currentTitle,
+                                NSArray<NSString *> *avoidTitles,
                                 NSUInteger count,
-                                BOOL hashtags,
                                 YTzoomGeminiTitlesCompletion completion) {
     void (^finish)(NSArray *, NSString *) = ^(NSArray *titles, NSString *message) {
         dispatch_async(dispatch_get_main_queue(), ^{ completion(titles, message); });
@@ -161,7 +177,7 @@ void YTzoomGeminiGenerateTitles(NSArray<UIImage *> *images,
             [parts addObject:@{@"inline_data": @{@"mime_type": @"image/jpeg", @"data": encoded}}];
         }
         [parts insertObject:@{@"text": YTzoomGeminiPrompt(parts.count, imagesAreScreenshot,
-                                                          editorTexts, currentTitle, count, hashtags)}
+                                                          editorTexts, currentTitle, avoidTitles, count)}
                     atIndex:0];
         NSDictionary *body = @{
             @"contents": @[@{@"role": @"user", @"parts": parts}],
@@ -215,7 +231,7 @@ void YTzoomGeminiGenerateTitles(NSArray<UIImage *> *images,
                     : YTzoomLocalized(@"Gemini didn't return any titles. Try again."));
                 return;
             }
-            finish(titles, nil);
+            finish(titles.count > count ? [titles subarrayWithRange:NSMakeRange(0, count)] : titles, nil);
         }] resume];
     });
 }

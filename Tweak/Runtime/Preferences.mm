@@ -187,7 +187,6 @@ void YTzoomRegisterDefaults(void) {
         @"YTzoom.Preference.Tabs.Hidden.Notifs": @YES,
         @"YTzoom.Preference.Tabs.Hidden.WatchLater": @YES,
         @"YTzoom.Preference.AITitles.Enabled": @NO,
-        @"YTzoom.Preference.AITitles.Hashtags": @NO,
         @"YTzoom.Preference.AITitles.Placement": @0,
         @"YTzoom.Preference.Region.Country": @"",
         @"YTzoom.Preference.Region.Language": @YES,

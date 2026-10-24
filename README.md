@@ -61,7 +61,8 @@ Both pages carry the same options, and the YouTube Settings section has a search
 
 1. Get a Gemini API key at [aistudio.google.com](https://aistudio.google.com/apikey).
 2. Open YTzoom settings → **AI & Region**, turn on **AI Title Button** and paste the key into **Gemini API Key**.
-3. When you upload a Short, tap the ✨ button next to the title box and pick one of the suggestions.
+3. When you upload a Short, tap the ✨ button next to the title box. Pick one of the 5 suggested titles (1–4 words, sometimes
+   ending in an emoji), or tap **Regenerate** for 5 new ones.
 
 Gemini receives a few frames from your video (or a screenshot of the upload screen if no video
 frames can be read), the text you typed in the Shorts editor and your draft title. The key stays on

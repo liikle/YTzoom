@@ -117,7 +117,6 @@ void YTzoomApplyRegionOverride(id _Nullable context);
 NSString * _Nullable YTzoomRegionOverride(void);
 NSArray<NSString *> *YTzoomRegionCountryCodes(void);
 FOUNDATION_EXPORT NSString * const YTzoomAITitlesKey;
-FOUNDATION_EXPORT NSString * const YTzoomAITitlesHashtagsKey;
 FOUNDATION_EXPORT NSString * const YTzoomAITitlesPlacementKey;
 FOUNDATION_EXPORT NSString * const YTzoomRegionCountryKey;
 FOUNDATION_EXPORT NSString * const YTzoomRegionLanguageKey;

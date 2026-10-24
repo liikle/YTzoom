@@ -18,8 +18,8 @@ FOUNDATION_EXPORT void YTzoomGeminiGenerateTitles(NSArray<UIImage *> *images,
                                                   BOOL imagesAreScreenshot,
                                                   NSArray<NSString *> *editorTexts,
                                                   NSString *_Nullable currentTitle,
+                                                  NSArray<NSString *> *avoidTitles,
                                                   NSUInteger count,
-                                                  BOOL hashtags,
                                                   YTzoomGeminiTitlesCompletion completion);
 
 NS_ASSUME_NONNULL_END

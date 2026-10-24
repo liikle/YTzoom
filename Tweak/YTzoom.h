@@ -111,6 +111,18 @@ BOOL YTzoomProductOverlayMatches(id overlay);
 void YTzoomInstallNativeShareHooks(void);
 void YTzoomProfileConsiderDisplayView(UIView *view, id node);
 void YTzoomScheduleFirstLaunch(void);
+void YTzoomInstallAITitleHooks(void);
+void YTzoomInstallRegionHooks(void);
+void YTzoomApplyRegionOverride(id _Nullable context);
+NSString * _Nullable YTzoomRegionOverride(void);
+NSArray<NSString *> *YTzoomRegionCountryCodes(void);
+FOUNDATION_EXPORT NSString * const YTzoomAITitlesKey;
+FOUNDATION_EXPORT NSString * const YTzoomAITitlesHashtagsKey;
+FOUNDATION_EXPORT NSString * const YTzoomAITitlesPlacementKey;
+FOUNDATION_EXPORT NSString * const YTzoomRegionCountryKey;
+FOUNDATION_EXPORT NSString * const YTzoomRegionLanguageKey;
+FOUNDATION_EXPORT NSString * const YTzoomRegionTimeZoneKey;
+FOUNDATION_EXPORT NSString * const YTzoomRegionLocaleKey;
 
 NS_ASSUME_NONNULL_END
 void YTzoomInstallPlaybackFixHooks(void);

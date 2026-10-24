@@ -297,6 +297,36 @@ static NSDictionary *YTzoomActionDetail(NSString *title,
     };
 }
 
+static NSDictionary *YTzoomTextEntry(NSString *title,
+                                      NSString *subtitle,
+                                      NSString *key,
+                                      NSString *placeholder,
+                                      BOOL secure) {
+    return @{
+        @"type": @"entry",
+        @"title": YTzoomLocalized(title),
+        @"en": title,
+        @"subtitle": YTzoomLocalized(subtitle ?: @""),
+        @"key": key,
+        @"placeholder": placeholder ?: @"",
+        @"secure": @(secure),
+        @"asset": @"",
+        @"symbol": @""
+    };
+}
+
+static NSString *YTzoomTextEntrySummary(NSDictionary *item) {
+    id stored = YTzoomPreferenceObject(item[@"key"]);
+    NSString *value = [stored isKindOfClass:NSString.class] ? stored : @"";
+    if (value.length == 0) {
+        return [item[@"secure"] boolValue] ? YTzoomLocalized(@"Not Set") : item[@"placeholder"];
+    }
+    if (![item[@"secure"] boolValue]) return value;
+    return value.length > 4
+        ? [@"••••" stringByAppendingString:[value substringFromIndex:value.length - 4]]
+        : @"••••";
+}
+
 static UIColor *YTzoomSettingsBackground(void) {
     return [UIColor colorWithDynamicProvider:^UIColor *(UITraitCollection *traits) {
         return YTzoomInterfaceBackgroundColor(traits);
@@ -328,7 +358,11 @@ BOOL YTzoomPreferenceNeedsRestart(NSString *key) {
         @"YTzoom.Preference.Playback.CaptionsMode",
         @"YTzoom.Preference.Feed.HomeTabsHidden",
         @"YTzoom.Preference.Language",
-        @"YTzoom.Preference.Navigation.NotificationsHidden"
+        @"YTzoom.Preference.Navigation.NotificationsHidden",
+        YTzoomRegionCountryKey,
+        YTzoomRegionLanguageKey,
+        YTzoomRegionTimeZoneKey,
+        YTzoomRegionLocaleKey
     ] containsObject:key];
 }
 
@@ -895,6 +929,18 @@ willDisplayHeaderView:(UIView *)view
         dot.layer.borderWidth = 2.0;
         dot.layer.borderColor = UIColor.secondaryLabelColor.CGColor;
         cell.accessoryView = dot;
+    } else if ([type isEqualToString:@"entry"]) {
+        UILabel *value = [UILabel new];
+        value.text = YTzoomTextEntrySummary(item);
+        value.font = [UIFont systemFontOfSize:15.0];
+        value.textColor = YTzoomAccentColor();
+        value.textAlignment = NSTextAlignmentRight;
+        value.lineBreakMode = NSLineBreakByTruncatingMiddle;
+        [value sizeToFit];
+        CGRect frame = value.frame;
+        frame.size.width = MIN(frame.size.width, 160.0);
+        value.frame = frame;
+        cell.accessoryView = value;
     } else if ([type isEqualToString:@"text"]) {
         cell.textLabel.font = [UIFont systemFontOfSize:10.0];
         cell.textLabel.textColor = UIColor.secondaryLabelColor;
@@ -988,6 +1034,8 @@ willDisplayHeaderView:(UIView *)view
     } else if ([type isEqualToString:@"action"]) {
         YTzoomAction action = item[@"action"];
         action(self);
+    } else if ([type isEqualToString:@"entry"]) {
+        [self editTextEntry:item atIndexPath:indexPath];
     } else if ([type isEqualToString:@"color"]) {
         NSString *stored = YTzoomPreferenceObject(item[@"key"]);
         UIColorPickerViewController *picker = [UIColorPickerViewController new];
@@ -1233,6 +1281,46 @@ didPickDocumentsAtURLs:(NSArray<NSURL *> *)urls {
             NSArray *categories = @[@"Video", @"Audio", @"Shorts"];
             [self beginImportForCategory:categories[index]];
         });
+}
+
+- (void)editTextEntry:(NSDictionary *)item atIndexPath:(NSIndexPath *)indexPath {
+    NSString *key = item[@"key"];
+    id stored = YTzoomPreferenceObject(key);
+    UIAlertController *alert = [UIAlertController alertControllerWithTitle:item[@"title"]
+                                                                   message:item[@"subtitle"]
+                                                            preferredStyle:UIAlertControllerStyleAlert];
+    [alert addTextFieldWithConfigurationHandler:^(UITextField *field) {
+        field.text = [stored isKindOfClass:NSString.class] ? stored : @"";
+        field.placeholder = item[@"placeholder"];
+        field.secureTextEntry = [item[@"secure"] boolValue];
+        field.autocorrectionType = UITextAutocorrectionTypeNo;
+        field.autocapitalizationType = UITextAutocapitalizationTypeNone;
+        field.clearButtonMode = UITextFieldViewModeWhileEditing;
+    }];
+    __weak YTzoomOptionsController *weakSelf = self;
+    void (^store)(NSString *) = ^(NSString *value) {
+        YTzoomSetPreferenceObject(key, value.length != 0 ? value : nil);
+        [weakSelf.tableView reloadRowsAtIndexPaths:@[indexPath]
+                                  withRowAnimation:UITableViewRowAnimationNone];
+    };
+    [alert addAction:[UIAlertAction actionWithTitle:YTzoomLocalized(@"Cancel")
+                                              style:UIAlertActionStyleCancel
+                                            handler:nil]];
+    if ([stored isKindOfClass:NSString.class] && [stored length] != 0) {
+        [alert addAction:[UIAlertAction actionWithTitle:YTzoomLocalized(@"Clear")
+                                                  style:UIAlertActionStyleDestructive
+                                                handler:^(__unused UIAlertAction *action) {
+            store(nil);
+        }]];
+    }
+    __weak UIAlertController *weakAlert = alert;
+    [alert addAction:[UIAlertAction actionWithTitle:YTzoomLocalized(@"Save")
+                                              style:UIAlertActionStyleDefault
+                                            handler:^(__unused UIAlertAction *action) {
+        store([weakAlert.textFields.firstObject.text stringByTrimmingCharactersInSet:
+            NSCharacterSet.whitespaceAndNewlineCharacterSet]);
+    }]];
+    [self presentViewController:alert animated:YES completion:nil];
 }
 
 - (void)showResult:(NSString *)title message:(NSString *)message {
@@ -1912,6 +2000,44 @@ static NSDictionary *YTzoomGestureOptionsDefinition(void) {
          YTzoomLocalized(@"DOUBLE TAP"), YTzoomLocalized(@"SEEK")]);
 }
 
+static NSDictionary *YTzoomAIDefinition(void) {
+    NSMutableArray *regionTitles = [NSMutableArray arrayWithObject:@"Off"];
+    NSMutableArray *regionValues = [NSMutableArray arrayWithObject:@""];
+    NSLocale *english = [NSLocale localeWithLocaleIdentifier:@"en_US"];
+    for (NSString *code in YTzoomRegionCountryCodes()) {
+        [regionTitles addObject:[english localizedStringForCountryCode:code] ?: code];
+        [regionValues addObject:code];
+    }
+    return YTzoomPageDefinition(@"ai", @"AI & Region", @[
+        @[
+            YTzoomToggleDetail(@"AI Title Button",
+                @"Adds a button next to the title box when you upload a Short. Gemini writes titles from the video and the text you added.",
+                YTzoomAITitlesKey),
+            YTzoomTextEntry(@"Gemini API Key",
+                @"Get a key at aistudio.google.com. It stays on this device and isn't included in backups.",
+                @"YTzoom.Secret.GeminiAPIKey", @"AIza...", YES),
+            YTzoomTextEntry(@"Gemini Model", @"Leave empty to use the latest Flash model.",
+                @"YTzoom.Preference.AITitles.Model", @"gemini-flash-latest", NO),
+            YTzoomToggle(@"Add Hashtags", YTzoomAITitlesHashtagsKey, @"", @""),
+            YTzoomPickerDetail(@"Show Button On",
+                @"If the button doesn't appear on the upload screen, use Any Text Box and hold the button to copy the screen's class names.",
+                YTzoomAITitlesPlacementKey,
+                @[@"Upload Screen", @"Any Text Box"], @[@0, @1], 0)
+        ],
+        @[
+            YTzoomPickerDetail(@"Pretend to Be In",
+                @"For testing region-locked features. Changes what YouTube is told about your region; YouTube can still see your real location from your IP address and account.",
+                YTzoomRegionCountryKey, regionTitles, regionValues, 0),
+            YTzoomToggleDetail(@"Match Language", @"Also send that country's language.",
+                YTzoomRegionLanguageKey),
+            YTzoomToggleDetail(@"Match Time Zone", @"Also send that country's time zone.",
+                YTzoomRegionTimeZoneKey),
+            YTzoomToggleDetail(@"Change App Locale", @"YouTube also reads that country from iOS.",
+                YTzoomRegionLocaleKey)
+        ]
+    ], @[YTzoomLocalized(@"AI TITLES"), YTzoomLocalized(@"REGION (TESTING)")]);
+}
+
 UIViewController *YTzoomMakeTabBarOptionsController(void) {
     return [YTzoomTabEditorController new];
 }
@@ -1938,6 +2064,7 @@ NSArray<NSDictionary *> *YTzoomSettingsMenu(void) {
         @{@"header": @"LOOK & LAYOUT", @"rows": look},
         @{@"header": @"APP", @"rows": @[
             @{@"id": @"downloads", @"title": @"Downloads", @"detail": @"Download button, where to save, and backups", @"symbol": @"arrow.down.circle"},
+            @{@"id": @"ai", @"title": @"AI & Region", @"detail": @"Gemini titles and region testing", @"symbol": @"sparkles"},
             @{@"id": @"general", @"title": @"General", @"detail": @"Language, appearance, privacy, and prompts", @"symbol": @"gearshape"}
         ]}
     ];
@@ -1956,6 +2083,7 @@ static NSDictionary *YTzoomDefinitionForPage(NSString *pageID) {
     if ([pageID isEqualToString:@"glass"]) return YTzoomGlassOptionsDefinition();
     if ([pageID isEqualToString:@"general"]) return YTzoomGeneralDefinition();
     if ([pageID isEqualToString:@"downloads"]) return YTzoomDownloadsDefinition();
+    if ([pageID isEqualToString:@"ai"]) return YTzoomAIDefinition();
     return nil;
 }
 

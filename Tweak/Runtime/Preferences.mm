@@ -39,6 +39,26 @@ static void YTzoomAnnouncePreferenceChange(NSString *key) {
     }
 }
 
+static id YTzoomRenameLegacyValue(id value) {
+    if ([value isKindOfClass:NSString.class]) {
+        return [value isEqualToString:@"ytkace"] ? @"ytzoom" : value;
+    }
+    if ([value isKindOfClass:NSArray.class]) {
+        NSMutableArray *values = [NSMutableArray array];
+        for (id entry in (NSArray *)value) [values addObject:YTzoomRenameLegacyValue(entry)];
+        return values;
+    }
+    if ([value isKindOfClass:NSDictionary.class]) {
+        NSMutableDictionary *values = [NSMutableDictionary dictionary];
+        [(NSDictionary *)value enumerateKeysAndObjectsUsingBlock:^(id key, id entry, BOOL *stop) {
+            (void)stop;
+            values[YTzoomRenameLegacyValue(key)] = YTzoomRenameLegacyValue(entry);
+        }];
+        return values;
+    }
+    return value;
+}
+
 // Settings saved before the rename use the YTKACE prefix. Copy them over once.
 static void YTzoomMigrateLegacyPreferences(void) {
     NSUserDefaults *defaults = YTzoomDefaults();
@@ -49,15 +69,7 @@ static void YTzoomMigrateLegacyPreferences(void) {
         NSString *renamed = [@"YTzoom." stringByAppendingString:[key substringFromIndex:7]];
         renamed = [renamed stringByReplacingOccurrencesOfString:@"YTKACE" withString:@"YTzoom"];
         if ([defaults objectForKey:renamed] == nil) {
-            id value = stored[key];
-            if ([value isKindOfClass:NSArray.class]) {
-                NSMutableArray *values = [NSMutableArray array];
-                for (id entry in (NSArray *)value) {
-                    [values addObject:[entry isEqual:@"ytkace"] ? @"ytzoom" : entry];
-                }
-                value = values;
-            }
-            [defaults setObject:value forKey:renamed];
+            [defaults setObject:YTzoomRenameLegacyValue(stored[key]) forKey:renamed];
         }
         [defaults removeObjectForKey:key];
     }
@@ -174,6 +186,13 @@ void YTzoomRegisterDefaults(void) {
         @"YTzoom.Preference.Tabs.Hidden.History": @YES,
         @"YTzoom.Preference.Tabs.Hidden.Notifs": @YES,
         @"YTzoom.Preference.Tabs.Hidden.WatchLater": @YES,
+        @"YTzoom.Preference.AITitles.Enabled": @NO,
+        @"YTzoom.Preference.AITitles.Hashtags": @NO,
+        @"YTzoom.Preference.AITitles.Placement": @0,
+        @"YTzoom.Preference.Region.Country": @"",
+        @"YTzoom.Preference.Region.Language": @YES,
+        @"YTzoom.Preference.Region.TimeZone": @YES,
+        @"YTzoom.Preference.Region.Locale": @YES,
         @"YTzoom.Preference.Tabs.Order": @[@"home", @"shorts", @"subscriptions", @"library", @"ytzoom"]
     }];
     if (!hasPlacement && [legacyDownloadButton boolValue]) {

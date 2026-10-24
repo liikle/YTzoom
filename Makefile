@@ -81,6 +81,9 @@ YTzoom_FILES = \
 	Tweak/Features/Interface/PostImageSaver.mm \
 	Tweak/Features/Interface/NativeShareHooks.mm \
 	Tweak/Features/Interface/NavigationVisibility.mm \
+	Tweak/Features/AITitles/GeminiClient.mm \
+	Tweak/Features/AITitles/TitleGenerator.mm \
+	Tweak/Features/Region/RegionSpoof.mm \
 	Tweak/Settings/SettingsEntry.mm \
 	Tweak/Settings/NativeSettingsEntry.mm \
 	Tweak/Settings/YTzoomRootOptionsController.mm \

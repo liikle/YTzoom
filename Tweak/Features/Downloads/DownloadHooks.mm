@@ -623,6 +623,7 @@ static IMP OriginalContextLong;
 
 static void YTzoomCaptureContext(id context) {
     if (context == nil) return;
+    YTzoomApplyRegionOverride(context);
     @synchronized (YTzoomSABRDownloader.class) {
         if (YTzoomLastInnerTubeContext == nil) {
         }

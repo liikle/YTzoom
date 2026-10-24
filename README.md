@@ -15,6 +15,8 @@ An open-source YouTube enhancement for iOS.
 | Tabs | Hide, reorder and add YouTube destinations |
 | Library | Downloaded video, Shorts and audio players with resume support |
 | Settings | Searchable settings, 15 languages and a native YouTube settings section |
+| AI titles | A Gemini-powered button next to the Shorts title box that suggests titles from the video and the text you added |
+| Region testing | Tell YouTube you are in another country (US, UK, Japan and more) to test region-locked features |
 
 ## Compatibility
 
@@ -54,6 +56,25 @@ To build both IPAs in one run, fill in the second URL field as well: the workflo
 
 Open the YTzoom tab and tap the gear, or open YouTube Settings and choose YTzoom.
 Both pages carry the same options, and the YouTube Settings section has a search bar.
+
+## AI Titles
+
+1. Get a Gemini API key at [aistudio.google.com](https://aistudio.google.com/apikey).
+2. Open YTzoom settings → **AI & Region**, turn on **AI Title Button** and paste the key into **Gemini API Key**.
+3. When you upload a Short, tap the ✨ button next to the title box and pick one of the suggestions.
+
+Gemini receives a few frames from your video (or a screenshot of the upload screen if no video
+frames can be read), the text you typed in the Shorts editor and your draft title. The key stays on
+the device and is left out of YTzoom backups. If the button doesn't show up on the upload screen,
+set **Show Button On** to **Any Text Box**, then hold the button to copy the screen's class names and
+open an issue with them.
+
+## Region Testing
+
+**AI & Region → Pretend to Be In** changes the country, and optionally the language, time zone and
+locale, that YouTube is told on every request. Restart YouTube after changing it. YouTube can still
+see your real location from your IP address and account, so features gated on the server usually
+also need a VPN in that country. Use a test account.
 
 ## Screenshots
 

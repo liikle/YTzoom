@@ -12,6 +12,7 @@
 #import <CoreImage/CoreImage.h>
 #import <QuartzCore/QuartzCore.h>
 #import <UIKit/UIKit.h>
+#import <arm_neon.h>
 #import <objc/message.h>
 #import <objc/runtime.h>
 #import <os/lock.h>
@@ -181,13 +182,17 @@ static float YTzoomMoshDifference(CVPixelBufferRef a, CVPixelBufferRef b) {
 }
 
 // destination = from * (1 - weight) + destination * weight, every byte of
-// every plane (same layout). weight 0 is a plain copy of `from`.
+// every plane (same layout), sixteen bytes at a time with NEON. weight 0 is a
+// plain copy of `from`.
 static void YTzoomMoshBlendInto(CVPixelBufferRef from, CVPixelBufferRef destination, float weight) {
     if (weight <= 0.0f) {
         YTzoomMoshCopyInto(from, destination);
         return;
     }
-    unsigned keep = (unsigned)lroundf(MIN(1.0f, weight) * 256.0f);
+    if (weight >= 1.0f) return;
+    uint8_t keep = (uint8_t)MIN(255L, MAX(1L, lroundf(weight * 256.0f)));
+    uint8_t fade = (uint8_t)(256 - keep);
+    uint8x8_t keepLanes = vdup_n_u8(keep), fadeLanes = vdup_n_u8(fade);
     CVPixelBufferLockBaseAddress(from, kCVPixelBufferLock_ReadOnly);
     CVPixelBufferLockBaseAddress(destination, 0);
     BOOL planar = CVPixelBufferIsPlanar(from) && CVPixelBufferIsPlanar(destination);
@@ -207,9 +212,14 @@ static void YTzoomMoshBlendInto(CVPixelBufferRef from, CVPixelBufferRef destinat
         for (size_t row = 0; row < rows; row++) {
             const uint8_t *a = in + row * inStride;
             uint8_t *b = out + row * outStride;
-            for (size_t col = 0; col < bytes; col++) {
-                b[col] = (uint8_t)((a[col] * (256u - keep) + b[col] * keep + 128u) >> 8);
+            size_t col = 0;
+            for (; col + 16 <= bytes; col += 16) {
+                uint8x16_t va = vld1q_u8(a + col), vb = vld1q_u8(b + col);
+                uint16x8_t low = vmlal_u8(vmull_u8(vget_low_u8(va), fadeLanes), vget_low_u8(vb), keepLanes);
+                uint16x8_t high = vmlal_u8(vmull_u8(vget_high_u8(va), fadeLanes), vget_high_u8(vb), keepLanes);
+                vst1q_u8(b + col, vcombine_u8(vrshrn_n_u16(low, 8), vrshrn_n_u16(high, 8)));
             }
+            for (; col < bytes; col++) b[col] = (uint8_t)((a[col] * fade + b[col] * keep + 128u) >> 8);
         }
     }
     CVPixelBufferUnlockBaseAddress(destination, 0);

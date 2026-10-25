@@ -1105,3 +1105,5 @@ Licensed under CC BY-NC-SA 4.0.";
 "\"Basic\" Option Text" = "\"Basic\" Option Text";
 "The name of the normal moderation option in the Comments menu." = "The name of the normal moderation option in the Comments menu.";
 "Standard stabilization, on by default. It changes how the mosh moves." = "Standard stabilization, on by default. It changes how the mosh moves.";
+"Start Over" = "Start Over";
+"Started over. The next clip begins a fresh mosh." = "Started over. The next clip begins a fresh mosh.";

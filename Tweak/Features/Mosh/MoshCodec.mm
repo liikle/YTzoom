@@ -300,11 +300,17 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
 
     [self applyBitrateForFrame:_framesSinceClipStart];
 
-    // Encode a copy, not YouTube's buffer: encoding is asynchronous, and the
-    // decoded picture is written back into YouTube's buffer below, so handing
-    // the same buffer to the encoder would feed the decoder its own output.
+    // When writing back (a moshing clip), encode a copy: encoding is
+    // asynchronous and the decoded picture overwrites YouTube's buffer below,
+    // so encoding that same buffer would feed the decoder its own output. When
+    // not writing back (clip 1), the buffer is left untouched, so it can be
+    // encoded directly — skipping a full-frame copy on the capture queue.
+    os_unfair_lock_lock(&_lock);
+    BOOL willWriteBack = _writeBack;
+    os_unfair_lock_unlock(&_lock);
     CVPixelBufferRef toEncode = NULL;
-    if (CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, _encodePool, &toEncode) == kCVReturnSuccess &&
+    if (willWriteBack &&
+        CVPixelBufferPoolCreatePixelBuffer(kCFAllocatorDefault, _encodePool, &toEncode) == kCVReturnSuccess &&
         toEncode != NULL) {
         YTzoomCodecCopy(pixelBuffer, toEncode);
     } else {

@@ -1809,7 +1809,7 @@ static NSDictionary *YTzoomShortsOptionsDefinition(void) {
             YTzoomPickerDetail(@"Mosh Strength",
                 @"How hard clips mosh into each other. 1 is clean.",
                 @"YTzoom.Preference.Mosh.Intensity",
-                @[@"1", @"2", @"3", @"4", @"5"], @[@1, @2, @3, @4, @5], 2),
+                @[@"1", @"2", @"3", @"4", @"5"], @[@1, @2, @3, @4, @5], 0),
             YTzoomToggleDetail(@"Ghost Preview",
                 @"Show the last frame of the previous clip over the camera until you record again.",
                 YTzoomMoshGhostKey),

@@ -70,6 +70,10 @@ static CVPixelBufferRef YTzoomMoshReanchorFrame;   // owned; the frame to re-anc
 static BOOL YTzoomMoshReanchorPending;
 static BOOL YTzoomMoshWasRecording;
 static BOOL YTzoomMoshMoshing;
+// Set when the camera (re)opens or the user starts over; the capture queue tears
+// down the codec and clip state on the next frame so nothing from the previous
+// project bleeds in. Guarded by the lock.
+static BOOL YTzoomMoshResetPending;
 static CVPixelBufferRef YTzoomMoshLatestFrame;   // retained, newest recorded frame
 // Last frame of every clip recorded so far, newest last, so deleting the last
 // clip in YouTube brings back the frame of the one before it. Guarded by the lock.
@@ -215,6 +219,28 @@ static void YTzoomMoshHandleFrame(AVCaptureOutput *output, CMSampleBufferRef sam
     YTzoomMoshMainArea = area;
     YTzoomMoshConnection = connection;
 
+    // Tear down a previous project's state so no stale frame or reference bleeds
+    // into a new recording (camera reopened, or the user started over).
+    os_unfair_lock_lock(&YTzoomMoshLock);
+    BOOL doReset = YTzoomMoshResetPending;
+    YTzoomMoshResetPending = NO;
+    os_unfair_lock_unlock(&YTzoomMoshLock);
+    if (doReset) {
+        YTzoomMoshCodecInstance = nil;
+        if (YTzoomMoshLatestFrame != NULL) { CVPixelBufferRelease(YTzoomMoshLatestFrame); YTzoomMoshLatestFrame = NULL; }
+        YTzoomMoshWasRecording = NO;
+        YTzoomMoshMoshing = NO;
+        YTzoomDownloadLog(@"mosh", @"project reset");
+    }
+
+    // Keep the on-camera controls present: YouTube can rebuild the camera view
+    // without restarting the session, which drops them. attachControls no-ops
+    // when they are already in place and the live camera is showing.
+    static int YTzoomMoshControlTick;
+    if ((YTzoomMoshControlTick++ % 45) == 0) {
+        dispatch_async(dispatch_get_main_queue(), ^{ [YTzoomMoshOverlay attachControls]; });
+    }
+
     AVCaptureDevicePosition position = AVCaptureDevicePositionUnspecified;
     for (AVCaptureInputPort *port in connection.inputPorts) {
         if ([port.input isKindOfClass:AVCaptureDeviceInput.class]) {
@@ -294,16 +320,24 @@ static void YTzoomMoshHandleFrame(AVCaptureOutput *output, CMSampleBufferRef sam
     YTzoomMoshWasRecording = recording;
 }
 
-// Start a fresh project: the next recording is clip 1 again, on a new keyframe.
-static void YTzoomMoshForgetClips(void) {
+// Start a fresh project: the next recording is clip 1 again, on a new keyframe,
+// with no state (codec reference, clip frames, ghost) left from before. The
+// codec and the latest-frame pointer are owned by the capture queue, so they
+// are torn down there via the pending flag rather than from here.
+static void YTzoomMoshResetProject(void) {
     os_unfair_lock_lock(&YTzoomMoshLock);
     [YTzoomMoshClipFrames removeAllObjects];
     if (YTzoomMoshReanchorFrame != NULL) { CVPixelBufferRelease(YTzoomMoshReanchorFrame); YTzoomMoshReanchorFrame = NULL; }
     YTzoomMoshReanchorPending = NO;
     YTzoomMoshProjectStarted = NO;
+    YTzoomMoshRecorderRecording = NO;
+    YTzoomMoshMovieRecording = NO;
+    YTzoomMoshLastLiveAppend = 0.0;
+    YTzoomMoshResetPending = YES;
     os_unfair_lock_unlock(&YTzoomMoshLock);
-    [YTzoomMoshOverlay hideGhost];
+    dispatch_async(dispatch_get_main_queue(), ^{ [YTzoomMoshOverlay hideGhost]; });
 }
+
 
 // YouTube deleted its last clip: re-anchor onto the clip before it so the next
 // clip moshes out of that, and show its ghost.
@@ -791,7 +825,9 @@ static void YTzoomMoshStartRunning(AVCaptureSession *session, SEL selector) {
     ((void (*)(id, SEL))OriginalStartRunning)(session, selector);
     if (!YTzoomMoshEnabled() || !YTzoomMoshSessionHasVideo(session)) return;
     YTzoomMoshSession = session;
-    // The camera opens at 1x, like YouTube's.
+    // Opening the camera starts a fresh project: no reference, clips or ghost
+    // from a previous recording. The camera opens at 1x, like YouTube's.
+    YTzoomMoshResetProject();
     YTzoomSetPreference(YTzoomMoshUltraWideKey, NO);
     YTzoomMoshHookRecorder();
     YTzoomMoshApplyCameraSettings(session);
@@ -828,6 +864,7 @@ static void YTzoomMoshSetStabilization(AVCaptureConnection *connection, SEL sele
 @property(nonatomic, strong) UIButton *stabilizationButton;
 @property(nonatomic, strong) UIButton *frameRateButton;
 @property(nonatomic, strong) UIButton *moshButton;
+@property(nonatomic, strong) UIButton *startOverButton;
 @end
 
 static __weak YTzoomMoshControls *YTzoomMoshCurrentControls;
@@ -879,7 +916,10 @@ static UIColor *YTzoomMoshOnColor(void) {
         self.stabilizationButton.accessibilityLabel = YTzoomLocalized(@"Stabilization");
         self.frameRateButton = YTzoomMoshRoundButton(@"60", nil, @selector(toggleFrameRate), self);
         self.frameRateButton.accessibilityLabel = YTzoomLocalized(@"Frame Rate");
-        for (UIView *view in @[self.moshButton, self.lensButton, self.stabilizationButton, self.frameRateButton]) {
+        self.startOverButton = YTzoomMoshRoundButton(nil, @"arrow.counterclockwise", @selector(startOver), self);
+        self.startOverButton.accessibilityLabel = YTzoomLocalized(@"Start Over");
+        for (UIView *view in @[self.moshButton, self.lensButton, self.stabilizationButton,
+                               self.frameRateButton, self.startOverButton]) {
             [self addArrangedSubview:view];
         }
         [self refresh];
@@ -912,8 +952,13 @@ static UIColor *YTzoomMoshOnColor(void) {
 
 - (void)clearGhost:(UILongPressGestureRecognizer *)recognizer {
     if (recognizer.state != UIGestureRecognizerStateBegan) return;
-    YTzoomMoshForgetClips();
-    YTzoomShowNotice(YTzoomLocalized(@"Cleared the last clip. The next clip starts fresh."));
+    [self startOver];
+}
+
+- (void)startOver {
+    YTzoomMoshResetProject();
+    YTzoomShowNotice(YTzoomLocalized(@"Started over. The next clip begins a fresh mosh."));
+    [self refresh];
 }
 
 - (void)toggleLens {
@@ -1049,6 +1094,12 @@ static UIColor *YTzoomMoshOnColor(void) {
     YTzoomMoshControls *existing = YTzoomMoshCurrentControls;
     UIViewController *controller = [self cameraController];
     if (controller.view == nil) return;
+    // Only on a live-camera screen: if the top controller has no camera preview
+    // (e.g. the editor or review screen is up), leave its UI alone.
+    if ([self previewViewIn:controller.view depth:0] == nil) {
+        [existing removeFromSuperview];
+        return;
+    }
     if (existing != nil && existing.window != nil && existing.superview == controller.view) {
         [existing refresh];
         return;

@@ -270,8 +270,9 @@ static YTzoomHoldAllButton *YTzoomHoldAllMake(UIView *anchor, CGFloat side) {
 }
 
 // Attaches the toggle just below the title field `input`, trailing-aligned so
-// it sits under the AI title button at the field's right edge. Climbs out of a
-// clipping container if one would hide it.
+// it sits under the AI title button at the field's right edge. The button goes
+// on the page's top-level view, not nested in the title field's container, so
+// nothing clips it; it is clamped inside the safe area so it is never cut off.
 void YTzoomCommentHoldAttachForInput(UIView *input) {
     if (!YTzoomFeatureEnabled(YTzoomHoldAllButtonKey) || input == nil || input.window == nil) return;
     YTzoomHoldAllButton *existing = objc_getAssociatedObject(input, YTzoomHoldAllAssociation);
@@ -282,23 +283,28 @@ void YTzoomCommentHoldAttachForInput(UIView *input) {
     [existing removeFromSuperview];
 
     CGFloat side = 36.0;
-    UIView *page = YTzoomHoldAllOwner(input).view;
-    UIView *host = input.superview;
-    while (host != nil && host != page && host.clipsToBounds &&
-           CGRectGetMaxY([input convertRect:input.bounds toView:host]) + side + 10.0 > host.bounds.size.height &&
-           ![host isKindOfClass:UIScrollView.class]) {
-        host = host.superview;
-    }
+    UIView *host = YTzoomHoldAllOwner(input).view;
     if (host == nil) return;
 
     YTzoomHoldAllButton *button = YTzoomHoldAllMake(input, side);
     button.translatesAutoresizingMaskIntoConstraints = NO;
     [host addSubview:button];
+    [host bringSubviewToFront:button];
+    UILayoutGuide *safe = host.safeAreaLayoutGuide;
+    // Below the title field, aligned to its right edge, but kept fully inside
+    // the safe area so it can't fall off the bottom or the side.
+    NSLayoutConstraint *below = [button.topAnchor constraintEqualToAnchor:input.bottomAnchor constant:8.0];
+    below.priority = UILayoutPriorityDefaultHigh;
+    NSLayoutConstraint *right = [button.trailingAnchor constraintEqualToAnchor:input.trailingAnchor constant:-2.0];
+    right.priority = UILayoutPriorityDefaultHigh;
     [NSLayoutConstraint activateConstraints:@[
-        [button.trailingAnchor constraintEqualToAnchor:input.trailingAnchor constant:-2.0],
-        [button.topAnchor constraintEqualToAnchor:input.bottomAnchor constant:8.0],
+        below, right,
         [button.widthAnchor constraintEqualToConstant:side],
-        [button.heightAnchor constraintEqualToConstant:side]
+        [button.heightAnchor constraintEqualToConstant:side],
+        [button.topAnchor constraintGreaterThanOrEqualToAnchor:safe.topAnchor constant:4.0],
+        [button.bottomAnchor constraintLessThanOrEqualToAnchor:safe.bottomAnchor constant:-4.0],
+        [button.trailingAnchor constraintLessThanOrEqualToAnchor:safe.trailingAnchor constant:-4.0],
+        [button.leadingAnchor constraintGreaterThanOrEqualToAnchor:safe.leadingAnchor constant:4.0]
     ]];
     objc_setAssociatedObject(input, YTzoomHoldAllAssociation, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     YTzoomDownloadLog(@"holdall", @"attached below %@ host %@", NSStringFromClass(input.class),

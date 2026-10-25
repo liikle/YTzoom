@@ -202,7 +202,7 @@ void YTzoomRegisterDefaults(void) {
         @"YTzoom.Preference.Mosh.Stabilization": @YES,
         @"YTzoom.Preference.Mosh.HighFrameRate": @YES,
         @"YTzoom.Preference.Mosh.Ghost": @YES,
-        @"YTzoom.Preference.Mosh.Intensity": @3,
+        @"YTzoom.Preference.Mosh.Intensity": @1,
         @"YTzoom.Preference.Upload.HoldAllButton": @YES,
         @"YTzoom.Preference.Upload.HoldAll": @NO,
         @"YTzoom.Preference.Upload.BasicText": @"",

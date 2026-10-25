@@ -86,10 +86,17 @@ static CFTimeInterval YTzoomMoshLastCaptureAt;         // the camera is live whi
 static CVPixelBufferRef YTzoomMoshAppendedFrame;       // retained, the last picture YouTube recorded
 static CVPixelBufferRef YTzoomMoshOpeningFrame;        // retained, covers a moshing clip's unmoshed opening
 static CFTimeInterval YTzoomMoshFirstMoshedAt;         // when this clip's first moshed frame was handed on
-static int YTzoomMoshOpeningCovers;                    // frames covered so far this clip
-// The opening is a frame or two; if the mosh somehow never engages, stop
-// covering rather than freeze the clip.
-static const int YTzoomMoshMaxOpeningCovers = 8;
+static int YTzoomMoshOpeningCovers;                    // frames fully covered so far this clip
+static int YTzoomMoshOpeningBlend = -1;                // crossfade step, -1 before it starts
+// Frames that only hold the previous clip's last picture are fully covered;
+// if the mosh somehow never shows up, the hold ends here rather than freeze.
+static const int YTzoomMoshMaxOpeningCovers = 12;
+// Then a short crossfade from that exact picture into the clip (~0.17 s at
+// 60 fps), so whatever small difference is left dissolves instead of jumping.
+static const int YTzoomMoshOpeningFadeFrames = 10;
+// Mean luma difference under which the clip's picture counts as "the same
+// frame" as the previous clip's last one (noise and encode loss only).
+static const float YTzoomMoshSameFrameDifference = 6.0f;
 
 // How each clip ended, newest last, so deleting the last clip in YouTube brings
 // back the end of the one before it. `camera` is in the camera's own format
@@ -146,6 +153,69 @@ static BOOL YTzoomMoshSameLayout(CVPixelBufferRef a, CVPixelBufferRef b) {
         CVPixelBufferGetPixelFormatType(a) == CVPixelBufferGetPixelFormatType(b);
 }
 
+// Mean absolute difference of the first plane (luma), from a sparse grid.
+static float YTzoomMoshDifference(CVPixelBufferRef a, CVPixelBufferRef b) {
+    if (!YTzoomMoshSameLayout(a, b)) return FLT_MAX;
+    CVPixelBufferLockBaseAddress(a, kCVPixelBufferLock_ReadOnly);
+    CVPixelBufferLockBaseAddress(b, kCVPixelBufferLock_ReadOnly);
+    BOOL planar = CVPixelBufferIsPlanar(a);
+    const uint8_t *pa = (const uint8_t *)(planar ? CVPixelBufferGetBaseAddressOfPlane(a, 0) : CVPixelBufferGetBaseAddress(a));
+    const uint8_t *pb = (const uint8_t *)(planar ? CVPixelBufferGetBaseAddressOfPlane(b, 0) : CVPixelBufferGetBaseAddress(b));
+    size_t strideA = planar ? CVPixelBufferGetBytesPerRowOfPlane(a, 0) : CVPixelBufferGetBytesPerRow(a);
+    size_t strideB = planar ? CVPixelBufferGetBytesPerRowOfPlane(b, 0) : CVPixelBufferGetBytesPerRow(b);
+    size_t rows = planar ? CVPixelBufferGetHeightOfPlane(a, 0) : CVPixelBufferGetHeight(a);
+    size_t bytes = MIN(strideA, strideB);
+    double total = 0.0, count = 0.0;
+    if (pa != NULL && pb != NULL) {
+        for (size_t row = 3; row < rows; row += 8) {
+            const uint8_t *ra = pa + row * strideA, *rb = pb + row * strideB;
+            for (size_t col = 3; col < bytes; col += 8) {
+                total += abs((int)ra[col] - (int)rb[col]);
+                count += 1.0;
+            }
+        }
+    }
+    CVPixelBufferUnlockBaseAddress(b, kCVPixelBufferLock_ReadOnly);
+    CVPixelBufferUnlockBaseAddress(a, kCVPixelBufferLock_ReadOnly);
+    return count > 0.0 ? (float)(total / count) : FLT_MAX;
+}
+
+// destination = from * (1 - weight) + destination * weight, every byte of
+// every plane (same layout). weight 0 is a plain copy of `from`.
+static void YTzoomMoshBlendInto(CVPixelBufferRef from, CVPixelBufferRef destination, float weight) {
+    if (weight <= 0.0f) {
+        YTzoomMoshCopyInto(from, destination);
+        return;
+    }
+    unsigned keep = (unsigned)lroundf(MIN(1.0f, weight) * 256.0f);
+    CVPixelBufferLockBaseAddress(from, kCVPixelBufferLock_ReadOnly);
+    CVPixelBufferLockBaseAddress(destination, 0);
+    BOOL planar = CVPixelBufferIsPlanar(from) && CVPixelBufferIsPlanar(destination);
+    size_t planes = planar ? MIN(CVPixelBufferGetPlaneCount(from), CVPixelBufferGetPlaneCount(destination)) : 1;
+    for (size_t plane = 0; plane < planes; plane++) {
+        const uint8_t *in = (const uint8_t *)(planar ? CVPixelBufferGetBaseAddressOfPlane(from, plane)
+                                                     : CVPixelBufferGetBaseAddress(from));
+        uint8_t *out = (uint8_t *)(planar ? CVPixelBufferGetBaseAddressOfPlane(destination, plane)
+                                          : CVPixelBufferGetBaseAddress(destination));
+        size_t inStride = planar ? CVPixelBufferGetBytesPerRowOfPlane(from, plane) : CVPixelBufferGetBytesPerRow(from);
+        size_t outStride = planar ? CVPixelBufferGetBytesPerRowOfPlane(destination, plane)
+                                  : CVPixelBufferGetBytesPerRow(destination);
+        size_t rows = planar ? MIN(CVPixelBufferGetHeightOfPlane(from, plane), CVPixelBufferGetHeightOfPlane(destination, plane))
+                             : MIN(CVPixelBufferGetHeight(from), CVPixelBufferGetHeight(destination));
+        size_t bytes = MIN(inStride, outStride);
+        if (in == NULL || out == NULL) continue;
+        for (size_t row = 0; row < rows; row++) {
+            const uint8_t *a = in + row * inStride;
+            uint8_t *b = out + row * outStride;
+            for (size_t col = 0; col < bytes; col++) {
+                b[col] = (uint8_t)((a[col] * (256u - keep) + b[col] * keep + 128u) >> 8);
+            }
+        }
+    }
+    CVPixelBufferUnlockBaseAddress(destination, 0);
+    CVPixelBufferUnlockBaseAddress(from, kCVPixelBufferLock_ReadOnly);
+}
+
 static CVPixelBufferRef YTzoomMoshCopyPixelBuffer(CVPixelBufferRef source) {
     if (source == NULL) return NULL;
     CVPixelBufferRef copy = NULL;
@@ -164,10 +234,12 @@ static BOOL YTzoomMoshPreferenceActive(void) {
 }
 
 // Every video frame YouTube writes. Marks recording, remembers the picture, and
-// covers the opening of a moshing clip: the frames YouTube wrote before the
-// mosh engaged (it is only detected from this very append) become the exact
-// last picture of the previous clip, so the new clip never flashes its raw
-// view and continues the previous one frame for frame.
+// makes a moshing clip open on exactly the previous clip's last recorded
+// picture: every frame YouTube writes before the mosh shows up (it is only
+// detected from these appends, and YouTube's pipeline can have frames in
+// flight) is replaced by that picture, then the clip crossfades in from it.
+// Done here, on the frames actually written, so it holds whatever YouTube's
+// pipeline latency is: the cut is seamless in the file.
 static void YTzoomMoshNoteLiveAppend(CVPixelBufferRef buffer) {
     // Any video append counts as recording. (An earlier host-clock gate meant
     // to exclude editor exports also rejected real recording, because YouTube,
@@ -177,7 +249,9 @@ static void YTzoomMoshNoteLiveAppend(CVPixelBufferRef buffer) {
     CFTimeInterval now = CACurrentMediaTime();
     // Preferences are only read when this could be a new clip.
     BOOL moshActive = now - YTzoomMoshLastLiveAppend >= YTzoomMoshRecordingGap && YTzoomMoshPreferenceActive();
-    CVPixelBufferRef cover = NULL;
+    CVPixelBufferRef opening = NULL;
+    BOOL moshedSent = NO;
+    int covers = 0, blend = -1;
     os_unfair_lock_lock(&YTzoomMoshLock);
     BOOL first = YTzoomMoshLastLiveAppend == 0.0;
     BOOL newClip = first || now - YTzoomMoshLastLiveAppend >= YTzoomMoshRecordingGap;
@@ -190,6 +264,7 @@ static void YTzoomMoshNoteLiveAppend(CVPixelBufferRef buffer) {
             YTzoomMoshOpeningFrame = NULL;
             YTzoomMoshFirstMoshedAt = 0.0;
             YTzoomMoshOpeningCovers = 0;
+            YTzoomMoshOpeningBlend = -1;
             YTzoomMoshClipEnd *end = YTzoomMoshClipEnds.lastObject;
             if (YTzoomMoshProjectStarted && moshActive && end.recorded != NULL &&
                 CACurrentMediaTime() - YTzoomMoshClipFrameTime < YTzoomMoshClipLifetime) {
@@ -197,14 +272,10 @@ static void YTzoomMoshNoteLiveAppend(CVPixelBufferRef buffer) {
             }
         }
         if (YTzoomMoshOpeningFrame != NULL) {
-            if ((YTzoomMoshFirstMoshedAt == 0.0 || now < YTzoomMoshFirstMoshedAt) &&
-                YTzoomMoshOpeningCovers < YTzoomMoshMaxOpeningCovers) {
-                cover = CVPixelBufferRetain(YTzoomMoshOpeningFrame);
-                YTzoomMoshOpeningCovers++;
-            } else {
-                CVPixelBufferRelease(YTzoomMoshOpeningFrame);
-                YTzoomMoshOpeningFrame = NULL;
-            }
+            opening = CVPixelBufferRetain(YTzoomMoshOpeningFrame);
+            moshedSent = YTzoomMoshFirstMoshedAt != 0.0 && now >= YTzoomMoshFirstMoshedAt;
+            covers = YTzoomMoshOpeningCovers;
+            blend = YTzoomMoshOpeningBlend;
         }
         if (YTzoomMoshAppendedFrame != buffer) {
             if (YTzoomMoshAppendedFrame != NULL) CVPixelBufferRelease(YTzoomMoshAppendedFrame);
@@ -212,9 +283,39 @@ static void YTzoomMoshNoteLiveAppend(CVPixelBufferRef buffer) {
         }
     }
     os_unfair_lock_unlock(&YTzoomMoshLock);
-    if (cover != NULL) {
-        if (YTzoomMoshSameLayout(cover, buffer)) YTzoomMoshCopyInto(cover, buffer);
-        CVPixelBufferRelease(cover);
+
+    if (opening != NULL) {
+        BOOL usable = YTzoomMoshSameLayout(opening, buffer);
+        if (usable && blend < 0) {
+            // Hold until YouTube writes a moshed frame, recognised by being the
+            // same picture as the previous clip's end (the mosh opens on it).
+            // Frames still in flight from before the mosh are the raw view.
+            float difference = moshedSent ? YTzoomMoshDifference(opening, buffer) : FLT_MAX;
+            if (difference <= YTzoomMoshSameFrameDifference || covers >= YTzoomMoshMaxOpeningCovers) {
+                blend = 0;
+                YTzoomDownloadLog(@"mosh", @"opening held %d frames, fading in (difference %.1f)", covers,
+                                  difference == FLT_MAX ? -1.0f : difference);
+            }
+        }
+        if (!usable) {
+            blend = YTzoomMoshOpeningFadeFrames;
+        } else if (blend < 0) {
+            YTzoomMoshCopyInto(opening, buffer);
+            covers++;
+        } else if (blend < YTzoomMoshOpeningFadeFrames) {
+            float t = (float)(blend + 1) / (float)(YTzoomMoshOpeningFadeFrames + 1);
+            YTzoomMoshBlendInto(opening, buffer, t * t * (3.0f - 2.0f * t));
+            blend++;
+        }
+        CVPixelBufferRelease(opening);
+        os_unfair_lock_lock(&YTzoomMoshLock);
+        YTzoomMoshOpeningCovers = covers;
+        YTzoomMoshOpeningBlend = blend;
+        if (blend >= YTzoomMoshOpeningFadeFrames && YTzoomMoshOpeningFrame != NULL) {
+            CVPixelBufferRelease(YTzoomMoshOpeningFrame);
+            YTzoomMoshOpeningFrame = NULL;
+        }
+        os_unfair_lock_unlock(&YTzoomMoshLock);
     }
     if (first) YTzoomDownloadLog(@"mosh", @"first writer append seen");
 }
@@ -434,12 +535,22 @@ static void YTzoomMoshHandleFrame(AVCaptureOutput *output, CMSampleBufferRef sam
         os_unfair_lock_lock(&YTzoomMoshLock);
         YTzoomMoshProjectStarted = YES;
         os_unfair_lock_unlock(&YTzoomMoshLock);
+        // The written picture is the exact last frame whatever YouTube's
+        // latency; when it has the camera's layout and is that same frame
+        // (not mirrored or filtered), the next clip anchors on it directly.
+        float writtenDifference = YTzoomMoshDifference(recorded, last);
+        if (writtenDifference < 12.0f) {
+            CVPixelBufferRelease(last);
+            last = CVPixelBufferRetain(recorded);
+        }
         if (last != NULL) {
             YTzoomMoshClipEnd *end = [YTzoomMoshClipEnd new];
             end.camera = CVPixelBufferRetain(last);
             end.recorded = recorded != NULL ? CVPixelBufferRetain(recorded) : NULL;
             YTzoomMoshPushClipEnd(end);
-            YTzoomDownloadLog(@"mosh", @"clip end, kept last recorded frame (writer picture %d)", recorded != NULL);
+            YTzoomDownloadLog(@"mosh", @"clip end, kept last frame (written %d, difference %.1f, anchor %@)",
+                              recorded != NULL, writtenDifference == FLT_MAX ? -1.0f : writtenDifference,
+                              writtenDifference < 12.0f ? @"written" : @"camera");
             if (YTzoomMoshPreference(YTzoomMoshGhostKey)) {
                 UIImage *ghost = YTzoomMoshGhostImage(last, position);
                 if (ghost != nil) {
@@ -710,10 +821,6 @@ static __weak AVCaptureDevice *YTzoomMoshSwappedOutDevice;
 static __weak AVCaptureDevice *YTzoomMoshSwappedInDevice;
 static CGFloat YTzoomMoshSwapBaseZoom = 1.0;
 
-// Zoom rate in doublings per second. A pinch's small steps finish within a
-// frame, larger jumps glide over a few frames instead of snapping.
-static const float YTzoomMoshZoomRate = 8.0f;
-
 static BOOL YTzoomMoshRampZoom(AVCaptureDevice *device, CGFloat factor, float rate) {
     CGFloat low = MAX(1.0, device.minAvailableVideoZoomFactor);
     CGFloat high = MIN(device.activeFormat.videoMaxZoomFactor, device.maxAvailableVideoZoomFactor);
@@ -726,30 +833,26 @@ static BOOL YTzoomMoshRampZoom(AVCaptureDevice *device, CGFloat factor, float ra
     }
 }
 
-// YouTube sets the zoom straight from its pinch, one step per touch update;
-// as a fast ramp the camera moves through each step frame by frame.
+// YouTube's own zoom goes straight through, untouched: its pinch drives the
+// camera directly. Only while the ultra-wide is swapped in for 0.5x is the
+// same zoom also applied to the ultra-wide, since YouTube's camera isn't
+// running then.
 static void YTzoomMoshSetZoomFactor(AVCaptureDevice *device, SEL selector, CGFloat factor) {
     IMP setter = YTzoomMoshDeviceOriginal(device, NSStringFromSelector(selector));
-    if (YTzoomMoshEnabled() && YTzoomMoshSession != nil) {
-        AVCaptureDevice *ultraWide = YTzoomMoshSwappedInDevice;
-        if (ultraWide != nil && device != ultraWide && device == YTzoomMoshSwappedOutDevice) {
-            // Keep YouTube's own camera in step so its zoom UI reads back right.
-            if (setter != NULL) ((void (*)(id, SEL, CGFloat))setter)(device, selector, factor);
-            if ([ultraWide lockForConfiguration:nil]) {
-                YTzoomMoshRampZoom(ultraWide, factor / MAX(YTzoomMoshSwapBaseZoom, 1.0), YTzoomMoshZoomRate);
-                [ultraWide unlockForConfiguration];
-            }
-            return;
-        }
-        // Only the running camera ramps; a factor set while it is being set
-        // up (or stopped) must land immediately.
-        AVCaptureSession *session = YTzoomMoshSession;
-        if (device == YTzoomMoshDevice && session.isRunning &&
-            YTzoomMoshRampZoom(device, factor, YTzoomMoshZoomRate)) {
-            return;
-        }
-    }
     if (setter != NULL) ((void (*)(id, SEL, CGFloat))setter)(device, selector, factor);
+    AVCaptureDevice *ultraWide = YTzoomMoshSwappedInDevice;
+    if (!YTzoomMoshEnabled() || ultraWide == nil || device == ultraWide || device != YTzoomMoshSwappedOutDevice) return;
+    IMP ultraWideSetter = YTzoomMoshDeviceOriginal(ultraWide, NSStringFromSelector(selector));
+    if (ultraWideSetter == NULL || ![ultraWide lockForConfiguration:nil]) return;
+    CGFloat low = MAX(1.0, ultraWide.minAvailableVideoZoomFactor);
+    CGFloat high = MIN(ultraWide.activeFormat.videoMaxZoomFactor, ultraWide.maxAvailableVideoZoomFactor);
+    CGFloat target = factor / MAX(YTzoomMoshSwapBaseZoom, 1.0);
+    @try {
+        if (high >= low) {
+            ((void (*)(id, SEL, CGFloat))ultraWideSetter)(ultraWide, selector, MIN(MAX(target, low), high));
+        }
+    } @catch (__unused NSException *exception) {}
+    [ultraWide unlockForConfiguration];
 }
 
 static void YTzoomMoshHookDeviceClass(AVCaptureDevice *device) {

@@ -168,11 +168,15 @@ static float YTzoomCodecMeanDifference(CVPixelBufferRef a, CVPixelBufferRef b) {
     int _framesSinceClipStart;
     int _framesWithoutOutput;
     int _lastAppliedBitrate;
+    BOOL _restoreBitrate;              // the anchor's boost is still set; undo it on the next frame
     float _ghost;
 }
 
 static const int kFullBitrate = 24 * 1000 * 1000;
 static const int kOpeningBitrate = 18 * 1000 * 1000;
+// The anchor keyframe is the picture a whole clip is built on and should be
+// indistinguishable from the frame it reproduces, so it gets far more bits.
+static const int kAnchorBitrate = 120 * 1000 * 1000;
 static const float kStickSeconds = 0.5f;
 static const int kStallFrames = 150;
 
@@ -348,10 +352,13 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
     _framesWithoutOutput = 0;
     os_unfair_lock_unlock(&_lock);
 
-    // Full quality for the picture the whole next clip is built on.
-    _lastAppliedBitrate = kFullBitrate;
+    // Near-lossless for the picture the whole next clip is built on, so the
+    // decoded keyframe replacing the exact anchor a frame or two later is not
+    // a visible step. (Not a QP cap: that lets the encoder drop the frame.)
+    _lastAppliedBitrate = kAnchorBitrate;
+    _restoreBitrate = YES;
     VTSessionSetProperty(_compression, kVTCompressionPropertyKey_AverageBitRate,
-                         (__bridge CFNumberRef)@(kFullBitrate));
+                         (__bridge CFNumberRef)@(kAnchorBitrate));
     NSDictionary *properties = @{(id)kVTEncodeFrameOptionKey_ForceKeyFrame: @YES};
     OSStatus status = VTCompressionSessionEncodeFrame(_compression, pixelBuffer, CMTimeMake(index, _fps),
                                                       CMTimeMake(1, _fps), (__bridge CFDictionaryRef)properties,
@@ -428,7 +435,15 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
     _lastInput = CVPixelBufferRetain(pixelBuffer);
     os_unfair_lock_unlock(&_lock);
 
-    [self applyBitrateForFrame:_framesSinceClipStart];
+    if (_restoreBitrate) {
+        // Straight back to the clip's own curve, not through the throttle.
+        _restoreBitrate = NO;
+        _lastAppliedBitrate = [self bitrateForFrame:_framesSinceClipStart];
+        VTSessionSetProperty(_compression, kVTCompressionPropertyKey_AverageBitRate,
+                             (__bridge CFNumberRef)@(_lastAppliedBitrate));
+    } else {
+        [self applyBitrateForFrame:_framesSinceClipStart];
+    }
 
     // When writing back (a moshing clip), encode a copy: encoding is
     // asynchronous and the decoded picture overwrites YouTube's buffer below,
@@ -473,26 +488,26 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
     return wrote;
 }
 
-- (void)applyBitrateForFrame:(int)frame {
+- (int)bitrateForFrame:(int)frame {
     // A moshing clip opens starved so the held pixels survive, then climbs back
     // to full quality over the stick window; clip 1 just ramps opening → full.
     float ramp = MAX(6.0f, kStickSeconds * _fps);
     float t = MIN(1.0f, frame / ramp);
-    int stick;
     BOOL moshing;
     os_unfair_lock_lock(&_lock);
     moshing = _desyncAtIndex >= 0 || !_allowsRecoveryKeyframes;
     os_unfair_lock_unlock(&_lock);
     if (moshing) {
-        stick = (int)(kFullBitrate * 0.25f);
+        int stick = (int)(kFullBitrate * 0.25f);
         float eased = t * t * t;
-        int bitrate = stick + (int)((kFullBitrate - stick) * eased);
-        [self setBitrate:bitrate frame:frame];
-    } else {
-        float eased = MIN(1.0f, frame / MAX(6.0f, 0.3f * _fps));
-        int bitrate = kOpeningBitrate + (int)((kFullBitrate - kOpeningBitrate) * eased);
-        [self setBitrate:bitrate frame:frame];
+        return stick + (int)((kFullBitrate - stick) * eased);
     }
+    float eased = MIN(1.0f, frame / MAX(6.0f, 0.3f * _fps));
+    return kOpeningBitrate + (int)((kFullBitrate - kOpeningBitrate) * eased);
+}
+
+- (void)applyBitrateForFrame:(int)frame {
+    [self setBitrate:[self bitrateForFrame:frame] frame:frame];
 }
 
 - (void)setBitrate:(int)bitrate frame:(int)frame {

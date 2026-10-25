@@ -25,9 +25,12 @@ AVCaptureDevice *YTzoomMoshUltraWideCapableDevice(AVCaptureDevicePosition positi
 
 CGFloat YTzoomMoshWideBaseFactor(AVCaptureDevice *device) {
     if (@available(iOS 13.0, *)) {
+        // Only a virtual device has lenses to zoom across; the ultra-wide on
+        // its own (swapped in for 0.5x) is a plain camera whose 1.0 is 0.5x.
+        if (!device.isVirtualDevice) return 1.0;
         // Test the constituents for a real ultra-wide: on a wide+tele pairing
         // the first switch-over is the tele crossover, which would put "1x" at 2x.
-        BOOL hasUltraWide = [device.deviceType isEqualToString:AVCaptureDeviceTypeBuiltInUltraWideCamera];
+        BOOL hasUltraWide = NO;
         for (AVCaptureDevice *constituent in device.constituentDevices) {
             if ([constituent.deviceType isEqualToString:AVCaptureDeviceTypeBuiltInUltraWideCamera]) hasUltraWide = YES;
         }

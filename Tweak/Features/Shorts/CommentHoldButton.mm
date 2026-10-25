@@ -77,47 +77,152 @@ static UIView *YTzoomHoldAllFindInWindows(YTzoomHoldAllMatcher matcher) {
     return nil;
 }
 
-// Taps a view the way the user would: the enclosing control, then the
-// accessibility action VoiceOver uses, then the view's own tap gestures.
-static BOOL YTzoomHoldAllTap(UIView *view) {
-    NSUInteger depth = 0;
-    for (UIView *current = view; current != nil && depth < 6; current = current.superview, depth++) {
-        if ([current isKindOfClass:UISwitch.class]) return NO;
-        if ([current isKindOfClass:UIControl.class] && ((UIControl *)current).enabled) {
-            [(UIControl *)current sendActionsForControlEvents:UIControlEventTouchUpInside];
-            return YES;
+static BOOL YTzoomHoldAllInsideText(UIView *view) {
+    for (UIView *current = view; current != nil; current = current.superview) {
+        if ([current isKindOfClass:UITextField.class] || [current isKindOfClass:UITextView.class]) return YES;
+    }
+    return NO;
+}
+
+// Selects the list cell `view` sits in the way UIKit does on a tap: through
+// the list's own delegate.
+static BOOL YTzoomHoldAllSelectCell(UIView *view) {
+    UIView *cell = view;
+    while (cell != nil && ![cell isKindOfClass:UICollectionViewCell.class] &&
+           ![cell isKindOfClass:UITableViewCell.class]) {
+        cell = cell.superview;
+    }
+    UIView *list = cell.superview;
+    while (list != nil && ![list isKindOfClass:UICollectionView.class] && ![list isKindOfClass:UITableView.class]) {
+        list = list.superview;
+    }
+    if (cell == nil || list == nil) return NO;
+    if ([list isKindOfClass:UICollectionView.class] && [cell isKindOfClass:UICollectionViewCell.class]) {
+        UICollectionView *collection = (UICollectionView *)list;
+        NSIndexPath *path = [collection indexPathForCell:(UICollectionViewCell *)cell];
+        id<UICollectionViewDelegate> delegate = collection.delegate;
+        if (path == nil || ![delegate respondsToSelector:@selector(collectionView:didSelectItemAtIndexPath:)]) return NO;
+        if ([delegate respondsToSelector:@selector(collectionView:shouldSelectItemAtIndexPath:)] &&
+            ![delegate collectionView:collection shouldSelectItemAtIndexPath:path]) {
+            return NO;
         }
+        [delegate collectionView:collection didSelectItemAtIndexPath:path];
+        return YES;
     }
-    depth = 0;
+    if ([list isKindOfClass:UITableView.class] && [cell isKindOfClass:UITableViewCell.class]) {
+        UITableView *table = (UITableView *)list;
+        NSIndexPath *path = [table indexPathForCell:(UITableViewCell *)cell];
+        id<UITableViewDelegate> delegate = table.delegate;
+        if (path == nil || ![delegate respondsToSelector:@selector(tableView:didSelectRowAtIndexPath:)]) return NO;
+        if ([delegate respondsToSelector:@selector(tableView:willSelectRowAtIndexPath:)]) {
+            path = [delegate tableView:table willSelectRowAtIndexPath:path];
+            if (path == nil) return NO;
+        }
+        [delegate tableView:table didSelectRowAtIndexPath:path];
+        return YES;
+    }
+    return NO;
+}
+
+// For rows that only answer a tap gesture (YouTube's Elements rows): runs the
+// row's own tap handler. Only recognizers on the row or a parent of about its
+// height, never UIKit's own handlers (text selection, sheet dismissal), and
+// only handlers taking no argument or one object.
+static BOOL YTzoomHoldAllFireTapGesture(UIView *view) {
+    CGFloat limit = MAX(view.bounds.size.height * 3.0, 120.0);
+    NSUInteger depth = 0;
     for (UIView *current = view; current != nil && depth < 4; current = current.superview, depth++) {
-        if ([current accessibilityActivate]) return YES;
-    }
-    depth = 0;
-    for (UIView *current = view; current != nil && depth < 6; current = current.superview, depth++) {
+        if ([current isKindOfClass:UIScrollView.class] || [current isKindOfClass:UIWindow.class] ||
+            current.bounds.size.height > limit) {
+            break;
+        }
         for (UIGestureRecognizer *recognizer in current.gestureRecognizers) {
-            if (![recognizer isKindOfClass:UITapGestureRecognizer.class] || !recognizer.enabled) continue;
-            NSArray *targets = nil;
+            if (![recognizer isKindOfClass:UITapGestureRecognizer.class] || !recognizer.enabled ||
+                ((UITapGestureRecognizer *)recognizer).numberOfTapsRequired != 1) {
+                continue;
+            }
+            id targets = nil;
             @try { targets = [recognizer valueForKey:@"_targets"]; } @catch (__unused NSException *exception) {}
-            BOOL fired = NO;
-            for (id entry in targets) {
+            if (![targets isKindOfClass:NSArray.class]) continue;
+            for (id entry in (NSArray *)targets) {
                 Ivar targetIvar = class_getInstanceVariable(object_getClass(entry), "_target");
                 Ivar actionIvar = class_getInstanceVariable(object_getClass(entry), "_action");
                 if (targetIvar == NULL || actionIvar == NULL) continue;
+                const char *targetType = ivar_getTypeEncoding(targetIvar);
+                const char *actionType = ivar_getTypeEncoding(actionIvar);
+                if (targetType == NULL || targetType[0] != '@' || actionType == NULL || strcmp(actionType, ":") != 0) {
+                    continue;
+                }
                 id target = object_getIvar(entry, targetIvar);
                 SEL action = *(SEL *)((uint8_t *)(__bridge void *)entry + ivar_getOffset(actionIvar));
                 if (target == nil || action == NULL || ![target respondsToSelector:action]) continue;
-                ((void (*)(id, SEL, id))objc_msgSend)(target, action, recognizer);
-                fired = YES;
+                NSString *targetClass = NSStringFromClass(object_getClass(target));
+                if ([targetClass hasPrefix:@"UI"] || [targetClass hasPrefix:@"_UI"]) continue;
+                NSMethodSignature *signature = [target methodSignatureForSelector:action];
+                if (signature == nil || signature.numberOfArguments > 3 ||
+                    (signature.numberOfArguments == 3 && [signature getArgumentTypeAtIndex:2][0] != '@')) {
+                    continue;
+                }
+                @try {
+                    if (signature.numberOfArguments == 2) {
+                        ((void (*)(id, SEL))objc_msgSend)(target, action);
+                    } else {
+                        ((void (*)(id, SEL, id))objc_msgSend)(target, action, recognizer);
+                    }
+                    return YES;
+                } @catch (NSException *exception) {
+                    YTzoomDownloadLog(@"holdall", @"tap handler %@ %@ threw %@", targetClass,
+                                      NSStringFromSelector(action), exception.reason);
+                }
             }
-            if (fired) return YES;
         }
     }
     return NO;
 }
 
+// Taps a view the way the user would: the enclosing button, the accessibility
+// action VoiceOver uses, the row's tap gesture, then list-cell selection. A
+// handler that throws is caught here so a failed tap can't take the app down.
+static BOOL YTzoomHoldAllTap(UIView *view) {
+    if (view == nil || view.window == nil || YTzoomHoldAllInsideText(view)) return NO;
+    @try {
+        NSUInteger depth = 0;
+        for (UIView *current = view; current != nil && depth < 4; current = current.superview, depth++) {
+            if ([current isKindOfClass:UISwitch.class]) return NO;
+            if ([current isKindOfClass:UIControl.class] && ((UIControl *)current).enabled) {
+                [(UIControl *)current sendActionsForControlEvents:UIControlEventTouchUpInside];
+                return YES;
+            }
+        }
+        depth = 0;
+        for (UIView *current = view; current != nil && depth < 4; current = current.superview, depth++) {
+            if ([current accessibilityActivate]) return YES;
+        }
+        if (YTzoomHoldAllFireTapGesture(view)) return YES;
+        return YTzoomHoldAllSelectCell(view);
+    } @catch (NSException *exception) {
+        YTzoomDownloadLog(@"holdall", @"tap on %@ threw %@", NSStringFromClass(view.class), exception.reason);
+        return NO;
+    }
+}
+
 static UIViewController *YTzoomHoldAllOwner(UIView *view) {
     for (UIResponder *responder = view; responder != nil; responder = responder.nextResponder) {
         if ([responder isKindOfClass:UIViewController.class]) return (UIViewController *)responder;
+    }
+    return nil;
+}
+
+// The page's top-level view: the nearest view controller's root view that
+// actually contains `input`, so constraints between the two always share an
+// ancestor (activating them otherwise throws).
+static UIView *YTzoomHoldAllHost(UIView *input) {
+    for (UIView *current = input.superview; current != nil; current = current.superview) {
+        if ([current isKindOfClass:UIWindow.class]) return nil;
+        UIResponder *next = current.nextResponder;
+        if ([next isKindOfClass:UIViewController.class] && ((UIViewController *)next).viewIfLoaded == current) {
+            return current;
+        }
     }
     return nil;
 }
@@ -139,20 +244,18 @@ static BOOL YTzoomHoldAllTextMatches(NSString *candidate, NSString *option) {
 
 @implementation YTzoomHoldAllButton
 
-- (UIView *)pageRoot {
-    return YTzoomHoldAllOwner(self.anchor).view ?: self.window;
-}
-
 - (UIView *)commentsRow {
     __weak YTzoomHoldAllButton *weakSelf = self;
     NSString *hold = YTzoomHoldAllOptionText().lowercaseString;
     NSString *basic = YTzoomBasicOptionText().lowercaseString;
-    return YTzoomHoldAllFind([self pageRoot], 0, ^BOOL(UIView *view, NSString *text) {
-        if (view == weakSelf || [view isDescendantOfView:weakSelf]) return NO;
+    YTzoomHoldAllMatcher matcher = ^BOOL(UIView *view, NSString *text) {
+        if (view == weakSelf || [view isDescendantOfView:weakSelf] || YTzoomHoldAllInsideText(view)) return NO;
         NSString *lower = text.lowercaseString;
         if ([lower containsString:hold] || [lower containsString:basic]) return NO;
         return [lower hasPrefix:@"comment"] || ([lower containsString:@"comment"] && lower.length < 60);
-    });
+    };
+    UIView *page = self.anchor != nil ? YTzoomHoldAllHost(self.anchor) : nil;
+    return YTzoomHoldAllFind(page ?: self.superview, 0, matcher) ?: YTzoomHoldAllFind(self.window, 0, matcher);
 }
 
 - (void)refresh {
@@ -169,16 +272,26 @@ static BOOL YTzoomHoldAllTextMatches(NSString *candidate, NSString *option) {
     BOOL on = !YTzoomFeatureEnabled(YTzoomHoldAllActiveKey);
     YTzoomSetPreference(YTzoomHoldAllActiveKey, on);
     [self refresh];
-    [self applyState:on];
+    // Drive YouTube's menu on the next turn of the run loop, outside this
+    // button's own touch handling.
+    self.busy = YES;
+    __weak YTzoomHoldAllButton *weakSelf = self;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        YTzoomHoldAllButton *button = weakSelf;
+        button.busy = NO;
+        [button applyState:on];
+    });
 }
 
 - (void)applyState:(BOOL)on {
     UIView *row = [self commentsRow];
     if (row == nil) {
+        [self revertTo:!on];
         YTzoomShowNotice(YTzoomLocalized(@"Couldn't find the Comments setting on this page."));
         return;
     }
     if (!YTzoomHoldAllTap(row)) {
+        [self revertTo:!on];
         YTzoomShowNotice(YTzoomLocalized(@"Couldn't open the Comments setting. Hold the button to copy details."));
         return;
     }
@@ -186,9 +299,16 @@ static BOOL YTzoomHoldAllTextMatches(NSString *candidate, NSString *option) {
     [self waitForOption:on ? YTzoomHoldAllOptionText() : YTzoomBasicOptionText() on:on attempt:0];
 }
 
+// The menu wasn't driven, so the icon goes back to what YouTube still has.
+- (void)revertTo:(BOOL)on {
+    YTzoomSetPreference(YTzoomHoldAllActiveKey, on);
+    [self refresh];
+}
+
 - (void)waitForOption:(NSString *)option on:(BOOL)on attempt:(NSUInteger)attempt {
+    __weak YTzoomHoldAllButton *weakSelf = self;
     UIView *found = YTzoomHoldAllFindInWindows(^BOOL(UIView *view, NSString *text) {
-        (void)view;
+        if (view == weakSelf || [view isDescendantOfView:weakSelf] || YTzoomHoldAllInsideText(view)) return NO;
         return YTzoomHoldAllTextMatches(text, option);
     });
     if (found != nil) {
@@ -206,10 +326,10 @@ static BOOL YTzoomHoldAllTextMatches(NSString *candidate, NSString *option) {
     }
     if (attempt >= 26) {
         self.busy = NO;
+        [self revertTo:!on];
         YTzoomShowNotice([NSString stringWithFormat:YTzoomLocalized(@"Couldn't find \"%@\" in the menu. Pick it yourself, or change the text in YTzoom settings."), option]);
         return;
     }
-    __weak YTzoomHoldAllButton *weakSelf = self;
     dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(0.15 * NSEC_PER_SEC)), dispatch_get_main_queue(), ^{
         [weakSelf waitForOption:option on:on attempt:attempt + 1];
     });
@@ -283,8 +403,8 @@ void YTzoomCommentHoldAttachForInput(UIView *input) {
     [existing removeFromSuperview];
 
     CGFloat side = 36.0;
-    UIView *host = YTzoomHoldAllOwner(input).view;
-    if (host == nil) return;
+    UIView *host = YTzoomHoldAllHost(input);
+    if (host == nil || ![input isDescendantOfView:host]) return;
 
     YTzoomHoldAllButton *button = YTzoomHoldAllMake(input, side);
     button.translatesAutoresizingMaskIntoConstraints = NO;
@@ -297,15 +417,21 @@ void YTzoomCommentHoldAttachForInput(UIView *input) {
     below.priority = UILayoutPriorityDefaultHigh;
     NSLayoutConstraint *right = [button.trailingAnchor constraintEqualToAnchor:input.trailingAnchor constant:-2.0];
     right.priority = UILayoutPriorityDefaultHigh;
-    [NSLayoutConstraint activateConstraints:@[
-        below, right,
-        [button.widthAnchor constraintEqualToConstant:side],
-        [button.heightAnchor constraintEqualToConstant:side],
-        [button.topAnchor constraintGreaterThanOrEqualToAnchor:safe.topAnchor constant:4.0],
-        [button.bottomAnchor constraintLessThanOrEqualToAnchor:safe.bottomAnchor constant:-4.0],
-        [button.trailingAnchor constraintLessThanOrEqualToAnchor:safe.trailingAnchor constant:-4.0],
-        [button.leadingAnchor constraintGreaterThanOrEqualToAnchor:safe.leadingAnchor constant:4.0]
-    ]];
+    @try {
+        [NSLayoutConstraint activateConstraints:@[
+            below, right,
+            [button.widthAnchor constraintEqualToConstant:side],
+            [button.heightAnchor constraintEqualToConstant:side],
+            [button.topAnchor constraintGreaterThanOrEqualToAnchor:safe.topAnchor constant:4.0],
+            [button.bottomAnchor constraintLessThanOrEqualToAnchor:safe.bottomAnchor constant:-4.0],
+            [button.trailingAnchor constraintLessThanOrEqualToAnchor:safe.trailingAnchor constant:-4.0],
+            [button.leadingAnchor constraintGreaterThanOrEqualToAnchor:safe.leadingAnchor constant:4.0]
+        ]];
+    } @catch (NSException *exception) {
+        YTzoomDownloadLog(@"holdall", @"couldn't place the toggle: %@", exception.reason);
+        [button removeFromSuperview];
+        return;
+    }
     objc_setAssociatedObject(input, YTzoomHoldAllAssociation, button, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
     YTzoomDownloadLog(@"holdall", @"attached below %@ host %@", NSStringFromClass(input.class),
                       NSStringFromClass(host.class));

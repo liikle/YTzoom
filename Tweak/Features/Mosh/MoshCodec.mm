@@ -48,6 +48,61 @@ static void YTzoomCodecCopy(CVPixelBufferRef source, CVPixelBufferRef destinatio
     CVPixelBufferUnlockBaseAddress(source, kCVPixelBufferLock_ReadOnly);
 }
 
+// Copies a bi-planar picture through per-plane level maps (decoder output →
+// camera levels); a plain copy when there is nothing to correct.
+static void YTzoomCodecCopyMapped(CVPixelBufferRef source, CVPixelBufferRef destination,
+                                  const uint8_t *lumaMap, const uint8_t *chromaMap) {
+    if (lumaMap == NULL || chromaMap == NULL || !YTzoomCodecIsBiPlanar(CVPixelBufferGetPixelFormatType(source)) ||
+        CVPixelBufferGetPlaneCount(destination) < 2) {
+        YTzoomCodecCopy(source, destination);
+        return;
+    }
+    CVPixelBufferLockBaseAddress(source, kCVPixelBufferLock_ReadOnly);
+    CVPixelBufferLockBaseAddress(destination, 0);
+    for (size_t plane = 0; plane < 2; plane++) {
+        const uint8_t *map = plane == 0 ? lumaMap : chromaMap;
+        const uint8_t *from = (const uint8_t *)CVPixelBufferGetBaseAddressOfPlane(source, plane);
+        uint8_t *to = (uint8_t *)CVPixelBufferGetBaseAddressOfPlane(destination, plane);
+        size_t fromStride = CVPixelBufferGetBytesPerRowOfPlane(source, plane);
+        size_t toStride = CVPixelBufferGetBytesPerRowOfPlane(destination, plane);
+        size_t rows = MIN(CVPixelBufferGetHeightOfPlane(source, plane), CVPixelBufferGetHeightOfPlane(destination, plane));
+        size_t bytes = MIN(CVPixelBufferGetWidthOfPlane(source, plane), CVPixelBufferGetWidthOfPlane(destination, plane)) *
+            (plane == 0 ? 1 : 2);
+        if (from == NULL || to == NULL) continue;
+        for (size_t row = 0; row < rows; row++) {
+            const uint8_t *in = from + row * fromStride;
+            uint8_t *out = to + row * toStride;
+            for (size_t col = 0; col < bytes; col++) out[col] = map[in[col]];
+        }
+    }
+    CVPixelBufferUnlockBaseAddress(destination, 0);
+    CVPixelBufferUnlockBaseAddress(source, kCVPixelBufferLock_ReadOnly);
+}
+
+// Mean and spread of one plane, from a sparse grid.
+static BOOL YTzoomCodecPlaneStats(CVPixelBufferRef buffer, size_t plane, double *mean, double *spread) {
+    if (!CVPixelBufferIsPlanar(buffer) || CVPixelBufferGetPlaneCount(buffer) <= plane) return NO;
+    const uint8_t *base = (const uint8_t *)CVPixelBufferGetBaseAddressOfPlane(buffer, plane);
+    if (base == NULL) return NO;
+    size_t stride = CVPixelBufferGetBytesPerRowOfPlane(buffer, plane);
+    size_t rows = CVPixelBufferGetHeightOfPlane(buffer, plane);
+    size_t bytes = CVPixelBufferGetWidthOfPlane(buffer, plane) * (plane == 0 ? 1 : 2);
+    double sum = 0.0, squares = 0.0, count = 0.0;
+    for (size_t row = 2; row < rows; row += 6) {
+        const uint8_t *line = base + row * stride;
+        for (size_t col = 2; col < bytes; col += 6) {
+            double value = line[col];
+            sum += value;
+            squares += value * value;
+            count += 1.0;
+        }
+    }
+    if (count < 64.0) return NO;
+    *mean = sum / count;
+    *spread = sqrt(MAX(0.0, squares / count - *mean * *mean));
+    return YES;
+}
+
 static float YTzoomCodecMeanDifference(CVPixelBufferRef a, CVPixelBufferRef b) {
     if (a == NULL || b == NULL) return 0.0f;
     CVPixelBufferLockBaseAddress(a, kCVPixelBufferLock_ReadOnly);
@@ -88,6 +143,8 @@ static float YTzoomCodecMeanDifference(CVPixelBufferRef a, CVPixelBufferRef b) {
     CVPixelBufferPoolRef _encodePool;  // copies of camera frames fed to the encoder
 
     CVPixelBufferRef _latestDecoded;   // decoder output, YouTube's format
+    CVPixelBufferRef _spareDecoded;    // the next decoder output is mapped into this, then swapped in
+    os_unfair_lock _outputLock;        // serialises decoder output handling
     CVPixelBufferRef _lastInput;       // most recent encoder input, for ghost strength
     BOOL _hasDecoded;                  // the decoder has produced at least one picture
     BOOL _writeBack;                   // overwrite the camera frame with the decoded picture
@@ -95,9 +152,15 @@ static float YTzoomCodecMeanDifference(CVPixelBufferRef a, CVPixelBufferRef b) {
     int64_t _encodeIndex;              // monotonic, carried as each frame's PTS
     int64_t _desyncAtIndex;            // withhold the first frame at/after this index; -1 when none
     int64_t _retimeCounter;            // unique, increasing decode timestamps
+    int64_t _anchorIndex;              // index of the anchor keyframe in flight; -1 when none
+    CVPixelBufferRef _anchorSource;    // the anchor picture, compared with its decode
+
+    BOOL _correctLevels;               // decoder output needs mapping to the camera's levels
+    uint8_t _lumaMap[256];
+    uint8_t _chromaMap[256];
 
     BOOL _needDecoderParams;           // the decoder's very first frame must be a keyframe
-    BOOL _allowNextKeyframe;           // a keyframe we deliberately asked for (reanchor / clip 1)
+    BOOL _allowNextKeyframe;           // a keyframe we deliberately asked for (clip 1)
     BOOL _allowRecoveryKeyframe;       // the decoder genuinely stalled
     BOOL _forceNextKeyframe;           // force the encoder to emit one on the next encode
     BOOL _allowsRecoveryKeyframes;     // off during a mosh window
@@ -131,7 +194,9 @@ static const int kStallFrames = 150;
     _fps = frameRate;
     _format = pixelFormat;
     _lock = OS_UNFAIR_LOCK_INIT;
+    _outputLock = OS_UNFAIR_LOCK_INIT;
     _desyncAtIndex = -1;
+    _anchorIndex = -1;
     _intensity = 3;
     _allowsRecoveryKeyframes = YES;
     NSDictionary *bufferAttrs = @{
@@ -145,7 +210,10 @@ static const int kStallFrames = 150;
         ![self buildCompression] ||
         CVPixelBufferCreate(kCFAllocatorDefault, width, height, pixelFormat,
                             (__bridge CFDictionaryRef)@{(id)kCVPixelBufferIOSurfacePropertiesKey: @{}},
-                            &_latestDecoded) != kCVReturnSuccess) {
+                            &_latestDecoded) != kCVReturnSuccess ||
+        CVPixelBufferCreate(kCFAllocatorDefault, width, height, pixelFormat,
+                            (__bridge CFDictionaryRef)@{(id)kCVPixelBufferIOSurfacePropertiesKey: @{}},
+                            &_spareDecoded) != kCVReturnSuccess) {
         return nil;
     }
     return self;
@@ -162,6 +230,8 @@ static const int kStallFrames = 150;
     }
     if (_decoderFormat != NULL) CFRelease(_decoderFormat);
     if (_latestDecoded != NULL) CVPixelBufferRelease(_latestDecoded);
+    if (_spareDecoded != NULL) CVPixelBufferRelease(_spareDecoded);
+    if (_anchorSource != NULL) CVPixelBufferRelease(_anchorSource);
     if (_lastInput != NULL) CVPixelBufferRelease(_lastInput);
     if (_encodePool != NULL) CVPixelBufferPoolRelease(_encodePool);
 }
@@ -258,13 +328,73 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
     }
 }
 
-- (void)reanchorWithPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+- (void)anchorToPixelBuffer:(CVPixelBufferRef)pixelBuffer {
+    if (_compression == NULL || pixelBuffer == NULL ||
+        CVPixelBufferGetPixelFormatType(pixelBuffer) != _format ||
+        (int)CVPixelBufferGetWidth(pixelBuffer) != _w || (int)CVPixelBufferGetHeight(pixelBuffer) != _h) {
+        return;
+    }
     os_unfair_lock_lock(&_lock);
-    _forceNextKeyframe = YES;
-    _allowNextKeyframe = YES;
+    int64_t index = _encodeIndex++;
+    _anchorIndex = index;
+    _forceNextKeyframe = NO;
     _desyncAtIndex = -1;
+    if (_anchorSource != NULL) CVPixelBufferRelease(_anchorSource);
+    _anchorSource = CVPixelBufferRetain(pixelBuffer);
+    // Until the keyframe comes back from the decoder, the picture written into
+    // the new clip is the anchor itself: the clip opens on exactly that frame.
+    YTzoomCodecCopy(pixelBuffer, _latestDecoded);
+    _hasDecoded = YES;
+    _framesWithoutOutput = 0;
     os_unfair_lock_unlock(&_lock);
-    if (pixelBuffer != NULL) [self processPixelBuffer:pixelBuffer];
+
+    // Full quality for the picture the whole next clip is built on.
+    _lastAppliedBitrate = kFullBitrate;
+    VTSessionSetProperty(_compression, kVTCompressionPropertyKey_AverageBitRate,
+                         (__bridge CFNumberRef)@(kFullBitrate));
+    NSDictionary *properties = @{(id)kVTEncodeFrameOptionKey_ForceKeyFrame: @YES};
+    OSStatus status = VTCompressionSessionEncodeFrame(_compression, pixelBuffer, CMTimeMake(index, _fps),
+                                                      CMTimeMake(1, _fps), (__bridge CFDictionaryRef)properties,
+                                                      NULL, NULL);
+    if (status != noErr) YTzoomDownloadLog(@"mosh", @"anchor encode failed %d", (int)status);
+}
+
+// The anchor's decode should reproduce the anchor. A systematic difference in
+// level (video vs full range, a gamma or matrix mismatch) shows up as a gain
+// and offset per plane; when it is more than noise, every later decoded picture
+// is mapped back so the mosh keeps the brightness of the frame it continues.
+// Called under _outputLock.
+- (void)calibrateDecoded:(CVPixelBufferRef)decoded against:(CVPixelBufferRef)source {
+    if (!YTzoomCodecIsBiPlanar(_format)) return;
+    double decodedMean = 0, decodedSpread = 0, sourceMean = 0, sourceSpread = 0;
+    double decodedChromaMean = 0, decodedChromaSpread = 0, sourceChromaMean = 0, sourceChromaSpread = 0;
+    CVPixelBufferLockBaseAddress(decoded, kCVPixelBufferLock_ReadOnly);
+    CVPixelBufferLockBaseAddress(source, kCVPixelBufferLock_ReadOnly);
+    BOOL luma = YTzoomCodecPlaneStats(decoded, 0, &decodedMean, &decodedSpread) &&
+                YTzoomCodecPlaneStats(source, 0, &sourceMean, &sourceSpread);
+    BOOL chroma = YTzoomCodecPlaneStats(decoded, 1, &decodedChromaMean, &decodedChromaSpread) &&
+                  YTzoomCodecPlaneStats(source, 1, &sourceChromaMean, &sourceChromaSpread);
+    CVPixelBufferUnlockBaseAddress(source, kCVPixelBufferLock_ReadOnly);
+    CVPixelBufferUnlockBaseAddress(decoded, kCVPixelBufferLock_ReadOnly);
+    // A flat frame can't tell gain from offset; keep what an earlier clip found.
+    if (!luma || sourceSpread < 8.0 || decodedSpread < 8.0) return;
+
+    double gain = MIN(1.2, MAX(0.85, sourceSpread / decodedSpread));
+    double offset = MIN(24.0, MAX(-24.0, sourceMean - gain * decodedMean));
+    double chromaGain = 1.0 + (gain - 1.0) * 0.87;   // video-range chroma spans 224 of 219 luma steps
+    if (chroma && sourceChromaSpread > 6.0 && decodedChromaSpread > 6.0) {
+        chromaGain = MIN(1.2, MAX(0.85, sourceChromaSpread / decodedChromaSpread));
+    }
+    double worst = 0.0;
+    for (int value = 0; value < 256; value++) {
+        double mapped = MIN(255.0, MAX(0.0, gain * value + offset));
+        if (value >= 16 && value <= 235) worst = MAX(worst, fabs(mapped - value));
+        _lumaMap[value] = (uint8_t)lround(mapped);
+        _chromaMap[value] = (uint8_t)lround(MIN(255.0, MAX(0.0, 128.0 + chromaGain * (value - 128.0))));
+    }
+    _correctLevels = worst > 3.0;
+    YTzoomDownloadLog(@"mosh", @"levels gain %.3f offset %.1f chroma %.3f %@", gain, offset, chromaGain,
+                      _correctLevels ? @"corrected" : @"match");
 }
 
 - (float)ghostStrength {
@@ -398,8 +528,10 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
     int64_t thisIndex = CMSampleBufferGetPresentationTimeStamp(sampleBuffer).value;
 
     os_unfair_lock_lock(&_lock);
+    BOOL isAnchor = thisIndex == _anchorIndex;
+    if (isAnchor) _anchorIndex = -1;
     if (isKeyframe) {
-        BOOL allowed = _needDecoderParams || _allowNextKeyframe || _allowRecoveryKeyframe;
+        BOOL allowed = _needDecoderParams || _allowNextKeyframe || _allowRecoveryKeyframe || isAnchor;
         _allowNextKeyframe = NO;
         _allowRecoveryKeyframe = NO;
         if (!allowed) {
@@ -410,7 +542,7 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
         }
         _needDecoderParams = NO;
     }
-    if (_desyncAtIndex >= 0 && thisIndex >= _desyncAtIndex) {
+    if (!isAnchor && _desyncAtIndex >= 0 && thisIndex >= _desyncAtIndex) {
         // Withhold the first frame of the new clip, matched by its own index so
         // a stale in-flight frame from the previous clip doesn't spend it.
         _desyncAtIndex = -1;
@@ -424,7 +556,7 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
 
     for (int pass = 0; pass < repeats; pass++) {
         BOOL shown = pass == repeats - 1;
-        [self submitToDecoder:sampleBuffer shown:shown];
+        [self submitToDecoder:sampleBuffer tag:shown ? (isAnchor ? 2 : 1) : 0];
     }
 }
 
@@ -463,7 +595,8 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
     return YES;
 }
 
-- (void)submitToDecoder:(CMSampleBufferRef)sampleBuffer shown:(BOOL)shown {
+// tag: 0 a hidden duplicate, 1 shown, 2 shown and the anchor keyframe.
+- (void)submitToDecoder:(CMSampleBufferRef)sampleBuffer tag:(intptr_t)tag {
     // A decoder discards a picture whose PTS isn't ahead of the last, so every
     // submission (duplicates included) gets a fresh, increasing timestamp.
     os_unfair_lock_lock(&_lock);
@@ -483,23 +616,41 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
     VTDecodeInfoFlags info = 0;
     VTDecompressionSessionDecodeFrame(_decompression, retimed,
                                       kVTDecodeFrame_EnableAsynchronousDecompression,
-                                      (void *)(intptr_t)(shown ? 1 : 0), &info);
+                                      (void *)tag, &info);
     CFRelease(retimed);
 }
 
-- (void)handleDecoded:(CVImageBufferRef)imageBuffer shown:(BOOL)shown {
-    if (imageBuffer == NULL || !shown) return;
+- (void)handleDecoded:(CVImageBufferRef)imageBuffer tag:(intptr_t)tag {
+    if (imageBuffer == NULL || tag == 0) return;
     if (CVPixelBufferGetWidth(imageBuffer) != (size_t)_w ||
         CVPixelBufferGetHeight(imageBuffer) != (size_t)_h ||
         CVPixelBufferGetPixelFormatType(imageBuffer) != _format) {
         return;
     }
+    // Map into the spare picture off the main lock, then swap it in, so the
+    // capture queue's write-back never waits on a full-frame conversion.
+    os_unfair_lock_lock(&_outputLock);
+    if (tag == 2) {
+        os_unfair_lock_lock(&_lock);
+        CVPixelBufferRef anchor = _anchorSource;
+        _anchorSource = NULL;
+        os_unfair_lock_unlock(&_lock);
+        if (anchor != NULL) {
+            [self calibrateDecoded:imageBuffer against:anchor];
+            CVPixelBufferRelease(anchor);
+        }
+    }
+    YTzoomCodecCopyMapped(imageBuffer, _spareDecoded, _correctLevels ? _lumaMap : NULL,
+                          _correctLevels ? _chromaMap : NULL);
     os_unfair_lock_lock(&_lock);
-    YTzoomCodecCopy(imageBuffer, _latestDecoded);
+    CVPixelBufferRef previous = _latestDecoded;
+    _latestDecoded = _spareDecoded;
+    _spareDecoded = previous;
     _hasDecoded = YES;
     _framesWithoutOutput = 0;
     if (_lastInput != NULL) _ghost = YTzoomCodecMeanDifference(_latestDecoded, _lastInput);
     os_unfair_lock_unlock(&_lock);
+    os_unfair_lock_unlock(&_outputLock);
 }
 
 @end
@@ -521,5 +672,5 @@ static void YTzoomCodecDecompressionOutput(void *decompressionOutputRefCon, void
     (void)presentationDuration;
     if (status != noErr || imageBuffer == NULL) return;
     [(__bridge MoshCodec *)decompressionOutputRefCon handleDecoded:imageBuffer
-                                                             shown:(intptr_t)sourceFrameRefCon != 0];
+                                                               tag:(intptr_t)sourceFrameRefCon];
 }

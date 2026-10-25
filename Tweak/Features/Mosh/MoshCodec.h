@@ -60,10 +60,15 @@ NS_ASSUME_NONNULL_BEGIN
 /// held reference, which is the effect.
 - (BOOL)processPixelBuffer:(CVPixelBufferRef)pixelBuffer;
 
-/// Undo support: the next frame becomes a deliberate keyframe carrying the
-/// picture that now ends the project, so the following clip moshes out of it
-/// rather than out of a clip that was deleted.
-- (void)reanchorWithPixelBuffer:(CVPixelBufferRef)pixelBuffer;
+/// Anchors the stream on `pixelBuffer`, the exact last frame recorded so far
+/// (an owned copy that stays unmodified). It is encoded as a deliberate
+/// keyframe and becomes the written-back picture immediately, so the next
+/// clip opens on precisely that frame and moshes out of it. The decoded
+/// keyframe is also compared with it to correct any level shift (e.g. video
+/// vs full range) in the decoder's output, so the mosh never comes out lighter
+/// or darker than the frame it continues. Called at the start of every clip
+/// after the first, including after a clip was deleted.
+- (void)anchorToPixelBuffer:(CVPixelBufferRef)pixelBuffer;
 
 /// How far the decoder has drifted from the encoder's input, 0 when no mosh is
 /// running. Drives the ghost-hide and a UI meter.
